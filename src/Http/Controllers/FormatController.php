@@ -217,9 +217,14 @@ class FormatController
             'y'       => round((float) ($e['y'] ?? 10), 1),
             'w'       => round((float) ($e['w'] ?? 40), 1),
             'h'       => round((float) ($e['h'] ?? 10), 1),
-            'size'    => (int) ($e['size'] ?? 11),
-            'align'   => in_array(($e['align'] ?? 'left'), ['left', 'center', 'right'], true) ? $e['align'] : 'left',
-            'bold'    => (bool) ($e['bold'] ?? false),
+            'size'      => (int) ($e['size'] ?? 11),
+            'align'     => in_array(($e['align'] ?? 'left'), ['left', 'center', 'right'], true) ? ($e['align'] ?? 'left') : 'left',
+            'bold'      => (bool) ($e['bold'] ?? false),
+            'italic'    => (bool) ($e['italic'] ?? false),
+            'underline' => (bool) ($e['underline'] ?? false),
+            'font'      => in_array(($e['font'] ?? 'DejaVu Sans'), ['DejaVu Sans', 'DejaVu Serif', 'DejaVu Sans Mono'], true) ? ($e['font'] ?? 'DejaVu Sans') : 'DejaVu Sans',
+            'color'     => preg_match('/^#[0-9a-fA-F]{6}$/', (string) ($e['color'] ?? '')) ? $e['color'] : '#1f2937',
+            'bg'        => (isset($e['bg']) && preg_match('/^#[0-9a-fA-F]{6}$/', (string) $e['bg'])) ? $e['bg'] : null,
         ];
 
         if ($typ === 'bild') {

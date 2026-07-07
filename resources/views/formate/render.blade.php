@@ -28,7 +28,13 @@
                         $size = $el['size'] ?? 11;
                         $align = $el['align'] ?? 'left';
                         $weight = ($el['bold'] ?? false) ? 'bold' : 'normal';
-                        $style = "left:{$x}mm;top:{$y}mm;width:{$w}mm;height:{$h}mm;font-size:{$size}pt;text-align:{$align};font-weight:{$weight};";
+                        $fstyle = ($el['italic'] ?? false) ? 'italic' : 'normal';
+                        $deco = ($el['underline'] ?? false) ? 'underline' : 'none';
+                        $font = $el['font'] ?? 'DejaVu Sans';
+                        $color = $el['color'] ?? '#1f2937';
+                        $bg = $el['bg'] ?? null;
+                        $style = "left:{$x}mm;top:{$y}mm;width:{$w}mm;height:{$h}mm;font-size:{$size}pt;text-align:{$align};font-weight:{$weight};font-style:{$fstyle};text-decoration:{$deco};font-family:'{$font}';color:{$color};"
+                            . ($bg ? "background-color:{$bg};" : '');
                     @endphp
 
                     @if ($el['typ'] === 'text')

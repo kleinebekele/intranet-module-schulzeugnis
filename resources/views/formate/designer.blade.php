@@ -53,6 +53,12 @@
         #dz-props .dz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         #dz-props .dz-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: #374151; }
         #dz-props .dz-check input { margin-top: 0; width: auto; }
+        #dz-props .dz-fmt { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+        #dz-props .dz-fmt .dz-check { margin-top: 0; }
+        #dz-props input[type=color] { width: 100%; height: 30px; margin-top: 2px; padding: 2px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; }
+        #dz-props .dz-bg { display: flex; align-items: center; gap: 6px; }
+        #dz-props .dz-bg input[type=checkbox] { margin-top: 0; width: auto; }
+        #dz-props .dz-bg input[type=color] { flex: 1; }
         #dz-props .dz-typ { display: inline-block; font-size: 12px; font-weight: 600; color: #4f46e5; background: #eef2ff; border-radius: 999px; padding: 2px 10px; }
         #dz-props .dz-btn { margin-top: 10px; width: 100%; border: 1px solid #d1d5db; color: #374151; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
         #dz-props .dz-btn:hover { background: #f9fafb; }
@@ -183,6 +189,15 @@
                 d.style.fontSize = (el.size * 0.3528 * SCALE) + 'px';
                 d.style.textAlign = el.align || 'left';
                 d.style.fontWeight = el.bold ? '700' : '400';
+                if (['text', 'feld', 'block', 'unterschrift'].includes(el.typ)) {
+                    const fam = el.font || 'DejaVu Sans';
+                    const generic = (fam.indexOf('Mono') >= 0) ? 'monospace' : (fam.indexOf('Serif') >= 0) ? 'serif' : 'sans-serif';
+                    d.style.fontFamily = '"' + fam + '", ' + generic;
+                    d.style.fontStyle = el.italic ? 'italic' : 'normal';
+                    d.style.textDecoration = el.underline ? 'underline' : 'none';
+                    d.style.color = el.color || '#1f2937';
+                    d.style.background = el.bg || 'transparent';
+                }
                 d.innerHTML = displayHtml(el);
                 d.addEventListener('mousedown', (e) => startDrag(e, i));
                 if (i === STATE.sel) {
@@ -291,6 +306,7 @@
                     '</select></label>';
             }
             if (hasFont) {
+                const f = el.font || 'DejaVu Sans';
                 html += '<div class="dz-grid">' +
                     '<label>Schrift (pt)<input id="dzp-size" type="number" step="1" value="' + el.size + '"></label>' +
                     '<label>Ausrichtung<select id="dzp-align">' +
@@ -299,7 +315,20 @@
                     '<option value="right"' + (el.align === 'right' ? ' selected' : '') + '>rechts</option>' +
                     '</select></label>' +
                     '</div>' +
-                    '<label class="dz-check"><input id="dzp-bold" type="checkbox"' + (el.bold ? ' checked' : '') + '> Fett</label>';
+                    '<div class="dz-fmt">' +
+                    '<label class="dz-check"><input id="dzp-bold" type="checkbox"' + (el.bold ? ' checked' : '') + '> <b>F</b></label>' +
+                    '<label class="dz-check"><input id="dzp-italic" type="checkbox"' + (el.italic ? ' checked' : '') + '> <i>K</i></label>' +
+                    '<label class="dz-check"><input id="dzp-underline" type="checkbox"' + (el.underline ? ' checked' : '') + '> <u>U</u></label>' +
+                    '</div>' +
+                    '<label>Schriftart<select id="dzp-font">' +
+                    '<option value="DejaVu Sans"' + (f === 'DejaVu Sans' ? ' selected' : '') + '>Standard (Sans)</option>' +
+                    '<option value="DejaVu Serif"' + (f === 'DejaVu Serif' ? ' selected' : '') + '>Serif</option>' +
+                    '<option value="DejaVu Sans Mono"' + (f === 'DejaVu Sans Mono' ? ' selected' : '') + '>Monospace</option>' +
+                    '</select></label>' +
+                    '<div class="dz-grid">' +
+                    '<label>Textfarbe<input id="dzp-color" type="color" value="' + (el.color || '#1f2937') + '"></label>' +
+                    '<label>Hintergrund<span class="dz-bg"><input id="dzp-bgon" type="checkbox"' + (el.bg ? ' checked' : '') + '><input id="dzp-bg" type="color" value="' + (el.bg || '#fff59d') + '"></span></label>' +
+                    '</div>';
             }
             if (isBild) html += '<button id="dzp-bildreplace" class="dz-btn" type="button">Bild ersetzen …</button>';
             html += '<button id="dzp-del" class="dz-del" type="button">Element löschen</button>';
@@ -318,6 +347,12 @@
             on('dzp-size', 'input', (e) => { el.size = Math.max(5, +e.target.value || 11); render(); });
             on('dzp-align', 'change', (e) => { el.align = e.target.value; render(); });
             on('dzp-bold', 'change', (e) => { el.bold = e.target.checked; render(); });
+            on('dzp-italic', 'change', (e) => { el.italic = e.target.checked; render(); });
+            on('dzp-underline', 'change', (e) => { el.underline = e.target.checked; render(); });
+            on('dzp-font', 'change', (e) => { el.font = e.target.value; render(); });
+            on('dzp-color', 'input', (e) => { el.color = e.target.value; render(); });
+            on('dzp-bgon', 'change', (e) => { el.bg = e.target.checked ? document.getElementById('dzp-bg').value : null; render(); });
+            on('dzp-bg', 'input', (e) => { if (document.getElementById('dzp-bgon').checked) { el.bg = e.target.value; render(); } });
             on('dzp-bildreplace', 'click', () => { fileMode = 'replace'; fileTarget = STATE.sel; fileInput.value = ''; fileInput.click(); });
             on('dzp-del', 'click', () => { STATE.elements.splice(STATE.sel, 1); STATE.sel = -1; renderProps(); render(); });
         }
