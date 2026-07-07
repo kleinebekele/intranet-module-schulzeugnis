@@ -43,7 +43,7 @@
                     <a href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank" title="Vorschau"
                        class="inline-flex items-center justify-center rounded-lg border border-indigo-200 p-2 text-lg text-indigo-600 hover:bg-indigo-50"><i class="bx bx-show"></i></a>
                     <a href="{{ route('module.schulzeugnis.formate.pdf', $format) }}" target="_blank" title="PDF"
-                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-file"></i></a>
+                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bxs-file-pdf"></i></a>
                     <a href="{{ route('module.schulzeugnis.formate.edit', $format) }}" title="Bearbeiten"
                        class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-cog"></i></a>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.duplicate', $format) }}">
