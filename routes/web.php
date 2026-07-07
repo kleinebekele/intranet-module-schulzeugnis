@@ -61,6 +61,7 @@ Route::middleware(['web', 'auth'])
         Route::post('formate/{format}/bild', [FormatController::class, 'uploadBild'])->name('formate.bild');
         Route::put('formate/{format}', [FormatController::class, 'update'])->name('formate.update');
         Route::post('formate/{format}/archivieren', [FormatController::class, 'toggle'])->name('formate.toggle');
+        Route::post('formate/{format}/duplizieren', [FormatController::class, 'duplicate'])->name('formate.duplicate');
         Route::delete('formate/{format}', [FormatController::class, 'destroy'])->name('formate.destroy');
 
         // Lehrer – je Schuljahr (Verknüpfung zum Core-Konto über core_user_id, kein FK).

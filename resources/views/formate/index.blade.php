@@ -54,6 +54,13 @@
                        class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
                         Bearbeiten
                     </a>
+                    <form method="POST" action="{{ route('module.schulzeugnis.formate.duplicate', $format) }}">
+                        @csrf
+                        <button type="submit"
+                                class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+                            Duplizieren
+                        </button>
+                    </form>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.toggle', $format) }}">
                         @csrf
                         <button type="submit"

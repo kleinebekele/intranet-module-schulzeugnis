@@ -75,6 +75,21 @@ class FormatController
             ->with('status', "Format {$format->name} " . ($format->aktiv ? 'reaktiviert.' : 'archiviert.'));
     }
 
+    public function duplicate(Format $format)
+    {
+        $kopie = $format->replicate();
+        $kopie->name = $format->name . ' (Kopie)';
+        $kopie->save();
+
+        Protokoll::log('format_dupliziert', [
+            'beschreibung' => "Zeugnisformat {$format->name} dupliziert",
+        ]);
+
+        return redirect()
+            ->route('module.schulzeugnis.formate.index')
+            ->with('status', "Format {$format->name} als Kopie dupliziert.");
+    }
+
     public function destroy(Format $format)
     {
         $verwendet = DB::table('zeugnis_klassen')->where('standard_format_id', $format->id)->exists()
