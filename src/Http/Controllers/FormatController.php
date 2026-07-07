@@ -139,9 +139,12 @@ class FormatController
     /** Layout aus dem Editor entgegennehmen und am Format speichern. */
     public function saveLayout(Request $request, Format $format)
     {
-        $roh = $request->input('elemente', []);
+        // Rohes JSON lesen (nicht $request->input), damit die TrimStrings-Middleware
+        // keine führenden/abschließenden Leerzeichen in Texten entfernt.
+        $payload = json_decode($request->getContent(), true);
+        $roh = (is_array($payload) && is_array($payload['elemente'] ?? null)) ? $payload['elemente'] : [];
 
-        $elemente = collect(is_array($roh) ? $roh : [])
+        $elemente = collect($roh)
             ->map(fn ($e) => $this->sanitizeElement($e))
             ->filter()
             ->values()

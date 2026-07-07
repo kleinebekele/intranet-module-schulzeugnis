@@ -66,6 +66,17 @@
         #dz-props .dz-del { margin-top: 14px; width: 100%; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
         #dz-props .dz-del:hover { background: #fef2f2; }
         #dz-app .dz-hint { font-size: 12px; color: #9ca3af; }
+        #dz-varhelp { margin-top: 12px; color: #4f46e5; border-color: #c7d2fe; }
+        #dz-modal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 60; align-items: center; justify-content: center; padding: 20px; }
+        #dz-modal.dz-open { display: flex; }
+        #dz-modal .dz-box { background: #fff; border-radius: 14px; max-width: 540px; width: 100%; max-height: 82vh; overflow: auto; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+        #dz-modal h2 { font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 8px; }
+        #dz-modal p { font-size: 14px; color: #4b5563; margin: 0 0 14px; line-height: 1.5; }
+        #dz-modal table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        #dz-modal th, #dz-modal td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eef2f7; }
+        #dz-modal th { color: #6b7280; font-weight: 600; }
+        #dz-modal code { background: #eef2ff; color: #4f46e5; padding: 1px 6px; border-radius: 5px; }
+        #dz-modal .dz-close { margin-top: 16px; background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
     </style>
 
     <div id="dz-app">
@@ -79,6 +90,7 @@
                 <button class="dz-add" data-typ="bild">+ Logo / Bild</button>
                 <button class="dz-add" data-typ="linie">+ Linie</button>
                 <input type="file" id="dz-file" accept="image/*" style="display:none">
+                <button id="dz-varhelp" class="dz-add" type="button">? Variablen erklären</button>
                 <p class="dz-hint" id="dz-pagehint" style="margin-top:12px;"></p>
                 <p class="dz-hint" style="margin-top:8px;">Element anklicken zum Auswählen, ziehen zum Verschieben, an den blauen Griffen die Größe ändern. Danach <strong>Speichern</strong>.</p>
             </div>
@@ -93,6 +105,15 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Eigenschaften</p>
                 <div id="dz-props"></div>
             </div>
+        </div>
+    </div>
+
+    <div id="dz-modal">
+        <div class="dz-box">
+            <h2>Variablen in Textfeldern</h2>
+            <p>In einem <strong>„Statischer Text"</strong>-Feld kannst du Platzhalter in geschweiften Klammern verwenden – beim Erstellen des Zeugnisses werden sie automatisch mit den echten Daten des Schülers gefüllt.<br><br>Beispiel:<br><code>erhält für die Klasse {Klasse} im Schuljahr {Schuljahr} folgendes Zeugnis:</code></p>
+            <table><thead><tr><th>Variable</th><th>Beispiel-Inhalt</th></tr></thead><tbody id="dz-vartable"></tbody></table>
+            <button id="dz-modal-close" class="dz-close" type="button">Verstanden</button>
         </div>
     </div>
 
@@ -414,6 +435,13 @@
         document.querySelectorAll('.dz-add').forEach((b) => b.addEventListener('click', () => add(b.dataset.typ)));
         document.getElementById('dz-save').addEventListener('click', save);
         fileInput.addEventListener('change', onFile);
+
+        document.getElementById('dz-varhelp').addEventListener('click', () => {
+            document.getElementById('dz-vartable').innerHTML = Object.keys(VARIABLEN).map((k) => '<tr><td><code>{' + k + '}</code></td><td>' + esc(DATEN[VARIABLEN[k]] || '') + '</td></tr>').join('');
+            document.getElementById('dz-modal').classList.add('dz-open');
+        });
+        document.getElementById('dz-modal-close').addEventListener('click', () => document.getElementById('dz-modal').classList.remove('dz-open'));
+        document.getElementById('dz-modal').addEventListener('click', (e) => { if (e.target.id === 'dz-modal') e.currentTarget.classList.remove('dz-open'); });
 
         buildPages();
         render();
