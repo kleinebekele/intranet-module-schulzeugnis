@@ -39,29 +39,29 @@
 
                 <div class="flex items-center gap-2">
                     <a href="{{ route('module.schulzeugnis.formate.designer', $format) }}" title="Designer"
-                       class="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-2 text-lg text-white hover:bg-indigo-700"><i class="bx bx-layout"></i></a>
+                       class="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-2.5 text-2xl text-white hover:bg-indigo-700"><i class="bx bx-layout"></i></a>
                     <a href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank" title="Vorschau"
-                       class="inline-flex items-center justify-center rounded-lg border border-indigo-200 p-2 text-lg text-indigo-600 hover:bg-indigo-50"><i class="bx bx-show"></i></a>
+                       class="inline-flex items-center justify-center rounded-lg border border-indigo-200 p-2.5 text-2xl text-indigo-600 hover:bg-indigo-50"><i class="bx bx-show"></i></a>
                     <a href="{{ route('module.schulzeugnis.formate.pdf', $format) }}" target="_blank" title="PDF"
-                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bxs-file-pdf"></i></a>
+                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bxs-file-pdf"></i></a>
                     <a href="{{ route('module.schulzeugnis.formate.edit', $format) }}" title="Bearbeiten"
-                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-cog"></i></a>
+                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bx-cog"></i></a>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.duplicate', $format) }}">
                         @csrf
                         <button type="submit" title="Duplizieren"
-                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-copy"></i></button>
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bx-copy"></i></button>
                     </form>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.toggle', $format) }}">
                         @csrf
                         <button type="submit" title="{{ $format->aktiv ? 'Archivieren' : 'Reaktivieren' }}"
-                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx {{ $format->aktiv ? 'bx-archive-in' : 'bx-archive-out' }}"></i></button>
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx {{ $format->aktiv ? 'bx-archive-in' : 'bx-archive-out' }}"></i></button>
                     </form>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.destroy', $format) }}"
                           onsubmit="return confirm('Format {{ $format->name }} wirklich löschen?');">
                         @csrf
                         @method('DELETE')
                         <button type="submit" title="Löschen"
-                                class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-lg text-red-600 hover:bg-red-50"><i class="bx bx-trash"></i></button>
+                                class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2.5 text-2xl text-red-600 hover:bg-red-50"><i class="bx bx-trash"></i></button>
                     </form>
                 </div>
             </div>
