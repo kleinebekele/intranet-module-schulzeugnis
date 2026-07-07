@@ -30,7 +30,9 @@
         #dz-app .dz-side { width: 220px; flex: none; }
         #dz-app .dz-canvas { flex: 1; overflow: auto; max-height: 78vh; background: #f3f4f6; border-radius: 12px; padding: 24px; }
         #dz-pages { display: flex; flex-direction: column; gap: 22px; align-items: center; }
-        .dz-pagelabel { font-size: 12px; color: #6b7280; margin-bottom: 6px; text-align: center; }
+        .dz-pagelabel { font-size: 12px; color: #6b7280; text-align: center; }
+        .dz-pagebar { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px; }
+        .dz-swap { font-size: 12px; border: 1px solid #d1d5db; border-radius: 6px; padding: 2px 6px; color: #4f46e5; background: #fff; cursor: pointer; }
         .dz-page { position: relative; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.15); }
         .dz-page.dz-active { outline: 2px solid #a5b4fc; }
         .dz-el { position: absolute; overflow: hidden; box-sizing: border-box; cursor: move; border: 1px dashed transparent; line-height: 1.3; padding: 0 1px; }
@@ -120,10 +122,20 @@
             for (let n = 1; n <= PAGES; n++) {
                 const block = document.createElement('div');
                 if (PAGES > 1) {
-                    const lab = document.createElement('div');
+                    const bar = document.createElement('div');
+                    bar.className = 'dz-pagebar';
+                    const lab = document.createElement('span');
                     lab.className = 'dz-pagelabel';
                     lab.textContent = pageLabel(n);
-                    block.appendChild(lab);
+                    bar.appendChild(lab);
+                    const sel = document.createElement('select');
+                    sel.className = 'dz-swap';
+                    let opts = '<option value="">Seite tauschen mit …</option>';
+                    for (let m = 1; m <= PAGES; m++) if (m !== n) opts += '<option value="' + m + '">Seite ' + m + ' (' + (LABELS[m - 1] || '') + ')</option>';
+                    sel.innerHTML = opts;
+                    sel.addEventListener('change', () => { if (sel.value) { swapPages(n, +sel.value); sel.value = ''; } });
+                    bar.appendChild(sel);
+                    block.appendChild(bar);
                 }
                 const pg = document.createElement('div');
                 pg.className = 'dz-page';
@@ -228,6 +240,18 @@
             STATE.sel = i;
             if (i >= 0) STATE.activePage = STATE.elements[i].seite || 1;
             renderProps(); render();
+        }
+
+        function swapPages(a, b) {
+            STATE.elements.forEach((el) => {
+                const s = el.seite || 1;
+                if (s === a) el.seite = b;
+                else if (s === b) el.seite = a;
+            });
+            STATE.sel = -1;
+            STATE.activePage = b;
+            renderProps(); render();
+            statusEl.textContent = 'Seiten ' + a + ' und ' + b + ' getauscht (noch nicht gespeichert)';
         }
 
         function renderProps() {
