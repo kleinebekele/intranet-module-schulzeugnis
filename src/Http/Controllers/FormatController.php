@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
@@ -154,6 +155,26 @@ class FormatController
         return response()->json(['ok' => true, 'anzahl' => count($elemente)]);
     }
 
+    /** Bild/Logo hochladen (auf die public-Disk), gibt Pfad + URL zurück. */
+    public function uploadBild(Request $request, Format $format)
+    {
+        $request->validate([
+            'bild' => ['required', 'file', 'mimes:jpeg,jpg,png,gif,webp', 'max:4096'],
+        ]);
+
+        $path = $request->file('bild')->store("schulzeugnis/{$format->id}", 'public');
+
+        Protokoll::log('format_bild_hochgeladen', [
+            'beschreibung' => "Bild für Format {$format->name} hochgeladen",
+        ]);
+
+        return response()->json([
+            'ok'   => true,
+            'path' => $path,
+            'url'  => Storage::disk('public')->url($path),
+        ]);
+    }
+
     /** Verfügbare Datenbindungen für die Palette. */
     private function bindungen(): array
     {
@@ -183,11 +204,11 @@ class FormatController
         }
 
         $typ = $e['typ'] ?? 'text';
-        if (! in_array($typ, ['text', 'feld', 'block', 'unterschrift'], true)) {
+        if (! in_array($typ, ['text', 'feld', 'block', 'unterschrift', 'bild', 'linie'], true)) {
             return null;
         }
 
-        return [
+        $out = [
             'typ'     => $typ,
             'seite'   => max(1, (int) ($e['seite'] ?? 1)),
             'bindung' => isset($e['bindung']) ? (string) $e['bindung'] : null,
@@ -200,17 +221,54 @@ class FormatController
             'align'   => in_array(($e['align'] ?? 'left'), ['left', 'center', 'right'], true) ? $e['align'] : 'left',
             'bold'    => (bool) ($e['bold'] ?? false),
         ];
+
+        if ($typ === 'bild') {
+            $out['bild'] = isset($e['bild']) ? (string) $e['bild'] : null;
+        }
+        if ($typ === 'linie') {
+            $out['staerke'] = round((float) ($e['staerke'] ?? 0.3), 2);
+        }
+
+        return $out;
     }
 
     /** @return array<string,mixed> */
     private function renderDaten(Format $format): array
     {
-        $elemente = $format->layout ?: $this->standardLayout();
+        $elemente = $this->resolveBilder($format->layout ?: $this->standardLayout());
 
         return [
             'seiten' => $this->baueSeiten($format, $elemente),
             'daten'  => $this->beispielDaten(),
         ];
+    }
+
+    /**
+     * Bild-Elemente in einbettbare data-URIs auflösen (für Browser-Vorschau UND PDF).
+     *
+     * @param  array<int,array<string,mixed>>  $elemente
+     * @return array<int,array<string,mixed>>
+     */
+    private function resolveBilder(array $elemente): array
+    {
+        return array_map(function ($e) {
+            if (($e['typ'] ?? '') === 'bild' && ! empty($e['bild'])) {
+                $e['src'] = $this->bildDataUri($e['bild']);
+            }
+
+            return $e;
+        }, $elemente);
+    }
+
+    private function bildDataUri(string $path): ?string
+    {
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($path)) {
+            return null;
+        }
+
+        return 'data:' . ($disk->mimeType($path) ?: 'image/png') . ';base64,' . base64_encode($disk->get($path));
     }
 
     /**

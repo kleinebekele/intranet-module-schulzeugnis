@@ -45,6 +45,12 @@
                         <div class="el" style="{{ $style }}white-space: pre-line;">{{ $val($el['bindung'] ?? '') }}</div>
                     @elseif ($el['typ'] === 'unterschrift')
                         <div class="el sig" style="{{ $style }}">{{ $val($el['bindung'] ?? '') ?: ($el['text'] ?? '') }}</div>
+                    @elseif ($el['typ'] === 'bild')
+                        @if (! empty($el['src']))
+                            <img style="position:absolute;left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:{{ $h }}mm;object-fit:contain;" src="{{ $el['src'] }}">
+                        @endif
+                    @elseif ($el['typ'] === 'linie')
+                        <div class="el" style="left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:0;border-top:{{ $el['staerke'] ?? 0.3 }}mm solid #374151;"></div>
                     @endif
                 @endforeach
             </div>

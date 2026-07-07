@@ -58,6 +58,7 @@ Route::middleware(['web', 'auth'])
         Route::get('formate/{format}/pdf', [FormatController::class, 'pdf'])->name('formate.pdf');
         Route::get('formate/{format}/designer', [FormatController::class, 'designer'])->name('formate.designer');
         Route::put('formate/{format}/layout', [FormatController::class, 'saveLayout'])->name('formate.layout');
+        Route::post('formate/{format}/bild', [FormatController::class, 'uploadBild'])->name('formate.bild');
         Route::put('formate/{format}', [FormatController::class, 'update'])->name('formate.update');
         Route::post('formate/{format}/archivieren', [FormatController::class, 'toggle'])->name('formate.toggle');
         Route::delete('formate/{format}', [FormatController::class, 'destroy'])->name('formate.destroy');

@@ -36,6 +36,7 @@
         .dz-el { position: absolute; overflow: hidden; box-sizing: border-box; cursor: move; border: 1px dashed transparent; line-height: 1.3; padding: 0 1px; }
         .dz-el:hover { border-color: #c7d2fe; }
         .dz-el.dz-sel { border: 1px solid #6366f1; z-index: 5; }
+        .dz-el img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
         .dz-el b { display: block; }
         .dz-sig { border-top: 1px solid #374151; padding-top: 2px; }
         .dz-h { position: absolute; width: 10px; height: 10px; background: #6366f1; border: 1px solid #fff; box-sizing: border-box; }
@@ -51,6 +52,8 @@
         #dz-props .dz-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: #374151; }
         #dz-props .dz-check input { margin-top: 0; width: auto; }
         #dz-props .dz-typ { display: inline-block; font-size: 12px; font-weight: 600; color: #4f46e5; background: #eef2ff; border-radius: 999px; padding: 2px 10px; }
+        #dz-props .dz-btn { margin-top: 10px; width: 100%; border: 1px solid #d1d5db; color: #374151; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
+        #dz-props .dz-btn:hover { background: #f9fafb; }
         #dz-props .dz-del { margin-top: 14px; width: 100%; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
         #dz-props .dz-del:hover { background: #fef2f2; }
         #dz-app .dz-hint { font-size: 12px; color: #9ca3af; }
@@ -64,6 +67,9 @@
                 <button class="dz-add" data-typ="feld">+ Datenfeld</button>
                 <button class="dz-add" data-typ="block">+ Textblock</button>
                 <button class="dz-add" data-typ="unterschrift">+ Unterschrift</button>
+                <button class="dz-add" data-typ="bild">+ Logo / Bild</button>
+                <button class="dz-add" data-typ="linie">+ Linie</button>
+                <input type="file" id="dz-file" accept="image/*" style="display:none">
                 <p class="dz-hint" id="dz-pagehint" style="margin-top:12px;"></p>
                 <p class="dz-hint" style="margin-top:8px;">Element anklicken zum Auswählen, ziehen zum Verschieben, an den blauen Griffen die Größe ändern. Danach <strong>Speichern</strong>.</p>
             </div>
@@ -90,8 +96,10 @@
         const LABELS = @json($seitenLabels);
         const SCALE = 2.5;
         const SAVE_URL = @json(route('module.schulzeugnis.formate.layout', $format));
+        const UPLOAD_URL = @json(route('module.schulzeugnis.formate.bild', $format));
+        const BILD_BASE = '/storage/';
         const CSRF = @json(csrf_token());
-        const TYPLABEL = { text: 'Statischer Text', feld: 'Datenfeld', block: 'Textblock', unterschrift: 'Unterschrift' };
+        const TYPLABEL = { text: 'Statischer Text', feld: 'Datenfeld', block: 'Textblock', unterschrift: 'Unterschrift', bild: 'Logo / Bild', linie: 'Linie' };
 
         STATE.elements.forEach((e) => { if (!e.seite) e.seite = 1; });
 
@@ -99,7 +107,9 @@
         const props = document.getElementById('dz-props');
         const statusEl = document.getElementById('dz-status');
         const pageHint = document.getElementById('dz-pagehint');
+        const fileInput = document.getElementById('dz-file');
         const pageDivs = {};
+        let fileMode = 'add', fileTarget = -1;
 
         const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         const r1 = (n) => Math.round(n * 10) / 10;
@@ -133,6 +143,8 @@
             if (el.typ === 'text') return esc(el.text || '(Text)');
             if (el.typ === 'unterschrift') return '<div class="dz-sig">' + esc(el.text || DATEN['unterschrift'] || '') + '</div>';
             if (el.typ === 'feld') return esc(el.bindung in DATEN ? DATEN[el.bindung] : '{' + (el.bindung || '') + '}');
+            if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:#9ca3af;">Bild wählen …</span>';
+            if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm solid #374151;"></div>';
             if (el.typ === 'block') {
                 if (el.bindung === 'fachtexte') {
                     return (DATEN['fachtexte'] || []).map((f) => '<b>' + esc(f.fach) + '</b>' + esc(f.text)).join('');
@@ -223,34 +235,43 @@
             if (!el) { props.innerHTML = '<p class="dz-hint">Kein Element ausgewählt.</p>'; return; }
             const isText = el.typ === 'text' || el.typ === 'unterschrift';
             const isBind = el.typ === 'feld' || el.typ === 'block';
-            const bindOpts = Object.keys(BINDUNGEN).map((k) => '<option value="' + k + '"' + (el.bindung === k ? ' selected' : '') + '>' + esc(BINDUNGEN[k]) + '</option>').join('');
-            let seiteFeld = '';
+            const isBild = el.typ === 'bild';
+            const isLinie = el.typ === 'linie';
+            const hasFont = isText || isBind;
+
+            let html = '<div style="margin-top:6px;"><span class="dz-typ">' + TYPLABEL[el.typ] + '</span></div>';
+
             if (PAGES > 1) {
                 let opts = '';
                 for (let n = 1; n <= PAGES; n++) opts += '<option value="' + n + '"' + ((el.seite || 1) === n ? ' selected' : '') + '>' + esc(pageLabel(n)) + '</option>';
-                seiteFeld = '<label>Seite<select id="dzp-seite">' + opts + '</select></label>';
+                html += '<label>Seite<select id="dzp-seite">' + opts + '</select></label>';
             }
-            props.innerHTML =
-                '<div style="margin-top:6px;"><span class="dz-typ">' + TYPLABEL[el.typ] + '</span></div>' +
-                seiteFeld +
-                (isText ? '<label>Text<input id="dzp-text" type="text" value="' + esc(el.text || '') + '"></label>' : '') +
-                (isBind ? '<label>Datenfeld<select id="dzp-bindung">' + bindOpts + '</select></label>' : '') +
-                '<div class="dz-grid">' +
+            if (isText) html += '<label>Text<input id="dzp-text" type="text" value="' + esc(el.text || '') + '"></label>';
+            if (isBind) {
+                const bindOpts = Object.keys(BINDUNGEN).map((k) => '<option value="' + k + '"' + (el.bindung === k ? ' selected' : '') + '>' + esc(BINDUNGEN[k]) + '</option>').join('');
+                html += '<label>Datenfeld<select id="dzp-bindung">' + bindOpts + '</select></label>';
+            }
+            html += '<div class="dz-grid">' +
                 '<label>X (mm)<input id="dzp-x" type="number" step="1" value="' + r1(el.x) + '"></label>' +
                 '<label>Y (mm)<input id="dzp-y" type="number" step="1" value="' + r1(el.y) + '"></label>' +
                 '<label>Breite<input id="dzp-w" type="number" step="1" value="' + r1(el.w) + '"></label>' +
-                '<label>Höhe<input id="dzp-h" type="number" step="1" value="' + r1(el.h) + '"></label>' +
-                '</div>' +
-                '<div class="dz-grid">' +
-                '<label>Schrift (pt)<input id="dzp-size" type="number" step="1" value="' + el.size + '"></label>' +
-                '<label>Ausrichtung<select id="dzp-align">' +
-                '<option value="left"' + (el.align === 'left' ? ' selected' : '') + '>links</option>' +
-                '<option value="center"' + (el.align === 'center' ? ' selected' : '') + '>zentriert</option>' +
-                '<option value="right"' + (el.align === 'right' ? ' selected' : '') + '>rechts</option>' +
-                '</select></label>' +
-                '</div>' +
-                '<label class="dz-check"><input id="dzp-bold" type="checkbox"' + (el.bold ? ' checked' : '') + '> Fett</label>' +
-                '<button id="dzp-del" class="dz-del" type="button">Element löschen</button>';
+                (isLinie ? '' : '<label>Höhe<input id="dzp-h" type="number" step="1" value="' + r1(el.h) + '"></label>') +
+                '</div>';
+            if (isLinie) html += '<label>Stärke (mm)<input id="dzp-staerke" type="number" step="0.1" value="' + (el.staerke || 0.3) + '"></label>';
+            if (hasFont) {
+                html += '<div class="dz-grid">' +
+                    '<label>Schrift (pt)<input id="dzp-size" type="number" step="1" value="' + el.size + '"></label>' +
+                    '<label>Ausrichtung<select id="dzp-align">' +
+                    '<option value="left"' + (el.align === 'left' ? ' selected' : '') + '>links</option>' +
+                    '<option value="center"' + (el.align === 'center' ? ' selected' : '') + '>zentriert</option>' +
+                    '<option value="right"' + (el.align === 'right' ? ' selected' : '') + '>rechts</option>' +
+                    '</select></label>' +
+                    '</div>' +
+                    '<label class="dz-check"><input id="dzp-bold" type="checkbox"' + (el.bold ? ' checked' : '') + '> Fett</label>';
+            }
+            if (isBild) html += '<button id="dzp-bildreplace" class="dz-btn" type="button">Bild ersetzen …</button>';
+            html += '<button id="dzp-del" class="dz-del" type="button">Element löschen</button>';
+            props.innerHTML = html;
 
             const on = (id, ev, fn) => { const n = document.getElementById(id); if (n) n.addEventListener(ev, fn); };
             on('dzp-seite', 'change', (e) => { el.seite = +e.target.value; STATE.activePage = el.seite; render(); });
@@ -260,20 +281,45 @@
             on('dzp-y', 'input', (e) => { el.y = Math.max(0, +e.target.value || 0); render(); });
             on('dzp-w', 'input', (e) => { el.w = Math.max(4, +e.target.value || 4); render(); });
             on('dzp-h', 'input', (e) => { el.h = Math.max(4, +e.target.value || 4); render(); });
+            on('dzp-staerke', 'input', (e) => { el.staerke = Math.max(0.1, +e.target.value || 0.3); render(); });
             on('dzp-size', 'input', (e) => { el.size = Math.max(5, +e.target.value || 11); render(); });
             on('dzp-align', 'change', (e) => { el.align = e.target.value; render(); });
             on('dzp-bold', 'change', (e) => { el.bold = e.target.checked; render(); });
+            on('dzp-bildreplace', 'click', () => { fileMode = 'replace'; fileTarget = STATE.sel; fileInput.value = ''; fileInput.click(); });
             on('dzp-del', 'click', () => { STATE.elements.splice(STATE.sel, 1); STATE.sel = -1; renderProps(); render(); });
         }
 
         function add(typ) {
+            if (typ === 'bild') { fileMode = 'add'; fileInput.value = ''; fileInput.click(); return; }
             const el = { typ, seite: STATE.activePage, x: 20, y: 20, w: 80, h: 10, size: 12, align: 'left', bold: false };
             if (typ === 'text') el.text = 'Neuer Text';
             if (typ === 'feld') el.bindung = 'schueler.name';
             if (typ === 'block') { el.bindung = 'haupttext'; el.w = 150; el.h = 60; el.size = 11; }
             if (typ === 'unterschrift') { el.bindung = 'unterschrift'; el.text = 'Klassenlehrer/in'; el.align = 'center'; el.h = 8; el.size = 10; }
+            if (typ === 'linie') { el.w = 100; el.h = 2; el.staerke = 0.3; }
             STATE.elements.push(el);
             select(STATE.elements.length - 1);
+        }
+
+        async function onFile() {
+            const f = fileInput.files[0];
+            if (!f) return;
+            const fd = new FormData();
+            fd.append('bild', f);
+            statusEl.textContent = 'lade Bild hoch …';
+            try {
+                const r = await fetch(UPLOAD_URL, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' }, body: fd });
+                const ct = r.headers.get('content-type') || '';
+                if (!r.ok || !ct.includes('application/json')) { statusEl.textContent = 'Upload fehlgeschlagen – bitte eine gültige Bilddatei wählen'; return; }
+                const j = await r.json();
+                if (fileMode === 'replace' && fileTarget >= 0) {
+                    STATE.elements[fileTarget].bild = j.path; render(); statusEl.textContent = 'Bild ersetzt';
+                } else {
+                    STATE.elements.push({ typ: 'bild', seite: STATE.activePage, bild: j.path, x: 20, y: 20, w: 40, h: 25, size: 12, align: 'left', bold: false });
+                    select(STATE.elements.length - 1); statusEl.textContent = 'Bild hinzugefügt';
+                }
+            } catch (e) { statusEl.textContent = 'Netzwerkfehler beim Upload'; }
+            finally { fileMode = 'add'; fileTarget = -1; }
         }
 
         async function save() {
@@ -291,6 +337,7 @@
 
         document.querySelectorAll('.dz-add').forEach((b) => b.addEventListener('click', () => add(b.dataset.typ)));
         document.getElementById('dz-save').addEventListener('click', save);
+        fileInput.addEventListener('change', onFile);
 
         buildPages();
         render();
