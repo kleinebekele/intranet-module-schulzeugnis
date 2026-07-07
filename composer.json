@@ -1,0 +1,28 @@
+{
+    "name": "do1emu/module-schulzeugnis",
+    "description": "Schulzeugnis-Modul für die modulare Intranet-Plattform (Waldorfschule): Textzeugnisse und Abschluss-Notenzeugnisse, je Schuljahr importierbare Stammdaten, vollständig vom Core entkoppelt.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "intranet", "modul", "schulzeugnis", "zeugnis", "waldorf"],
+    "authors": [
+        {
+            "name": "do1emu"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "barryvdh/laravel-dompdf": "^3.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Intranet\\Modules\\Schulzeugnis\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Intranet\\Modules\\Schulzeugnis\\SchulzeugnisServiceProvider"
+            ]
+        }
+    }
+}
