@@ -227,6 +227,7 @@ class FormatController
         }
         if ($typ === 'linie') {
             $out['staerke'] = round((float) ($e['staerke'] ?? 0.3), 2);
+            $out['stil'] = in_array(($e['stil'] ?? 'solid'), ['solid', 'dashed', 'dotted'], true) ? $e['stil'] : 'solid';
         }
 
         return $out;

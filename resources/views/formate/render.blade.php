@@ -50,7 +50,7 @@
                             <img style="position:absolute;left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:{{ $h }}mm;object-fit:contain;" src="{{ $el['src'] }}">
                         @endif
                     @elseif ($el['typ'] === 'linie')
-                        <div class="el" style="left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:0;border-top:{{ $el['staerke'] ?? 0.3 }}mm solid #374151;"></div>
+                        <div class="el" style="left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:0;border-top:{{ $el['staerke'] ?? 0.3 }}mm {{ $el['stil'] ?? 'solid' }} #374151;"></div>
                     @endif
                 @endforeach
             </div>

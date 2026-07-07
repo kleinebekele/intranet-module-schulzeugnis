@@ -156,7 +156,7 @@
             if (el.typ === 'unterschrift') return '<div class="dz-sig">' + esc(el.text || DATEN['unterschrift'] || '') + '</div>';
             if (el.typ === 'feld') return esc(el.bindung in DATEN ? DATEN[el.bindung] : '{' + (el.bindung || '') + '}');
             if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:#9ca3af;">Bild wählen …</span>';
-            if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm solid #374151;"></div>';
+            if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm ' + (el.stil || 'solid') + ' #374151;"></div>';
             if (el.typ === 'block') {
                 if (el.bindung === 'fachtexte') {
                     return (DATEN['fachtexte'] || []).map((f) => '<b>' + esc(f.fach) + '</b>' + esc(f.text)).join('');
@@ -281,7 +281,15 @@
                 '<label>Breite<input id="dzp-w" type="number" step="1" value="' + r1(el.w) + '"></label>' +
                 (isLinie ? '' : '<label>Höhe<input id="dzp-h" type="number" step="1" value="' + r1(el.h) + '"></label>') +
                 '</div>';
-            if (isLinie) html += '<label>Stärke (mm)<input id="dzp-staerke" type="number" step="0.1" value="' + (el.staerke || 0.3) + '"></label>';
+            if (isLinie) {
+                html += '<label>Stärke (mm)<input id="dzp-staerke" type="number" step="0.1" value="' + (el.staerke || 0.3) + '"></label>';
+                const st = el.stil || 'solid';
+                html += '<label>Linienstil<select id="dzp-stil">' +
+                    '<option value="solid"' + (st === 'solid' ? ' selected' : '') + '>durchgehend</option>' +
+                    '<option value="dashed"' + (st === 'dashed' ? ' selected' : '') + '>gestrichelt</option>' +
+                    '<option value="dotted"' + (st === 'dotted' ? ' selected' : '') + '>gepunktet</option>' +
+                    '</select></label>';
+            }
             if (hasFont) {
                 html += '<div class="dz-grid">' +
                     '<label>Schrift (pt)<input id="dzp-size" type="number" step="1" value="' + el.size + '"></label>' +
@@ -306,6 +314,7 @@
             on('dzp-w', 'input', (e) => { el.w = Math.max(4, +e.target.value || 4); render(); });
             on('dzp-h', 'input', (e) => { el.h = Math.max(4, +e.target.value || 4); render(); });
             on('dzp-staerke', 'input', (e) => { el.staerke = Math.max(0.1, +e.target.value || 0.3); render(); });
+            on('dzp-stil', 'change', (e) => { el.stil = e.target.value; render(); });
             on('dzp-size', 'input', (e) => { el.size = Math.max(5, +e.target.value || 11); render(); });
             on('dzp-align', 'change', (e) => { el.align = e.target.value; render(); });
             on('dzp-bold', 'change', (e) => { el.bold = e.target.checked; render(); });
@@ -320,7 +329,7 @@
             if (typ === 'feld') el.bindung = 'schueler.name';
             if (typ === 'block') { el.bindung = 'haupttext'; el.w = 150; el.h = 60; el.size = 11; }
             if (typ === 'unterschrift') { el.bindung = 'unterschrift'; el.text = 'Klassenlehrer/in'; el.align = 'center'; el.h = 8; el.size = 10; }
-            if (typ === 'linie') { el.w = 100; el.h = 2; el.staerke = 0.3; }
+            if (typ === 'linie') { el.w = 100; el.h = 2; el.staerke = 0.3; el.stil = 'solid'; }
             STATE.elements.push(el);
             select(STATE.elements.length - 1);
         }
