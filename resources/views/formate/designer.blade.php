@@ -14,6 +14,9 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <button id="dz-varhelp" type="button">
+                    <span style="font-weight:700;">?</span> Variablen erklären
+                </button>
                 <span id="dz-status" class="text-sm text-gray-500"></span>
                 <a href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank"
                    class="rounded-lg border border-indigo-200 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50">Vorschau</a>
@@ -66,7 +69,8 @@
         #dz-props .dz-del { margin-top: 14px; width: 100%; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
         #dz-props .dz-del:hover { background: #fef2f2; }
         #dz-app .dz-hint { font-size: 12px; color: #9ca3af; }
-        #dz-varhelp { margin-top: 12px; color: #4f46e5; border-color: #c7d2fe; }
+        #dz-varhelp { display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        #dz-varhelp:hover { background: #fde68a; }
         #dz-modal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 60; align-items: center; justify-content: center; padding: 20px; }
         #dz-modal.dz-open { display: flex; }
         #dz-modal .dz-box { background: #fff; border-radius: 14px; max-width: 540px; width: 100%; max-height: 82vh; overflow: auto; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
@@ -90,7 +94,6 @@
                 <button class="dz-add" data-typ="bild">+ Logo / Bild</button>
                 <button class="dz-add" data-typ="linie">+ Linie</button>
                 <input type="file" id="dz-file" accept="image/*" style="display:none">
-                <button id="dz-varhelp" class="dz-add" type="button">? Variablen erklären</button>
                 <p class="dz-hint" id="dz-pagehint" style="margin-top:12px;"></p>
                 <p class="dz-hint" style="margin-top:8px;">Element anklicken zum Auswählen, ziehen zum Verschieben, an den blauen Griffen die Größe ändern. Danach <strong>Speichern</strong>.</p>
             </div>
