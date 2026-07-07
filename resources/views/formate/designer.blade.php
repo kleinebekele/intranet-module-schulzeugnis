@@ -313,6 +313,9 @@
                 let opts = '';
                 for (let n = 1; n <= PAGES; n++) opts += '<option value="' + n + '"' + ((el.seite || 1) === n ? ' selected' : '') + '>' + esc(pageLabel(n)) + '</option>';
                 html += '<label>Seite<select id="dzp-seite">' + opts + '</select></label>';
+                let copts = '<option value="">— auf Seite kopieren —</option>';
+                for (let n = 1; n <= PAGES; n++) copts += '<option value="' + n + '">Seite ' + n + ' (' + esc(LABELS[n - 1] || '') + ')</option>';
+                html += '<label>Kopie auf Seite<select id="dzp-copyseite">' + copts + '</select></label>';
             }
             if (el.typ === 'text') {
                 html += '<label>Text<textarea id="dzp-text" rows="3">' + esc(el.text || '') + '</textarea></label>';
@@ -370,6 +373,15 @@
 
             const on = (id, ev, fn) => { const n = document.getElementById(id); if (n) n.addEventListener(ev, fn); };
             on('dzp-seite', 'change', (e) => { el.seite = +e.target.value; STATE.activePage = el.seite; render(); });
+            on('dzp-copyseite', 'change', (e) => {
+                const ziel = +e.target.value;
+                if (!ziel) return;
+                const kopie = JSON.parse(JSON.stringify(el));
+                kopie.seite = ziel;
+                STATE.elements.push(kopie);
+                STATE.activePage = ziel;
+                select(STATE.elements.length - 1);
+            });
             on('dzp-text', 'input', (e) => { el.text = e.target.value; render(); });
             on('dzp-bindung', 'change', (e) => { el.bindung = e.target.value; render(); });
             on('dzp-x', 'input', (e) => { el.x = Math.max(0, +e.target.value || 0); render(); });
