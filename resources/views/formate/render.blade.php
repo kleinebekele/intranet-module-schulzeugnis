@@ -57,6 +57,8 @@
                         @endif
                     @elseif ($el['typ'] === 'linie')
                         <div class="el" style="left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:0;border-top:{{ $el['staerke'] ?? 0.3 }}mm {{ $el['stil'] ?? 'solid' }} #374151;"></div>
+                    @elseif ($el['typ'] === 'textbereich')
+                        <div class="el" style="{{ $style }}white-space: pre-line;">{{ $el['inhalt'] ?? '' }}</div>
                     @endif
                 @endforeach
             </div>

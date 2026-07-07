@@ -225,7 +225,7 @@ class FormatController
         }
 
         $typ = $e['typ'] ?? 'text';
-        if (! in_array($typ, ['text', 'feld', 'block', 'unterschrift', 'bild', 'linie'], true)) {
+        if (! in_array($typ, ['text', 'feld', 'block', 'unterschrift', 'bild', 'linie', 'textbereich'], true)) {
             return null;
         }
 
@@ -264,11 +264,118 @@ class FormatController
     {
         $daten = $this->beispielDaten();
         $elemente = $this->ersetzeVariablen($this->resolveBilder($format->layout ?: $this->standardLayout()), $daten);
+        $elemente = $this->fuelleTextbereiche($elemente, (string) ($daten['zeugnistext'] ?? ''));
 
         return [
             'seiten' => $this->baueSeiten($format, $elemente),
             'daten'  => $daten,
         ];
+    }
+
+    /**
+     * Verteilt den {Zeugnistext} auf alle Textbereich-Rahmen (nach Seite/Position
+     * sortiert). Umbruch exakt über dompdfs eigene Schriftvermessung. Überlauf
+     * (Rest passt nicht mehr) wird hier NICHT ausgegeben und keine Seite ergänzt –
+     * das ist später Sache des befüllten Zeugnisses (Warnung in der DB).
+     *
+     * @param  array<int,array<string,mixed>>  $elemente
+     * @return array<int,array<string,mixed>>
+     */
+    private function fuelleTextbereiche(array $elemente, string $text): array
+    {
+        $order = [];
+        foreach ($elemente as $i => $e) {
+            if (($e['typ'] ?? '') === 'textbereich') {
+                $order[] = $i;
+            }
+        }
+
+        if (empty($order) || trim($text) === '') {
+            return $elemente;
+        }
+
+        usort($order, function ($a, $b) use ($elemente) {
+            $ea = $elemente[$a];
+            $eb = $elemente[$b];
+
+            return [$ea['seite'] ?? 1, $ea['y'] ?? 0, $ea['x'] ?? 0]
+                <=> [$eb['seite'] ?? 1, $eb['y'] ?? 0, $eb['x'] ?? 0];
+        });
+
+        $mmToPt = 2.83465;
+        $first  = $elemente[$order[0]];
+        $size   = (float) ($first['size'] ?? 11);
+        $family = $first['font'] ?? 'DejaVu Sans';
+
+        $fm   = $this->fontMetrics();
+        $font = ($fm && method_exists($fm, 'getFont')) ? $fm->getFont($family, 'normal') : null;
+        $mess = function (string $s) use ($fm, $font, $size) {
+            if ($fm && $font) {
+                return (float) $fm->getTextWidth($s, $font, $size);
+            }
+
+            return mb_strlen($s) * $size * 0.52; // Fallback-Schätzung
+        };
+
+        // Sicherheits-Rand: Zeilen an der schmalsten Spalte umbrechen, dann passen sie überall.
+        $minBreitePt = min(array_map(fn ($i) => ((float) ($elemente[$i]['w'] ?? 40)) * $mmToPt - 4, $order));
+
+        $zeilen = $this->umbrechen($text, max(10, $minBreitePt), $mess);
+
+        $pos = 0;
+        foreach ($order as $i) {
+            $hPt      = ((float) ($elemente[$i]['h'] ?? 10)) * $mmToPt;
+            $sz       = (float) ($elemente[$i]['size'] ?? 11);
+            $maxZeilen = max(1, (int) floor($hPt / ($sz * 1.35)));
+            $anteil   = array_slice($zeilen, $pos, $maxZeilen);
+            $pos     += count($anteil);
+            $elemente[$i]['inhalt'] = implode("\n", $anteil);
+        }
+
+        return $elemente;
+    }
+
+    /**
+     * Bricht Text in sichtbare Zeilen um (respektiert \n als Absätze/Leerzeilen).
+     *
+     * @return array<int,string>
+     */
+    private function umbrechen(string $text, float $breitePt, callable $mess): array
+    {
+        $zeilen = [];
+
+        foreach (explode("\n", $text) as $absatz) {
+            if (trim($absatz) === '') {
+                $zeilen[] = '';
+                continue;
+            }
+
+            $woerter = preg_split('/\s+/u', trim($absatz));
+            $aktuell = '';
+
+            foreach ($woerter as $w) {
+                $probe = $aktuell === '' ? $w : $aktuell . ' ' . $w;
+                if ($aktuell === '' || $mess($probe) <= $breitePt) {
+                    $aktuell = $probe;
+                } else {
+                    $zeilen[] = $aktuell;
+                    $aktuell  = $w;
+                }
+            }
+
+            $zeilen[] = $aktuell;
+        }
+
+        return $zeilen;
+    }
+
+    private function fontMetrics()
+    {
+        try {
+            return app('dompdf.wrapper')->getDomPDF()->getFontMetrics();
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /** Platzhalter-Variablen für freie Textfelder (Anzeigename => Datenschlüssel). */
@@ -393,6 +500,22 @@ class FormatController
                 ['fach' => 'Mathematik', 'text' => 'Im Rechnen arbeitet sie sorgfältig und erfasst neue Zusammenhänge rasch.'],
                 ['fach' => 'Eurythmie', 'text' => 'Mit Anmut und Konzentration bewegt sich Lina im Raum.'],
             ],
+            'zeugnistext'           => "Lina hat ein arbeitsreiches und frohes Schuljahr erlebt. Mit wachem Interesse "
+                . "hat sie am Unterricht teilgenommen und sich in der Klassengemeinschaft hilfsbereit und "
+                . "verlässlich gezeigt. Besonders in den künstlerischen Fächern ist sie sichtlich aufgeblüht "
+                . "und hat andere Kinder mit ihrer Begeisterung angesteckt.\n\n"
+                . "Deutsch\n"
+                . "Lina liest sicher und betont und bringt eigene Gedanken lebendig in den Unterricht ein. "
+                . "Beim freien Schreiben findet sie eine anschauliche Sprache und achtet zunehmend auf einen "
+                . "sauberen Satzbau. Ihre Handschrift ist gleichmäßig und gut lesbar geworden.\n\n"
+                . "Mathematik\n"
+                . "Im Rechnen arbeitet Lina sorgfältig und erfasst neue Zusammenhänge rasch. Die schriftlichen "
+                . "Rechenverfahren wendet sie sicher an; beim Sachrechnen entwickelt sie eigene Lösungswege und "
+                . "erklärt diese verständlich.\n\n"
+                . "Eurythmie\n"
+                . "Mit Anmut und Konzentration bewegt sich Lina im Raum und nimmt die Formen mit feinem Gespür auf. "
+                . "In der Gruppe ist sie eine aufmerksame und rücksichtsvolle Partnerin.\n\n"
+                . "Wir wünschen Lina für das kommende Schuljahr weiterhin viel Freude und Zuversicht.",
             'ausgabe.zeile'         => 'Musterstadt, den 30.06.2027',
             'unterschrift'          => 'Klassenlehrer/in',
         ];

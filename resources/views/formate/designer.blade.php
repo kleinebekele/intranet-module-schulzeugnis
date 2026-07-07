@@ -93,6 +93,7 @@
                 <button class="dz-add" data-typ="unterschrift">+ Unterschrift</button>
                 <button class="dz-add" data-typ="bild">+ Logo / Bild</button>
                 <button class="dz-add" data-typ="linie">+ Linie</button>
+                <button class="dz-add" data-typ="textbereich">+ Textbereich</button>
                 <input type="file" id="dz-file" accept="image/*" style="display:none">
                 <p class="dz-hint" id="dz-pagehint" style="margin-top:12px;"></p>
                 <p class="dz-hint" style="margin-top:8px;">Element anklicken zum Auswählen, ziehen zum Verschieben, an den blauen Griffen die Größe ändern. Danach <strong>Speichern</strong>.</p>
@@ -190,6 +191,7 @@
             if (el.typ === 'feld') return esc(el.bindung in DATEN ? DATEN[el.bindung] : '{' + (el.bindung || '') + '}');
             if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:#9ca3af;">Bild wählen …</span>';
             if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm ' + (el.stil || 'solid') + ' #374151;"></div>';
+            if (el.typ === 'textbereich') return esc(DATEN['zeugnistext'] || '(Zeugnistext)').replace(/\n/g, '<br>');
             if (el.typ === 'block') {
                 if (el.bindung === 'fachtexte') {
                     return (DATEN['fachtexte'] || []).map((f) => '<b>' + esc(f.fach) + '</b>' + esc(f.text)).join('');
@@ -216,7 +218,7 @@
                 d.style.fontSize = (el.size * 0.3528 * SCALE) + 'px';
                 d.style.textAlign = el.align || 'left';
                 d.style.fontWeight = el.bold ? '700' : '400';
-                if (['text', 'feld', 'block', 'unterschrift'].includes(el.typ)) {
+                if (['text', 'feld', 'block', 'unterschrift', 'textbereich'].includes(el.typ)) {
                     const fam = el.font || 'DejaVu Sans';
                     const generic = (fam.indexOf('Mono') >= 0) ? 'monospace' : (fam.indexOf('Serif') >= 0) ? 'serif' : 'sans-serif';
                     d.style.fontFamily = '"' + fam + '", ' + generic;
@@ -303,7 +305,7 @@
             const isBind = el.typ === 'feld' || el.typ === 'block';
             const isBild = el.typ === 'bild';
             const isLinie = el.typ === 'linie';
-            const hasFont = isText || isBind;
+            const hasFont = isText || isBind || el.typ === 'textbereich';
 
             let html = '<div style="margin-top:6px;"><span class="dz-typ">' + TYPLABEL[el.typ] + '</span></div>';
 
@@ -397,6 +399,7 @@
             if (typ === 'block') { el.bindung = 'haupttext'; el.w = 150; el.h = 60; el.size = 11; }
             if (typ === 'unterschrift') { el.bindung = 'unterschrift'; el.text = 'Klassenlehrer/in'; el.align = 'center'; el.h = 8; el.size = 10; }
             if (typ === 'linie') { el.w = 100; el.h = 2; el.staerke = 0.3; el.stil = 'solid'; }
+            if (typ === 'textbereich') { el.w = 160; el.h = 120; el.size = 11; }
             STATE.elements.push(el);
             select(STATE.elements.length - 1);
         }
