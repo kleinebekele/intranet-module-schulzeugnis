@@ -131,6 +131,7 @@ class FormatController
                 : ['Seite'],
             'elemente'     => $format->layout ?: $this->standardLayout(),
             'bindungen'    => $this->bindungen(),
+            'variablen'    => $this->variablen(),
             'daten'        => $this->beispielDaten(),
         ]);
     }
@@ -181,9 +182,11 @@ class FormatController
         return [
             'schulname'        => 'Schulname',
             'titel'            => 'Titel (Zeugnis + Schuljahr)',
-            'schueler.name'    => 'Schüler: Name',
-            'schueler.geboren' => 'Schüler: geboren am/in',
-            'klasse.zeile'     => 'Klasse',
+            'schueler.name'         => 'Schüler: Name',
+            'schueler.geboren'      => 'Schüler: geboren am/in (zusammengesetzt)',
+            'schueler.geburtsdatum' => 'Schüler: Geburtsdatum',
+            'schueler.geburtsort'   => 'Schüler: Geburtsort',
+            'klasse.zeile'          => 'Klasse',
             'haupttext'        => 'Haupttext (Klassenlehrer)',
             'fachtexte'        => 'Fachtexte (Liste)',
             'ausgabe.zeile'    => 'Ort / Datum',
@@ -241,12 +244,48 @@ class FormatController
     /** @return array<string,mixed> */
     private function renderDaten(Format $format): array
     {
-        $elemente = $this->resolveBilder($format->layout ?: $this->standardLayout());
+        $daten = $this->beispielDaten();
+        $elemente = $this->ersetzeVariablen($this->resolveBilder($format->layout ?: $this->standardLayout()), $daten);
 
         return [
             'seiten' => $this->baueSeiten($format, $elemente),
-            'daten'  => $this->beispielDaten(),
+            'daten'  => $daten,
         ];
+    }
+
+    /** Platzhalter-Variablen für freie Textfelder (Anzeigename => Datenschlüssel). */
+    private function variablen(): array
+    {
+        return [
+            'Name'         => 'schueler.name',
+            'Geburtsdatum' => 'schueler.geburtsdatum',
+            'Geburtsort'   => 'schueler.geburtsort',
+            'Klasse'       => 'klasse',
+            'Schuljahr'    => 'schuljahr',
+            'Schulname'    => 'schulname',
+        ];
+    }
+
+    /**
+     * Ersetzt {Variablen} in freien Textelementen durch die Datenwerte.
+     *
+     * @param  array<int,array<string,mixed>>  $elemente
+     * @param  array<string,mixed>  $daten
+     * @return array<int,array<string,mixed>>
+     */
+    private function ersetzeVariablen(array $elemente, array $daten): array
+    {
+        $map = $this->variablen();
+
+        return array_map(function ($e) use ($daten, $map) {
+            if (($e['typ'] ?? '') === 'text' && ! empty($e['text'])) {
+                $e['text'] = preg_replace_callback('/\{(\w+)\}/', function ($m) use ($daten, $map) {
+                    return isset($map[$m[1]]) ? (string) ($daten[$map[$m[1]]] ?? $m[0]) : $m[0];
+                }, $e['text']);
+            }
+
+            return $e;
+        }, $elemente);
     }
 
     /**
@@ -322,7 +361,11 @@ class FormatController
             'titel'                 => 'Zeugnis 2026/2027',
             'schueler.name'         => 'Lina Mustermann',
             'schueler.geboren'      => 'geboren am 14.03.2015 in Musterstadt',
+            'schueler.geburtsdatum' => '14.03.2015',
+            'schueler.geburtsort'   => 'Musterstadt',
             'klasse.zeile'          => 'Klasse 5a',
+            'klasse'                => '5a',
+            'schuljahr'             => '2026/2027',
             'haupttext'             => "Lina hat ein arbeitsreiches und frohes Schuljahr erlebt. Mit wachem Interesse "
                 . "hat sie am Unterricht teilgenommen und sich in der Klassengemeinschaft hilfsbereit gezeigt. "
                 . "Besonders in den künstlerischen Fächern ist sie sichtlich aufgeblüht.\n\n"

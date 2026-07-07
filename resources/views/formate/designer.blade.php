@@ -50,6 +50,7 @@
         #dz-app .dz-add:hover { background: #f9fafb; }
         #dz-props label { display: block; font-size: 12px; color: #6b7280; margin-top: 8px; }
         #dz-props input[type=text], #dz-props input[type=number], #dz-props select { width: 100%; margin-top: 2px; border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 7px; font-size: 13px; }
+        #dz-props textarea { width: 100%; margin-top: 2px; border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 7px; font-size: 13px; resize: vertical; font-family: inherit; }
         #dz-props .dz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         #dz-props .dz-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: #374151; }
         #dz-props .dz-check input { margin-top: 0; width: auto; }
@@ -98,6 +99,7 @@
     <script>
         const STATE = { elements: @json($elemente), sel: -1, activePage: 1 };
         const BINDUNGEN = @json($bindungen);
+        const VARIABLEN = @json($variablen);
         const DATEN = @json($daten);
         const PAGE = @json($designSeite);
         const PAGES = @json($seitenAnzahl);
@@ -121,6 +123,7 @@
 
         const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         const r1 = (n) => Math.round(n * 10) / 10;
+        const substVars = (t) => String(t).replace(/\{(\w+)\}/g, (m, k) => (k in VARIABLEN && VARIABLEN[k] in DATEN) ? DATEN[VARIABLEN[k]] : m);
         const pageLabel = (n) => (PAGES > 1 ? ('Seite ' + n + ' · ' + (LABELS[n - 1] || '')) : 'Seite');
 
         function buildPages() {
@@ -158,7 +161,7 @@
         }
 
         function displayHtml(el) {
-            if (el.typ === 'text') return esc(el.text || '(Text)');
+            if (el.typ === 'text') return esc(substVars(el.text || '(Text)'));
             if (el.typ === 'unterschrift') return '<div class="dz-sig">' + esc(el.text || DATEN['unterschrift'] || '') + '</div>';
             if (el.typ === 'feld') return esc(el.bindung in DATEN ? DATEN[el.bindung] : '{' + (el.bindung || '') + '}');
             if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:#9ca3af;">Bild wählen …</span>';
@@ -285,7 +288,12 @@
                 for (let n = 1; n <= PAGES; n++) opts += '<option value="' + n + '"' + ((el.seite || 1) === n ? ' selected' : '') + '>' + esc(pageLabel(n)) + '</option>';
                 html += '<label>Seite<select id="dzp-seite">' + opts + '</select></label>';
             }
-            if (isText) html += '<label>Text<input id="dzp-text" type="text" value="' + esc(el.text || '') + '"></label>';
+            if (el.typ === 'text') {
+                html += '<label>Text<textarea id="dzp-text" rows="3">' + esc(el.text || '') + '</textarea></label>';
+                html += '<p class="dz-hint" style="margin-top:4px;">Variablen: ' + Object.keys(VARIABLEN).map((k) => '{' + k + '}').join(' ') + '</p>';
+            } else if (el.typ === 'unterschrift') {
+                html += '<label>Text<input id="dzp-text" type="text" value="' + esc(el.text || '') + '"></label>';
+            }
             if (isBind) {
                 const bindOpts = Object.keys(BINDUNGEN).map((k) => '<option value="' + k + '"' + (el.bindung === k ? ' selected' : '') + '>' + esc(BINDUNGEN[k]) + '</option>').join('');
                 html += '<label>Datenfeld<select id="dzp-bindung">' + bindOpts + '</select></label>';
