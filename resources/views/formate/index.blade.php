@@ -12,7 +12,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-3xl space-y-3">
+    <div class="space-y-3">
         {{-- Erfolgsmeldungen rendert das Core-Layout global – hier nur Fehler. --}}
         @if (session('error'))
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
@@ -38,44 +38,30 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('module.schulzeugnis.formate.designer', $format) }}"
-                       class="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
-                        Designer
-                    </a>
-                    <a href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank"
-                       class="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">
-                        Vorschau
-                    </a>
-                    <a href="{{ route('module.schulzeugnis.formate.pdf', $format) }}" target="_blank"
-                       class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                        PDF
-                    </a>
-                    <a href="{{ route('module.schulzeugnis.formate.edit', $format) }}"
-                       class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                        Bearbeiten
-                    </a>
+                    <a href="{{ route('module.schulzeugnis.formate.designer', $format) }}" title="Designer"
+                       class="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-2 text-lg text-white hover:bg-indigo-700"><i class="bx bx-layout"></i></a>
+                    <a href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank" title="Vorschau"
+                       class="inline-flex items-center justify-center rounded-lg border border-indigo-200 p-2 text-lg text-indigo-600 hover:bg-indigo-50"><i class="bx bx-show"></i></a>
+                    <a href="{{ route('module.schulzeugnis.formate.pdf', $format) }}" target="_blank" title="PDF"
+                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-file"></i></a>
+                    <a href="{{ route('module.schulzeugnis.formate.edit', $format) }}" title="Bearbeiten"
+                       class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-cog"></i></a>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.duplicate', $format) }}">
                         @csrf
-                        <button type="submit"
-                                class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                            Duplizieren
-                        </button>
+                        <button type="submit" title="Duplizieren"
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx bx-copy"></i></button>
                     </form>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.toggle', $format) }}">
                         @csrf
-                        <button type="submit"
-                                class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                            {{ $format->aktiv ? 'Archivieren' : 'Reaktivieren' }}
-                        </button>
+                        <button type="submit" title="{{ $format->aktiv ? 'Archivieren' : 'Reaktivieren' }}"
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-lg text-gray-600 hover:bg-gray-50"><i class="bx {{ $format->aktiv ? 'bx-archive-in' : 'bx-archive-out' }}"></i></button>
                     </form>
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.destroy', $format) }}"
                           onsubmit="return confirm('Format {{ $format->name }} wirklich löschen?');">
                         @csrf
                         @method('DELETE')
-                        <button type="submit"
-                                class="rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50">
-                            Löschen
-                        </button>
+                        <button type="submit" title="Löschen"
+                                class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-lg text-red-600 hover:bg-red-50"><i class="bx bx-trash"></i></button>
                     </form>
                 </div>
             </div>
