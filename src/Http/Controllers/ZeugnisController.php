@@ -84,6 +84,7 @@ class ZeugnisController
             'warnungen'        => $warnungen,
             'fachlehrer'       => $fachlehrer,
             'klassentexte'     => $klassentexte,
+            'istAdmin'         => (bool) auth()->user()?->is_admin,
         ]);
     }
 
@@ -553,6 +554,87 @@ class ZeugnisController
         $fachId ? $q->where('fach_id', $fachId) : $q->whereNull('fach_id');
 
         return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId]);
+    }
+
+    /** Klassenweiten Text (je Fach bzw. Haupttext) direkt bearbeiten. */
+    public function klassentextEdit(Klasse $klasse, string $fach)
+    {
+        [$fachId, $fachModel] = $this->fachAusParam($fach);
+        $this->autorisiereKlassentext($klasse, $fachId);
+
+        return view('schulzeugnis::klassen.klassentext', [
+            'klasse'      => $klasse->load('schuljahr'),
+            'fach'        => $fachModel,
+            'fachParam'   => $fach,
+            'klassentext' => $this->klassentextFuer($klasse->id, $fachId),
+        ]);
+    }
+
+    public function klassentextUpdate(Request $request, Klasse $klasse, string $fach)
+    {
+        [$fachId, $fachModel] = $this->fachAusParam($fach);
+        $this->autorisiereKlassentext($klasse, $fachId);
+
+        $data = $request->validate(['text' => ['nullable', 'string']]);
+
+        $kt  = $this->klassentextFuer($klasse->id, $fachId);
+        $alt = $kt->text;
+        $kt->text = $data['text'] ?? null;
+        $kt->save();
+
+        if ((string) $alt !== (string) $kt->text) {
+            Protokoll::log('klassentext_geaendert', [
+                'schuljahr_id' => $klasse->schuljahr_id,
+                'beschreibung' => 'Klassenweiter Text (' . ($fachModel?->name ?? 'Haupttext') . ') in ' . ($klasse->name ?? '') . ' geändert',
+                'neu_wert'     => $kt->text,
+            ]);
+
+            // Überlauf-Analyse aller Zeugnisse der Klasse verwerfen – sie ist jetzt veraltet.
+            Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+                ->update(['ueberlauf_status' => null]);
+        }
+
+        return redirect()->route('module.schulzeugnis.zeugnisse.index', $klasse)
+            ->with('status', 'Klassentext (' . ($fachModel?->name ?? 'Haupttext') . ') gespeichert.');
+    }
+
+    /** Route-Parameter → [fachId|null, Fach|null]. "haupt" = Haupttext. */
+    private function fachAusParam(string $fach): array
+    {
+        if ($fach === 'haupt') {
+            return [null, null];
+        }
+        $model = Fach::findOrFail((int) $fach);
+
+        return [$model->id, $model];
+    }
+
+    /** Klassentext darf ändern: Admin, Fachlehrer des Fachs bzw. Klassenlehrer (Haupttext). */
+    private function autorisiereKlassentext(Klasse $klasse, ?int $fachId): void
+    {
+        $user = auth()->user();
+        if ($user?->is_admin) {
+            return;
+        }
+
+        $meineLehrerIds = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)
+            ->where('core_user_id', $user?->id)
+            ->pluck('id');
+
+        if ($fachId === null) {
+            if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
+                return;
+            }
+        } else {
+            $fachLehrer = Lehrauftrag::where('klasse_id', $klasse->id)
+                ->where('fach_id', $fachId)
+                ->pluck('lehrer_id');
+            if ($meineLehrerIds->intersect($fachLehrer)->isNotEmpty()) {
+                return;
+            }
+        }
+
+        abort(403, 'Keine Berechtigung, diesen Klassentext zu bearbeiten.');
     }
 
     /** Überlauf-Analyse neu berechnen und am Zeugnis zwischenspeichern. */

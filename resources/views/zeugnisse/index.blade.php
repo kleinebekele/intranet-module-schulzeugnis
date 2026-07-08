@@ -48,11 +48,16 @@
             pointer-events: none; opacity: 0; transform: translateY(4px);
             transition: opacity .12s ease, transform .12s ease;
         }
-        #zt-tip.zt-show { opacity: 1; transform: translateY(0); }
+        #zt-tip.zt-show { opacity: 1; transform: translateY(0); pointer-events: auto; }
         #zt-tip .zt-tip-fach { font-weight: 700; color: #4f46e5; font-size: 13px; margin-bottom: 2px; }
         #zt-tip .zt-tip-label { text-transform: uppercase; letter-spacing: .04em; font-size: 10px; font-weight: 600; color: #9ca3af; margin-top: 7px; }
         #zt-tip .zt-tip-text { white-space: pre-wrap; color: #4b5563; margin-top: 1px; line-height: 1.35; }
         #zt-tip .zt-tip-muted { color: #9ca3af; font-style: italic; }
+        #zt-tip .zt-tip-link {
+            display: inline-flex; align-items: center; gap: 4px; margin-top: 10px;
+            font-weight: 600; color: #4f46e5; text-decoration: none;
+        }
+        #zt-tip .zt-tip-link:hover { color: #4338ca; text-decoration: underline; }
     </style>
 
     <div class="space-y-3">
@@ -98,13 +103,15 @@
                             style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
                             data-fach="Haupttext" data-rolle="Klassenlehrer"
                             data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
-                            data-klassentext="{{ $klassentexte['haupt'] ?? '' }}">Haupt</th>
+                            data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
+                            @if ($istAdmin || $binKlassenlehrer) data-editurl="{{ route('module.schulzeugnis.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif>Haupt</th>
                         @foreach ($faecher as $fach)
                             <th class="zt-col zt-col-{{ $fach->id }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
                                 data-fach="{{ $fach->name }}" data-rolle="Fachlehrer"
                                 data-lehrer="{{ implode(', ', $fachlehrer[$fach->id] ?? []) }}"
-                                data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}">{{ $fach->kuerzel ?: $fach->name }}</th>
+                                data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}"
+                                @if ($istAdmin || in_array($fach->id, $meineFachIds)) data-editurl="{{ route('module.schulzeugnis.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
                         <th class="border-b border-l border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
                         <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">Vorschau</th>
@@ -275,6 +282,10 @@
 
             const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
 
+            let hideTimer = null;
+            const cancelHide = () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } };
+            const scheduleHide = () => { cancelHide(); hideTimer = setTimeout(() => tip.classList.remove('zt-show'), 220); };
+
             function position(th) {
                 const r = th.getBoundingClientRect();
                 const tw = tip.offsetWidth, thh = tip.offsetHeight;
@@ -289,20 +300,25 @@
                 const rolle = th.dataset.rolle || 'Fachlehrer';
                 const lehrer = (th.dataset.lehrer || '').trim();
                 const ktext = (th.dataset.klassentext || '').trim();
+                const editurl = th.dataset.editurl || '';
                 tip.innerHTML =
                     '<div class="zt-tip-fach">' + esc(th.dataset.fach || '') + '</div>' +
                     '<div class="zt-tip-label">' + esc(rolle) + '</div>' +
                     '<div class="zt-tip-text' + (lehrer ? '' : ' zt-tip-muted') + '">' + (lehrer ? esc(lehrer) : '—') + '</div>' +
                     '<div class="zt-tip-label">Klassentext</div>' +
-                    '<div class="zt-tip-text' + (ktext ? '' : ' zt-tip-muted') + '">' + (ktext ? esc(ktext) : '— kein Klassentext —') + '</div>';
+                    '<div class="zt-tip-text' + (ktext ? '' : ' zt-tip-muted') + '">' + (ktext ? esc(ktext) : '— kein Klassentext —') + '</div>' +
+                    (editurl ? '<a class="zt-tip-link" href="' + esc(editurl) + '"><i class="bx bx-edit"></i> Klassentext bearbeiten</a>' : '');
                 position(th);
                 tip.classList.add('zt-show');
             }
 
             document.querySelectorAll('#zt-table th.zt-kopf').forEach((th) => {
-                th.addEventListener('mouseenter', () => show(th));
-                th.addEventListener('mouseleave', () => tip.classList.remove('zt-show'));
+                th.addEventListener('mouseenter', () => { cancelHide(); show(th); });
+                th.addEventListener('mouseleave', scheduleHide);
             });
+            // Über dem Tooltip bleibt er offen (damit der Link anklickbar ist).
+            tip.addEventListener('mouseenter', cancelHide);
+            tip.addEventListener('mouseleave', scheduleHide);
         })();
     </script>
 </x-app-layout>

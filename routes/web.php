@@ -66,6 +66,10 @@ Route::middleware(['web', 'auth'])
 
         // Befüllte Zeugnisse einer Klasse.
         Route::get('klassen/{klasse}/zeugnisse', [ZeugnisController::class, 'index'])->name('zeugnisse.index');
+
+        // Klassenweiter Text je Fach (bzw. Haupttext) – direkt von der Zeugnisliste aus bearbeitbar.
+        Route::get('klassen/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextEdit'])->name('klassentexte.edit');
+        Route::put('klassen/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextUpdate'])->name('klassentexte.update');
         Route::post('klassen/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('zeugnisse.store');
         Route::get('zeugnisse/{zeugnis}/bearbeiten', [ZeugnisController::class, 'edit'])->name('zeugnisse.edit');
         Route::get('zeugnisse/{zeugnis}/vorschau', [ZeugnisController::class, 'vorschau'])->name('zeugnisse.vorschau');
