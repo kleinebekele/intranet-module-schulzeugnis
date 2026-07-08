@@ -52,6 +52,8 @@ Route::middleware(['web', 'auth'])
         Route::get('klassen/{klasse}/zeugnisse', [ZeugnisController::class, 'index'])->name('zeugnisse.index');
         Route::post('klassen/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('zeugnisse.store');
         Route::get('zeugnisse/{zeugnis}/bearbeiten', [ZeugnisController::class, 'edit'])->name('zeugnisse.edit');
+        Route::get('zeugnisse/{zeugnis}/vorschau', [ZeugnisController::class, 'vorschau'])->name('zeugnisse.vorschau');
+        Route::get('zeugnisse/{zeugnis}/pdf', [ZeugnisController::class, 'pdf'])->name('zeugnisse.pdf');
         Route::put('zeugnisse/{zeugnis}', [ZeugnisController::class, 'update'])->name('zeugnisse.update');
         Route::post('zeugnisse/{zeugnis}/abschliessen', [ZeugnisController::class, 'abschliessen'])->name('zeugnisse.abschliessen');
         Route::post('zeugnisse/{zeugnis}/wieder-oeffnen', [ZeugnisController::class, 'wiederOeffnen'])->name('zeugnisse.wiederoeffnen');

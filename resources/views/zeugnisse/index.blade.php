@@ -70,6 +70,9 @@
                         @foreach ($faecher as $fach)
                             <th class="zt-col zt-col-{{ $fach->id }} border-b border-gray-200 px-2 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
+                        <th class="border-b border-l border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
+                        <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">Vorschau</th>
+                        <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">PDF</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -121,10 +124,48 @@
                                     @endif
                                 </td>
                             @endforeach
+
+                            {{-- Warnhinweis Textlänge --}}
+                            @php $w = $warnungen[$s->id] ?? null; @endphp
+                            <td class="border-l border-gray-200 px-3 text-center whitespace-nowrap">
+                                @if ($w && $w['status'] === 'verkleinert')
+                                    <span class="text-amber-600" title="Text zu lang – passt automatisch verkleinert bei {{ $w['passtBei'] }} pt">
+                                        <i class="bx bx-error-circle"></i> {{ $w['passtBei'] }} pt
+                                    </span>
+                                @elseif ($w && $w['status'] === 'ueberlauf')
+                                    <span class="text-red-600" title="Text passt auch bei kleinster Schrift nicht vollständig">
+                                        <i class="bx bxs-error"></i> zu lang
+                                    </span>
+                                @elseif ($w && $w['status'] === 'ok')
+                                    <i class="bx bx-check text-green-500" title="passt"></i>
+                                @else
+                                    <span class="text-gray-200">–</span>
+                                @endif
+                            </td>
+
+                            {{-- Vorschau / PDF --}}
+                            <td class="px-3 text-center">
+                                @if ($z)
+                                    <a href="{{ route('module.schulzeugnis.zeugnisse.vorschau', $z) }}" target="_blank" title="Vorschau (HTML)" class="inline-flex text-indigo-600 hover:text-indigo-800">
+                                        <i class="bx bx-show text-lg"></i>
+                                    </a>
+                                @else
+                                    <span class="text-gray-200">–</span>
+                                @endif
+                            </td>
+                            <td class="px-3 text-center">
+                                @if ($z)
+                                    <a href="{{ route('module.schulzeugnis.zeugnisse.pdf', $z) }}" target="_blank" title="Als PDF herunterladen" class="inline-flex text-red-600 hover:text-red-800">
+                                        <i class="bx bxs-file-pdf text-lg"></i>
+                                    </a>
+                                @else
+                                    <span class="text-gray-200">–</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $faecher->count() + 2 }}" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="{{ $faecher->count() + 5 }}" class="px-4 py-8 text-center text-gray-500">
                                 Noch keine Schüler in dieser Klasse.
                                 <a href="{{ route('module.schulzeugnis.schueler.index', $klasse->schuljahr_id) }}" class="text-indigo-600 hover:text-indigo-700">Schüler anlegen</a>.
                             </td>

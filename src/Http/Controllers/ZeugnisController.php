@@ -11,6 +11,7 @@ use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
+use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
 
 /**
  * Befüllte Zeugnisse einer Klasse: anlegen (Abschnitte automatisch), befüllen,
@@ -42,6 +43,15 @@ class ZeugnisController
             ->pluck('fach_id')->unique()->values()->all();
         $binKlassenlehrer = $klasse->klassenlehrer && (int) $klasse->klassenlehrer->core_user_id === (int) $userId;
 
+        // Überlauf-/Auto-Verkleinerungs-Analyse je Zeugnis (für die Warn-Spalte).
+        $renderer = app(ZeugnisRenderer::class);
+        $warnungen = [];
+        foreach ($schueler as $s) {
+            if ($s->zeugnis) {
+                $warnungen[$s->id] = $renderer->analyse($s->zeugnis);
+            }
+        }
+
         return view('schulzeugnis::zeugnisse.index', [
             'klasse'           => $klasse,
             'faecher'          => $faecher,
@@ -49,7 +59,36 @@ class ZeugnisController
             'stati'            => Abschnitt::STATI,
             'meineFachIds'     => $meineFachIds,
             'binKlassenlehrer' => $binKlassenlehrer,
+            'warnungen'        => $warnungen,
         ]);
+    }
+
+    /** HTML-Vorschau des befüllten Zeugnisses (echte Daten durchs Format-Layout). */
+    public function vorschau(Zeugnis $zeugnis, ZeugnisRenderer $renderer)
+    {
+        $r = $renderer->render($zeugnis);
+
+        return view('schulzeugnis::formate.render', ['seiten' => $r['seiten'], 'daten' => $r['daten']]);
+    }
+
+    /** Befülltes Zeugnis als PDF (dompdf), echtes Papierformat. */
+    public function pdf(Zeugnis $zeugnis, ZeugnisRenderer $renderer)
+    {
+        $zeugnis->loadMissing('format');
+        $format = $zeugnis->format;
+
+        [$groesse, $lage] = $format && $format->broschuere
+            ? ['a3', 'landscape']
+            : [$format && $format->seitenformat === 'a3' ? 'a3' : 'a4', $format && $format->ausrichtung === 'quer' ? 'landscape' : 'portrait'];
+
+        $r = $renderer->render($zeugnis);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulzeugnis::formate.render', ['seiten' => $r['seiten'], 'daten' => $r['daten']])
+            ->setPaper($groesse, $lage);
+
+        $name = $zeugnis->schueler?->fullName() ?: 'zeugnis';
+
+        return $pdf->stream('zeugnis-' . \Illuminate\Support\Str::slug($name) . '.pdf');
     }
 
     /** Zeugnis für einen Schüler anlegen und die Abschnitte automatisch erzeugen. */
