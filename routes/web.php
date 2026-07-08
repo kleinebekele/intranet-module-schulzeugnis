@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\AltZeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
@@ -24,6 +25,10 @@ Route::middleware(['web', 'auth'])
     ->name('module.schulzeugnis.')
     ->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('index');
+
+        // Werkzeug: alte Zeugnis-PDF (je 4 A4-Seiten) in A3-Broschüre umschießen.
+        Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');
+        Route::post('alt-zeugnisse/umwandeln', [AltZeugnisController::class, 'umwandeln'])->name('altzeugnisse.umwandeln');
 
         // Schuljahre – Anker des Moduls.
         Route::get('schuljahre', [SchuljahrController::class, 'index'])->name('schuljahre.index');
