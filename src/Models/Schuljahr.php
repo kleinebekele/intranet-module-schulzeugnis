@@ -25,6 +25,11 @@ class Schuljahr extends Model
         return $this->hasMany(Lehrer::class, 'schuljahr_id');
     }
 
+    public function schueler(): HasMany
+    {
+        return $this->hasMany(Schueler::class, 'schuljahr_id');
+    }
+
     protected $casts = [
         'start_date'    => 'date',
         'end_date'      => 'date',

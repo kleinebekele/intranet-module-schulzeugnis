@@ -6,6 +6,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\KlasseController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
 
 /*
@@ -39,6 +40,15 @@ Route::middleware(['web', 'auth'])
         Route::get('klassen/{klasse}/bearbeiten', [KlasseController::class, 'edit'])->name('klassen.edit');
         Route::put('klassen/{klasse}', [KlasseController::class, 'update'])->name('klassen.update');
         Route::delete('klassen/{klasse}', [KlasseController::class, 'destroy'])->name('klassen.destroy');
+
+        // Schüler – je Schuljahr (keine Verbindung zum Core, quell_id lose).
+        Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.current');
+        Route::get('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'index'])->name('schueler.index');
+        Route::get('schuljahre/{schuljahr}/schueler/neu', [SchuelerController::class, 'create'])->name('schueler.create');
+        Route::post('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'store'])->name('schueler.store');
+        Route::get('schueler/{schueler}/bearbeiten', [SchuelerController::class, 'edit'])->name('schueler.edit');
+        Route::put('schueler/{schueler}', [SchuelerController::class, 'update'])->name('schueler.update');
+        Route::delete('schueler/{schueler}', [SchuelerController::class, 'destroy'])->name('schueler.destroy');
 
         // Fächer – feste, jahresübergreifende Liste.
         Route::get('faecher', [FachController::class, 'index'])->name('faecher.index');

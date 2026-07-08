@@ -15,7 +15,7 @@ class SchuljahrController
 {
     public function index()
     {
-        $schuljahre = Schuljahr::withCount(['klassen', 'lehrer'])->orderByDesc('start_date')->orderByDesc('name')->get();
+        $schuljahre = Schuljahr::withCount(['klassen', 'lehrer', 'schueler'])->orderByDesc('start_date')->orderByDesc('name')->get();
 
         return view('schulzeugnis::schuljahre.index', compact('schuljahre'));
     }

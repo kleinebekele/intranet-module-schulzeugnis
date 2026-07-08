@@ -56,6 +56,10 @@
                            class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
                             {{ $schuljahr->lehrer_count }} Lehrer &rarr;
                         </a>
+                        <a href="{{ route('module.schulzeugnis.schueler.index', $schuljahr) }}"
+                           class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
+                            {{ $schuljahr->schueler_count }} {{ $schuljahr->schueler_count === 1 ? 'Schüler' : 'Schüler' }} &rarr;
+                        </a>
                     </div>
                 </div>
 
