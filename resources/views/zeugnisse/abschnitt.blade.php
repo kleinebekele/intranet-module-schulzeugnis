@@ -123,13 +123,13 @@
             @endif
 
             @unless ($readonly)
-                <div class="space-y-1 border-t border-gray-100 pt-4">
+                <div class="space-y-2 border-t border-gray-100 pt-4" id="zt-nav">
                     <div class="flex items-center justify-between gap-2">
                         <span>
                             @if ($navPrev)
                                 <button type="submit" name="weiter_zu" value="{{ $navPrev['id'] }}"
-                                        title="Speichern &amp; vorheriger Schüler: {{ $navPrev['name'] }}"
-                                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                        data-goto="{{ route('module.schulzeugnis.abschnitte.edit', $navPrev['id']) }}"
+                                        class="zt-navbtn inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     &larr; {{ $navPrev['name'] }}
                                 </button>
                             @endif
@@ -140,18 +140,24 @@
                         <span>
                             @if ($navNext)
                                 <button type="submit" name="weiter_zu" value="{{ $navNext['id'] }}"
-                                        title="Speichern &amp; nächster Schüler: {{ $navNext['name'] }}"
-                                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                        data-goto="{{ route('module.schulzeugnis.abschnitte.edit', $navNext['id']) }}"
+                                        class="zt-navbtn inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     {{ $navNext['name'] }} &rarr;
                                 </button>
                             @endif
                         </span>
                     </div>
-                    @if ($navGesamt)
-                        <p class="text-center text-xs text-gray-400">
-                            Schüler {{ $navPosition }} von {{ $navGesamt }} in {{ $titel }} · „Vor/Zurück" speichert und wechselt
-                        </p>
-                    @endif
+                    <div class="flex flex-wrap items-center justify-center gap-x-2 text-xs text-gray-400">
+                        <label class="inline-flex items-center gap-1.5">
+                            <input type="checkbox" id="zt-nav-save" checked
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            Beim Wechseln speichern
+                        </label>
+                        <span id="zt-nav-hint"></span>
+                        @if ($navGesamt)
+                            <span>· Schüler {{ $navPosition }} von {{ $navGesamt }} in {{ $titel }}</span>
+                        @endif
+                    </div>
                 </div>
             @endunless
         </form>
@@ -214,4 +220,45 @@
             @endif
         </div>
     </div>
+
+    <style>
+        #zt-nav .zt-navbtn.zt-nav-discard {
+            border-color: #fcd34d; color: #b45309; background: #fffbeb;
+        }
+        #zt-nav .zt-navbtn.zt-nav-discard:hover { background: #fef3c7; }
+    </style>
+    <script>
+        (function () {
+            const nav = document.getElementById('zt-nav');
+            if (!nav) return;
+            const save = document.getElementById('zt-nav-save');
+            const hint = document.getElementById('zt-nav-hint');
+            const KEY = 'zt-nav-save';
+
+            if (localStorage.getItem(KEY) === '0') save.checked = false;
+
+            function refresh() {
+                localStorage.setItem(KEY, save.checked ? '1' : '0');
+                nav.querySelectorAll('.zt-navbtn').forEach((b) => {
+                    b.classList.toggle('zt-nav-discard', !save.checked);
+                    b.title = save.checked ? 'Speichern und wechseln' : 'Ohne Speichern wechseln (Änderungen verwerfen)';
+                });
+                if (hint) {
+                    hint.textContent = save.checked ? '' : '· Pfeile verwerfen die Änderungen';
+                    hint.style.color = save.checked ? '' : '#b45309';
+                }
+            }
+            save.addEventListener('change', refresh);
+            refresh();
+
+            nav.querySelectorAll('.zt-navbtn').forEach((b) => {
+                b.addEventListener('click', (e) => {
+                    if (!save.checked) {
+                        e.preventDefault();
+                        window.location.assign(b.dataset.goto);
+                    }
+                });
+            });
+        })();
+    </script>
 </x-app-layout>
