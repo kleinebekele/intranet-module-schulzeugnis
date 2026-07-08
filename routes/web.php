@@ -63,6 +63,9 @@ Route::middleware(['web', 'auth'])
         Route::put('abschnitte/{abschnitt}', [ZeugnisController::class, 'abschnittUpdate'])->name('abschnitte.update');
         Route::post('abschnitte/{abschnitt}/wiederherstellen', [ZeugnisController::class, 'abschnittWiederherstellen'])->name('abschnitte.wiederherstellen');
 
+        // Meine Korrekturen – Einstieg für Lehrer (nur die ihnen zugewiesenen Texte).
+        Route::get('korrekturen', [ZeugnisController::class, 'korrekturenIndex'])->name('korrekturen.index');
+
         // Schüler – je Schuljahr (keine Verbindung zum Core, quell_id lose).
         Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.current');
         Route::get('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'index'])->name('schueler.index');

@@ -258,6 +258,11 @@ class SeedDemo extends Command
                 ['email' => $email],
                 ['name' => "{$vorname} {$nachname}", 'password' => Hash::make($password)],
             );
+            // Lehrer-Rolle, damit sie (bei entsprechend freigeschaltetem Menuepunkt)
+            // als Korrektoren aufs Modul zugreifen koennen.
+            if (\Illuminate\Support\Facades\Schema::hasTable('roles') && \App\Models\Role::whereKey('teacher')->exists()) {
+                $user->roles()->syncWithoutDetaching(['teacher']);
+            }
 
             $lehrer[] = Lehrer::create([
                 'schuljahr_id' => $schuljahr->id,
