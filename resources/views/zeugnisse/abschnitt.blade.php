@@ -226,29 +226,39 @@
         <div class="rounded-xl border border-gray-200 bg-white p-5">
             <h2 class="text-sm font-semibold text-gray-700">Änderungsverlauf</h2>
             @if ($verlauf->isEmpty())
-                <p class="mt-2 text-sm text-gray-400">Noch keine Textänderungen protokolliert.</p>
+                <p class="mt-2 text-sm text-gray-400">Noch keine Änderungen protokolliert.</p>
             @else
-                <ul class="mt-3 space-y-3">
-                    @foreach ($verlauf as $eintrag)
+                <ul class="mt-3 space-y-2.5">
+                    @foreach ($verlauf as $e)
                         <li class="border-l-2 border-gray-200 pl-3">
-                            <div class="flex items-center justify-between gap-3">
-                                <div class="text-xs text-gray-500">
-                                    {{ $eintrag->created_at?->format('d.m.Y H:i') }} Uhr
-                                    @if ($eintrag->akteur_name) &middot; {{ $eintrag->akteur_name }} @endif
-                                    @if ($eintrag->aktion === 'abschnitt_wiederhergestellt')
-                                        <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">wiederhergestellt</span>
-                                    @endif
-                                </div>
-                                @unless ($readonly)
+                            <div class="text-xs text-gray-500">
+                                {{ $e['zeit']?->format('d.m.Y H:i') }} Uhr
+                                @if ($e['akteur']) &middot; {{ $e['akteur'] }} @endif
+                                @if ($e['wiederhergestellt'])
+                                    <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">wiederhergestellt</span>
+                                @endif
+                            </div>
+                            <div class="mt-0.5 text-sm text-gray-700">
+                                <span class="font-medium">{{ $e['feld'] }}</span>
+                                <span class="text-gray-500">— {{ $e['summary'] }}</span>
+                            </div>
+                            <div class="mt-1 flex items-center gap-3 text-xs">
+                                @unless ($e['istStatus'])
+                                    <button type="button" class="zt-vergleich inline-flex items-center gap-1 text-indigo-600 hover:underline"
+                                            data-feld="{{ $e['feld'] }}" data-zeit="{{ $e['zeit']?->format('d.m.Y H:i') }}"
+                                            data-alt="{{ $e['alt'] }}" data-neu="{{ $e['neu'] }}">
+                                        <i class="bx bx-git-compare"></i> Vergleichen
+                                    </button>
+                                @endunless
+                                @if (! $readonly && $e['restorable'])
                                     <form method="POST" action="{{ route('module.schulzeugnis.abschnitte.wiederherstellen', $abschnitt) }}"
                                           onsubmit="return confirm('Diesen Stand wiederherstellen? Der aktuelle Text wird ersetzt (bleibt im Verlauf).');">
                                         @csrf
-                                        <input type="hidden" name="protokoll_id" value="{{ $eintrag->id }}">
-                                        <button type="submit" class="text-xs text-indigo-600 hover:underline">Wiederherstellen</button>
+                                        <input type="hidden" name="protokoll_id" value="{{ $e['id'] }}">
+                                        <button type="submit" class="text-gray-500 hover:text-indigo-600 hover:underline">Wiederherstellen</button>
                                     </form>
-                                @endunless
+                                @endif
                             </div>
-                            <p class="mt-1 whitespace-pre-line text-sm text-gray-700">{{ \Illuminate\Support\Str::limit($eintrag->neu_wert, 240) ?: '(leer)' }}</p>
                         </li>
                     @endforeach
                 </ul>
@@ -256,6 +266,30 @@
         </div>
         </div>{{-- /zt-side --}}
         </div>{{-- /zt-cols --}}
+    </div>
+
+    {{-- Vergleichs-Modal (Vorher/Nachher nebeneinander) --}}
+    <div id="zt-modal" class="zt-modal" hidden>
+        <div class="zt-modal-backdrop" data-close></div>
+        <div class="zt-modal-box">
+            <div class="zt-modal-head">
+                <div>
+                    <div class="text-sm font-semibold text-gray-800" id="zt-modal-feld">Vergleich</div>
+                    <div class="text-xs text-gray-400" id="zt-modal-zeit"></div>
+                </div>
+                <button type="button" class="zt-modal-x" data-close aria-label="Schließen"><i class="bx bx-x text-2xl"></i></button>
+            </div>
+            <div class="zt-modal-cols">
+                <div class="zt-modal-col">
+                    <div class="zt-modal-label">Vorher</div>
+                    <div class="zt-modal-pre" id="zt-modal-alt"></div>
+                </div>
+                <div class="zt-modal-col">
+                    <div class="zt-modal-label">Nachher</div>
+                    <div class="zt-modal-pre" id="zt-modal-neu"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <style>
@@ -294,6 +328,24 @@
         .zt-status-list li .bx { font-size: 1.125rem; }
         .zt-status-ro .zt-status-btn { background: #f9fafb; cursor: default; }
         .zt-status-ro .zt-status-caret { display: none; }
+
+        /* Vergleichs-Modal */
+        .zt-modal { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .zt-modal[hidden] { display: none; }
+        .zt-modal-backdrop { position: absolute; inset: 0; background: rgba(17,24,39,.5); }
+        .zt-modal-box {
+            position: relative; background: #fff; border-radius: .75rem;
+            box-shadow: 0 20px 50px -12px rgba(0,0,0,.5);
+            width: 100%; max-width: 900px; max-height: 85vh; display: flex; flex-direction: column;
+        }
+        .zt-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .9rem 1.1rem; border-bottom: 1px solid #eee; }
+        .zt-modal-x { color: #9ca3af; line-height: 1; }
+        .zt-modal-x:hover { color: #374151; }
+        .zt-modal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #eee; overflow: hidden; border-radius: 0 0 .75rem .75rem; flex: 1; min-height: 0; }
+        .zt-modal-col { background: #fff; display: flex; flex-direction: column; min-height: 0; }
+        .zt-modal-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; color: #9ca3af; padding: .55rem .9rem .1rem; }
+        .zt-modal-pre { white-space: pre-wrap; word-break: break-word; font-size: .875rem; color: #374151; line-height: 1.5; padding: .2rem .9rem 1rem; overflow: auto; }
+        @media (max-width: 640px) { .zt-modal-cols { grid-template-columns: 1fr; } }
     </style>
     <script>
         (function () {
@@ -342,6 +394,29 @@
                 });
             });
             document.addEventListener('click', (e) => { if (!root.contains(e.target)) list.hidden = true; });
+        })();
+
+        // Vergleichs-Modal (Vorher/Nachher).
+        (function () {
+            const modal = document.getElementById('zt-modal');
+            if (!modal) return;
+            const feldEl = document.getElementById('zt-modal-feld');
+            const zeitEl = document.getElementById('zt-modal-zeit');
+            const altEl = document.getElementById('zt-modal-alt');
+            const neuEl = document.getElementById('zt-modal-neu');
+            const close = () => { modal.hidden = true; };
+
+            document.querySelectorAll('.zt-vergleich').forEach((b) => {
+                b.addEventListener('click', () => {
+                    feldEl.textContent = 'Vergleich: ' + (b.dataset.feld || '');
+                    zeitEl.textContent = b.dataset.zeit ? (b.dataset.zeit + ' Uhr') : '';
+                    altEl.textContent = b.dataset.alt || '(leer)';
+                    neuEl.textContent = b.dataset.neu || '(leer)';
+                    modal.hidden = false;
+                });
+            });
+            modal.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', close));
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
         })();
     </script>
 </x-app-layout>

@@ -312,9 +312,37 @@ class ZeugnisController
         $klasse  = $zeugnis->schueler?->klasse;
 
         $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
-            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'])
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt'])
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->map(function (Protokoll $e) {
+                $istStatus = $e->aktion === 'abschnitt_status';
+                $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
+
+                if ($istStatus) {
+                    $summary = ($e->alt_wert ?: '—') . ' → ' . ($e->neu_wert ?: '—');
+                } else {
+                    $delta = $wz($e->neu_wert) - $wz($e->alt_wert);
+                    $summary = $delta > 0
+                        ? ($delta . ($delta === 1 ? ' Wort' : ' Wörter') . ' hinzugefügt')
+                        : ($delta < 0
+                            ? (abs($delta) . (abs($delta) === 1 ? ' Wort' : ' Wörter') . ' entfernt')
+                            : 'überarbeitet (gleiche Wortzahl)');
+                }
+
+                return [
+                    'id'                => $e->id,
+                    'zeit'              => $e->created_at,
+                    'akteur'            => $e->akteur_name,
+                    'feld'              => $e->beschreibung,
+                    'istStatus'         => $istStatus,
+                    'wiederhergestellt' => $e->aktion === 'abschnitt_wiederhergestellt',
+                    'summary'           => $summary,
+                    'alt'               => (string) $e->alt_wert,
+                    'neu'               => (string) $e->neu_wert,
+                    'restorable'        => in_array($e->aktion, ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'], true),
+                ];
+            });
 
         $berechtigung = $this->berechtigung($abschnitt, auth()->user());
         $nachbarn     = $this->abschnittNachbarn($abschnitt);
@@ -412,6 +440,7 @@ class ZeugnisController
             ]);
 
             $altInhalt = $abschnitt->inhalt;
+            $altStatus = $abschnitt->status;
             $abschnitt->inhalt = $data['inhalt'] ?? null;
             if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
                 $abschnitt->note = $data['note'] ?? null;
@@ -419,16 +448,9 @@ class ZeugnisController
             $abschnitt->status = $data['status'];
             $abschnitt->save();
 
-            if ((string) $altInhalt !== (string) $abschnitt->inhalt) {
-                Protokoll::log('abschnitt_geaendert', [
-                    'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
-                    'zeugnis_id'   => $zeugnis->id,
-                    'abschnitt_id' => $abschnitt->id,
-                    'beschreibung' => $this->abschnittLabel($abschnitt) . ' korrigiert',
-                    'alt_wert'     => $altInhalt,
-                    'neu_wert'     => $abschnitt->inhalt,
-                ]);
-            }
+            $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
+            $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
+            $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
             $this->ueberlaufNeuBerechnen($zeugnis);
 
@@ -460,6 +482,8 @@ class ZeugnisController
         }
 
         $altInhalt = $abschnitt->inhalt;
+        $altNotiz  = $abschnitt->notiz;
+        $altStatus = $abschnitt->status;
 
         $abschnitt->inhalt = $data['inhalt'] ?? null;
         if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
@@ -472,16 +496,10 @@ class ZeugnisController
 
         $abschnitt->korrektoren()->sync($korrektoren);
 
-        if ((string) $altInhalt !== (string) $abschnitt->inhalt) {
-            Protokoll::log('abschnitt_geaendert', [
-                'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
-                'zeugnis_id'   => $zeugnis->id,
-                'abschnitt_id' => $abschnitt->id,
-                'beschreibung' => $this->abschnittLabel($abschnitt) . ' geändert',
-                'alt_wert'     => $altInhalt,
-                'neu_wert'     => $abschnitt->inhalt,
-            ]);
-        }
+        $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
+        $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
+        $this->logFeld($abschnitt, 'Notiz', $altNotiz, $abschnitt->notiz, 'abschnitt_notiz');
+        $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
         // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Haupttext).
         $klassentextGeaendert = false;
@@ -489,16 +507,11 @@ class ZeugnisController
             $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
             $neu = $data['klassentext'] ?? null;
             if ((string) $kt->text !== (string) $neu) {
+                $altKt = $kt->text;
                 $kt->text = $neu;
                 $kt->save();
                 $klassentextGeaendert = true;
-                Protokoll::log('klassentext_geaendert', [
-                    'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
-                    'zeugnis_id'   => $zeugnis->id,
-                    'abschnitt_id' => $abschnitt->id,
-                    'beschreibung' => 'Klassenweiter Text (' . ($abschnitt->fach?->name ?? 'Haupttext') . ') in ' . ($klasse->name ?? '') . ' geändert',
-                    'neu_wert'     => $neu,
-                ]);
+                $this->logFeld($abschnitt, 'Klassenweiter Text', $altKt, $neu, 'abschnitt_klassentext');
             }
         }
 
@@ -566,7 +579,7 @@ class ZeugnisController
             'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
             'zeugnis_id'   => $zeugnis->id,
             'abschnitt_id' => $abschnitt->id,
-            'beschreibung' => $this->abschnittLabel($abschnitt) . ': Stand vom ' . $eintrag->created_at?->format('d.m.Y H:i') . ' wiederhergestellt',
+            'beschreibung' => 'Schülertext',
             'alt_wert'     => $altInhalt,
             'neu_wert'     => $ziel,
         ]);
@@ -577,11 +590,32 @@ class ZeugnisController
             ->with('status', 'Früherer Stand wiederhergestellt.');
     }
 
-    private function abschnittLabel(Abschnitt $abschnitt): string
+    /** Eine Feld-Änderung (Text/Notiz/Klassentext) protokollieren – nur wenn sie sich unterscheidet. */
+    private function logFeld(Abschnitt $abschnitt, string $feld, ?string $alt, ?string $neu, string $aktion = 'abschnitt_geaendert'): void
     {
-        return $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT
-            ? 'Haupttext'
-            : ('Fach: ' . ($abschnitt->fach?->name ?? '—'));
+        if ((string) $alt === (string) $neu) {
+            return;
+        }
+
+        Protokoll::log($aktion, [
+            'schuljahr_id' => $abschnitt->zeugnis?->schueler?->schuljahr_id,
+            'zeugnis_id'   => $abschnitt->zeugnis_id,
+            'abschnitt_id' => $abschnitt->id,
+            'beschreibung' => $feld,
+            'alt_wert'     => $alt,
+            'neu_wert'     => $neu,
+        ]);
+    }
+
+    /** Eine Status-Änderung protokollieren (alt/neu als lesbare Labels). */
+    private function logStatus(Abschnitt $abschnitt, string $alt, string $neu): void
+    {
+        if ($alt === $neu) {
+            return;
+        }
+
+        $label = fn ($k) => Abschnitt::STATI[$k]['label'] ?? $k;
+        $this->logFeld($abschnitt, 'Status', $label($alt), $label($neu), 'abschnitt_status');
     }
 
     /**
