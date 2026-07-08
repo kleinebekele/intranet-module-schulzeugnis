@@ -29,6 +29,7 @@ Route::middleware(['web', 'auth'])
         // Werkzeug: alte Zeugnis-PDF (je 4 A4-Seiten) in A3-Broschüre umschießen.
         Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');
         Route::post('alt-zeugnisse/umwandeln', [AltZeugnisController::class, 'umwandeln'])->name('altzeugnisse.umwandeln');
+        Route::get('alt-zeugnisse/download/{token}', [AltZeugnisController::class, 'download'])->name('altzeugnisse.download');
 
         // Schuljahre – Anker des Moduls.
         Route::get('schuljahre', [SchuljahrController::class, 'index'])->name('schuljahre.index');
