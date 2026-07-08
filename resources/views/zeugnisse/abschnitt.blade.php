@@ -125,39 +125,51 @@
             @endif
 
             @unless ($readonly)
-                <div class="space-y-2 border-t border-gray-100 pt-4" id="zt-nav">
-                    <div class="flex items-center justify-between gap-2">
-                        <span>
-                            @if ($navPrev)
-                                <button type="submit" name="weiter_zu" value="{{ $navPrev['id'] }}"
-                                        data-goto="{{ route('module.schulzeugnis.abschnitte.edit', $navPrev['id']) }}"
-                                        class="zt-navbtn inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    &larr; {{ $navPrev['name'] }}
-                                </button>
-                            @endif
-                        </span>
-                        <button type="submit" class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                            Speichern
-                        </button>
-                        <span>
-                            @if ($navNext)
-                                <button type="submit" name="weiter_zu" value="{{ $navNext['id'] }}"
-                                        data-goto="{{ route('module.schulzeugnis.abschnitte.edit', $navNext['id']) }}"
-                                        class="zt-navbtn inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    {{ $navNext['name'] }} &rarr;
-                                </button>
-                            @endif
-                        </span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-center gap-x-2 text-xs text-gray-400">
-                        <label class="inline-flex items-center gap-1.5">
-                            <input type="checkbox" id="zt-nav-save" checked
-                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            Beim Wechseln speichern
+                @php
+                    $vorauswahl = $navNext ? 'next' : ($navPrev ? 'prev' : 'index');
+                    $urlPrev  = $navPrev ? route('module.schulzeugnis.abschnitte.edit', $navPrev['id']) : '';
+                    $urlNext  = $navNext ? route('module.schulzeugnis.abschnitte.edit', $navNext['id']) : '';
+                    $urlIndex = route('module.schulzeugnis.zeugnisse.index', $schueler?->klasse);
+                    $labelNext = $navNext ? 'Nächster Schüler: ' . $navNext['name'] : 'Nächster Schüler (keiner)';
+                    $labelPrev = $navPrev ? 'Vorheriger Schüler: ' . $navPrev['name'] : 'Vorheriger Schüler (keiner)';
+                @endphp
+                <div class="space-y-3 border-t border-gray-100 pt-4" id="zt-nav">
+                    <p class="text-sm font-medium text-gray-700">Danach weiter zu:</p>
+                    <div class="space-y-1.5 text-sm">
+                        <label class="flex items-center gap-2 {{ $navNext ? 'text-gray-700' : 'text-gray-400' }}">
+                            <input type="radio" name="weiter" value="next" data-url="{{ $urlNext }}"
+                                   @checked($vorauswahl === 'next') @disabled(! $navNext)
+                                   class="text-indigo-600 focus:ring-indigo-500">
+                            <i class="bx bx-right-arrow-alt text-lg text-indigo-500"></i>
+                            <span>{{ $labelNext }}</span>
                         </label>
-                        <span id="zt-nav-hint"></span>
+                        <label class="flex items-center gap-2 {{ $navPrev ? 'text-gray-700' : 'text-gray-400' }}">
+                            <input type="radio" name="weiter" value="prev" data-url="{{ $urlPrev }}"
+                                   @checked($vorauswahl === 'prev') @disabled(! $navPrev)
+                                   class="text-indigo-600 focus:ring-indigo-500">
+                            <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
+                            <span>{{ $labelPrev }}</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-gray-700">
+                            <input type="radio" name="weiter" value="index" data-url="{{ $urlIndex }}"
+                                   @checked($vorauswahl === 'index')
+                                   class="text-indigo-600 focus:ring-indigo-500">
+                            <i class="bx bx-list-ul text-lg text-indigo-500"></i>
+                            Zurück zur Übersicht
+                        </label>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1">
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                            <i class="bx bx-save text-lg"></i> Speichern
+                        </button>
+                        <button type="button" id="zt-cancel"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="bx bx-x text-lg"></i> Abbrechen
+                        </button>
                         @if ($navGesamt)
-                            <span>· Schüler {{ $navPosition }} von {{ $navGesamt }} in {{ $titel }}</span>
+                            <span class="ml-auto text-xs text-gray-400">Schüler {{ $navPosition }} von {{ $navGesamt }} in {{ $titel }}</span>
                         @endif
                     </div>
                 </div>
@@ -233,42 +245,30 @@
         @media (min-width: 1024px) {
             .zt-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
         }
-        #zt-nav .zt-navbtn.zt-nav-discard {
-            border-color: #fcd34d; color: #b45309; background: #fffbeb;
-        }
-        #zt-nav .zt-navbtn.zt-nav-discard:hover { background: #fef3c7; }
     </style>
     <script>
         (function () {
             const nav = document.getElementById('zt-nav');
             if (!nav) return;
-            const save = document.getElementById('zt-nav-save');
-            const hint = document.getElementById('zt-nav-hint');
-            const KEY = 'zt-nav-save';
+            const KEY = 'zt-weiter';
+            const radios = [...nav.querySelectorAll('input[name="weiter"]')];
 
-            if (localStorage.getItem(KEY) === '0') save.checked = false;
-
-            function refresh() {
-                localStorage.setItem(KEY, save.checked ? '1' : '0');
-                nav.querySelectorAll('.zt-navbtn').forEach((b) => {
-                    b.classList.toggle('zt-nav-discard', !save.checked);
-                    b.title = save.checked ? 'Speichern und wechseln' : 'Ohne Speichern wechseln (Änderungen verwerfen)';
-                });
-                if (hint) {
-                    hint.textContent = save.checked ? '' : '· Pfeile verwerfen die Änderungen';
-                    hint.style.color = save.checked ? '' : '#b45309';
-                }
+            // Zuletzt gewähltes Ziel übernehmen (falls verfügbar) – erleichtert das
+            // Durchgehen einer Klasse in eine Richtung.
+            const stored = localStorage.getItem(KEY);
+            if (stored) {
+                const r = radios.find((x) => x.value === stored && !x.disabled);
+                if (r) r.checked = true;
             }
-            save.addEventListener('change', refresh);
-            refresh();
+            radios.forEach((r) => r.addEventListener('change', () => {
+                if (r.checked) localStorage.setItem(KEY, r.value);
+            }));
 
-            nav.querySelectorAll('.zt-navbtn').forEach((b) => {
-                b.addEventListener('click', (e) => {
-                    if (!save.checked) {
-                        e.preventDefault();
-                        window.location.assign(b.dataset.goto);
-                    }
-                });
+            // Abbrechen = ohne Speichern zum gewählten Ziel wechseln.
+            const cancel = document.getElementById('zt-cancel');
+            if (cancel) cancel.addEventListener('click', () => {
+                const sel = radios.find((x) => x.checked);
+                if (sel && sel.dataset.url) window.location.assign(sel.dataset.url);
             });
         })();
     </script>

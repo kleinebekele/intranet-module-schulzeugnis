@@ -405,10 +405,10 @@ class ZeugnisController
         // Korrektor: nur Text korrigieren + Status auf „in Korrektur"/„Korrektur durchgeführt".
         if ($b === 'korrektor') {
             $data = $request->validate([
-                'inhalt'    => ['nullable', 'string'],
-                'note'      => ['nullable', 'string', 'max:20'],
-                'status'    => ['required', Rule::in(self::KORREKTUR_STATI)],
-                'weiter_zu' => ['nullable', 'integer'],
+                'inhalt' => ['nullable', 'string'],
+                'note'   => ['nullable', 'string', 'max:20'],
+                'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
+                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index'])],
             ]);
 
             $altInhalt = $abschnitt->inhalt;
@@ -432,7 +432,7 @@ class ZeugnisController
 
             $this->ueberlaufNeuBerechnen($zeugnis);
 
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $this->naechstesZiel($request, $abschnitt))
+            return $this->zielNachSpeichern($request, $abschnitt)
                 ->with('status', $gespeichertWas . ' für ' . $gespeichertName . ' korrigiert.');
         }
 
@@ -445,14 +445,14 @@ class ZeugnisController
             'klassentext'   => ['nullable', 'string'],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
-            'weiter_zu'     => ['nullable', 'integer'],
+            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index'])],
         ]);
 
         // Korrektor-Pflicht nur beim normalen Speichern erzwingen. Beim Blättern
         // („Speichern & vorheriger/nächster") nicht blockieren – dann wird gespeichert
         // und einfach zum Nachbarn gewechselt, Korrektoren können später folgen.
         $korrektoren = $data['korrektoren'] ?? [];
-        $blaettert   = (int) $request->input('weiter_zu') > 0;
+        $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index'], true);
         if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
                 ->withInput()
@@ -510,16 +510,32 @@ class ZeugnisController
                 ->update(['ueberlauf_status' => null]);
         }
 
-        return redirect()->route('module.schulzeugnis.abschnitte.edit', $this->naechstesZiel($request, $abschnitt))
+        return $this->zielNachSpeichern($request, $abschnitt)
             ->with('status', $gespeichertWas . ' für ' . $gespeichertName . ' gespeichert.');
     }
 
-    /** Nach dem Speichern: zum per „weiter_zu" gewählten Nachbar-Abschnitt, sonst zurück zum aktuellen. */
-    private function naechstesZiel(Request $request, Abschnitt $fallback): int
+    /**
+     * Redirect nach dem Speichern gemäß Auswahl „weiter":
+     * next/prev = Nachbar-Schüler (gleiches Fach), index = zurück zur Zeugnisliste,
+     * sonst beim aktuellen Abschnitt bleiben.
+     */
+    private function zielNachSpeichern(Request $request, Abschnitt $abschnitt)
     {
-        $weiter = (int) $request->input('weiter_zu');
+        $weiter   = (string) $request->input('weiter');
+        $nachbarn = $this->abschnittNachbarn($abschnitt);
+        $klasse   = $abschnitt->zeugnis?->schueler?->klasse;
 
-        return ($weiter && Abschnitt::whereKey($weiter)->exists()) ? $weiter : $fallback->id;
+        if ($weiter === 'next' && $nachbarn['next']) {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $nachbarn['next']['id']);
+        }
+        if ($weiter === 'prev' && $nachbarn['prev']) {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $nachbarn['prev']['id']);
+        }
+        if ($weiter === 'index' && $klasse) {
+            return redirect()->route('module.schulzeugnis.zeugnisse.index', $klasse);
+        }
+
+        return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt);
     }
 
     /** Einen früheren Textstand aus dem Verlauf wiederherstellen. */
