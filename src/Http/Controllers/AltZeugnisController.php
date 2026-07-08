@@ -142,7 +142,14 @@ class AltZeugnisController
         }
     }
 
-    /** Schülername = die Zeile direkt unter der „Zeugnis"-Überschrift (heuristisch). */
+    /**
+     * Schülername von der ersten Zeugnis-Seite. Muster des alten Programms:
+     *   Julian Lechthoff
+     *   - geboren am 01.08.2018 in Bielefeld -
+     *   erhält für die Klasse 01 im Schuljahr 2025 / 2026 folgendes Zeugnis:
+     * Der Name ist also die Zeile direkt ÜBER „… geboren am …" (Fallback: erste
+     * nicht-leere Zeile).
+     */
     private function nameAusZeugnis(string $text): ?string
     {
         $zeilen = array_values(array_filter(
@@ -150,13 +157,17 @@ class AltZeugnisController
             fn ($z) => $z !== ''
         ));
 
+        if ($zeilen === []) {
+            return null;
+        }
+
         foreach ($zeilen as $i => $zeile) {
-            if (preg_match('/^Zeugnis$/iu', $zeile) && isset($zeilen[$i + 1])) {
-                return $zeilen[$i + 1];
+            if ($i > 0 && preg_match('/geboren\s+am/iu', $zeile)) {
+                return $zeilen[$i - 1];
             }
         }
 
-        return null;
+        return $zeilen[0];
     }
 
     /** Temporäre Ausgabe-PDFs älter als eine Stunde entfernen. */
