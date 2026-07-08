@@ -15,6 +15,23 @@
             &larr; Neue Datei umwandeln
         </a>
 
+        {{-- Entfernte Zeugnisse (Seitenzahl ≠ 4) --}}
+        @if (! empty($entfernt))
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p class="font-semibold">Folgende Zeugnisse wurden entfernt (nicht genau 4 Seiten):</p>
+                <ul class="mt-2 list-disc pl-5">
+                    @foreach ($entfernt as $e)
+                        <li>
+                            Zeugnis von <strong>{{ $e['name'] ?: 'unbekannt' }}</strong> wurde entfernt,
+                            da es aus {{ $e['anzahl'] }} Seite{{ $e['anzahl'] == 1 ? '' : 'n' }} besteht
+                            <span class="text-amber-700">(ab Original-Seite {{ $e['startSeite'] }})</span>.
+                        </li>
+                    @endforeach
+                </ul>
+                <p class="mt-2 text-amber-700">Der Rest wurde sauber umgewandelt.</p>
+            </div>
+        @endif
+
         {{-- Raute-Prüfung --}}
         @if (! $rauten['ok'])
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -27,8 +44,8 @@
                 <ul class="mt-2 list-disc pl-5">
                     @foreach ($rauten['treffer'] as $t)
                         <li>
-                            <strong>{{ $t['name'] ?: 'Zeugnis ' . $t['zeugnis'] }}</strong>
-                            <span class="text-red-700">(Zeugnis {{ $t['zeugnis'] }}, Original-Seite{{ count($t['seiten']) > 1 ? 'n' : '' }} {{ implode(', ', $t['seiten']) }})</span>
+                            <strong>{{ $t['name'] ?: 'unbekannt' }}</strong>
+                            <span class="text-red-700">(Original-Seite{{ count($t['seiten']) > 1 ? 'n' : '' }} {{ implode(', ', $t['seiten']) }})</span>
                         </li>
                     @endforeach
                 </ul>

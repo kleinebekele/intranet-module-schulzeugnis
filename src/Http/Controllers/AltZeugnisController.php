@@ -32,6 +32,10 @@ class AltZeugnisController
 
         $pfad = $request->file('pdf')->getRealPath();
 
+        // Text je Seite lesen – daran erkennen wir die Zeugnis-Grenzen (jede erste
+        // Seite enthält die Geburtszeile) und später die Rauten. Null bei Scan-PDFs.
+        $seitenTexte = $this->seitenTexte($pfad);
+
         $pdf = new Fpdi('L', 'mm', 'A3'); // A3 quer (420 × 297 mm)
         $pdf->setAutoPageBreak(false);
 
@@ -44,14 +48,50 @@ class AltZeugnisController
                 . '(Technisch: ' . $e->getMessage() . ')');
         }
 
-        if ($seiten === 0 || $seiten % 4 !== 0) {
-            return back()->with('error',
-                "Die hochgeladene PDF hat {$seiten} Seiten. Das ist nicht durch 4 teilbar – "
-                . 'pro Zeugnis müssen genau 4 A4-Seiten vorliegen. Bitte die Original-Datei prüfen.');
+        if ($seiten === 0) {
+            return back()->with('error', 'Die hochgeladene PDF enthält keine Seiten.');
         }
 
-        for ($gruppe = 0; $gruppe < $seiten / 4; $gruppe++) {
-            $basis = $gruppe * 4; // 0-basiert; Quellseiten sind 1-basiert
+        // Zeugnis-Gruppen bestimmen: bei lesbarem Text automatisch an den ersten
+        // Seiten, sonst strikt je 4 Seiten (dann muss die Seitenzahl durch 4 teilbar sein).
+        if ($seitenTexte !== null) {
+            $gruppen = $this->zeugnisGruppen($seitenTexte);
+        } else {
+            if ($seiten % 4 !== 0) {
+                return back()->with('error',
+                    "Die hochgeladene PDF hat {$seiten} Seiten und ihr Text ließ sich nicht lesen, "
+                    . 'sodass die Zeugnis-Grenzen nicht automatisch erkannt werden konnten. '
+                    . 'Ohne lesbaren Text müssen es genau 4 A4-Seiten pro Zeugnis sein (durch 4 teilbar).');
+            }
+            $gruppen = [];
+            for ($i = 0; $i < $seiten; $i += 4) {
+                $gruppen[] = ['start' => $i, 'laenge' => 4];
+            }
+        }
+
+        // In gültige (genau 4 Seiten) und entfernte Zeugnisse aufteilen.
+        $gueltig = [];
+        $entfernt = [];
+        foreach ($gruppen as $g) {
+            if ($g['laenge'] === 4 && $g['start'] + 4 <= $seiten) {
+                $gueltig[] = $g;
+            } else {
+                $entfernt[] = [
+                    'name'       => $seitenTexte !== null ? $this->nameAusZeugnis($seitenTexte[$g['start']] ?? '') : null,
+                    'anzahl'     => $g['laenge'],
+                    'startSeite' => $g['start'] + 1,
+                ];
+            }
+        }
+
+        if ($gueltig === []) {
+            return back()->with('error',
+                'Es wurde kein einziges Zeugnis mit genau 4 Seiten gefunden – die Datei wurde nicht umgewandelt.');
+        }
+
+        // Gültige Zeugnisse umschießen.
+        foreach ($gueltig as $g) {
+            $basis = $g['start']; // 0-basiert; Quellseiten sind 1-basiert
             $this->bogen($pdf, $basis + 4, $basis + 1); // Bogen 1: links 4, rechts 1
             $this->bogen($pdf, $basis + 2, $basis + 3); // Bogen 2: links 2, rechts 3
         }
@@ -73,8 +113,9 @@ class AltZeugnisController
         return view('schulzeugnis::altzeugnisse.ergebnis', [
             'token'       => $token,
             'seiten'      => $seiten,
-            'zeugnisse'   => (int) ($seiten / 4),
-            'rauten'      => $this->rautenSeiten($pfad),
+            'zeugnisse'   => count($gueltig),
+            'rauten'      => $this->rautenPruefung($seitenTexte, $gueltig),
+            'entfernt'    => $entfernt,
             'ausgabeName' => $ausgabeName,
         ]);
     }
@@ -108,38 +149,95 @@ class AltZeugnisController
     }
 
     /**
-     * Zeugnisse (4er-Gruppen), in deren Text eine Raute „#" vorkommt – mit dem
-     * Schülernamen (von der ersten Seite, unter der „Zeugnis"-Überschrift) und den
-     * betroffenen Original-Seiten.
+     * Text je Seite (0-basiert) über den PDF-Parser lesen. Null, wenn sich die
+     * PDF nicht als Text lesen lässt (z. B. reine Scan-PDF).
      *
-     * @return array{ok:bool,treffer:array<int,array{zeugnis:int,name:?string,seiten:array<int,int>}>,fehler:?string}
+     * @return array<int,string>|null
      */
-    private function rautenSeiten(string $pfad): array
+    private function seitenTexte(string $pfad): ?array
     {
         try {
-            $pages = (new Parser())->parseFile($pfad)->getPages();
+            $texte = [];
+            foreach ((new Parser())->parseFile($pfad)->getPages() as $i => $page) {
+                $texte[$i] = (string) $page->getText();
+            }
 
-            $proZeugnis = [];
-            foreach ($pages as $i => $page) {
-                if (str_contains((string) $page->getText(), '#')) {
-                    $proZeugnis[intdiv($i, 4)][] = $i + 1;
+            return $texte;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Zeugnis-Gruppen anhand der ersten Seiten bestimmen. Eine erste Seite
+     * enthält die Geburtszeile („… geboren am …"); alle Folgeseiten bis zur
+     * nächsten ersten Seite gehören zum selben Zeugnis.
+     *
+     * @param  array<int,string>  $seitenTexte
+     * @return array<int,array{start:int,laenge:int}>
+     */
+    private function zeugnisGruppen(array $seitenTexte): array
+    {
+        $starts = [];
+        foreach ($seitenTexte as $i => $text) {
+            if ($this->istErsteSeite($text)) {
+                $starts[] = $i;
+            }
+        }
+
+        // Sicherstellen, dass die erste Seite der Datei ein Gruppenanfang ist.
+        if ($starts === [] || $starts[0] !== 0) {
+            array_unshift($starts, 0);
+        }
+
+        $anzahl = count($seitenTexte);
+        $gruppen = [];
+        foreach ($starts as $k => $start) {
+            $ende = $starts[$k + 1] ?? $anzahl;
+            $gruppen[] = ['start' => $start, 'laenge' => $ende - $start];
+        }
+
+        return $gruppen;
+    }
+
+    /** Erste Seite eines Zeugnisses? Erkennbar an der Geburtszeile. */
+    private function istErsteSeite(string $text): bool
+    {
+        return (bool) preg_match('/geboren\s+am/iu', $text);
+    }
+
+    /**
+     * Gültige Zeugnisse, in deren Text eine Raute „#" vorkommt – mit Schülername
+     * (von der ersten Seite) und den betroffenen Original-Seiten.
+     *
+     * @param  array<int,string>|null  $seitenTexte
+     * @param  array<int,array{start:int,laenge:int}>  $gueltig
+     * @return array{ok:bool,treffer:array<int,array{name:?string,seiten:array<int,int>}>,fehler:?string}
+     */
+    private function rautenPruefung(?array $seitenTexte, array $gueltig): array
+    {
+        if ($seitenTexte === null) {
+            return ['ok' => false, 'treffer' => [], 'fehler' => 'PDF-Text nicht lesbar'];
+        }
+
+        $treffer = [];
+        foreach ($gueltig as $g) {
+            $betroffen = [];
+            for ($s = 0; $s < 4; $s++) {
+                $idx = $g['start'] + $s;
+                if (str_contains($seitenTexte[$idx] ?? '', '#')) {
+                    $betroffen[] = $idx + 1;
                 }
             }
-
-            $treffer = [];
-            foreach ($proZeugnis as $gruppe => $seiten) {
-                $ersteSeite = $pages[$gruppe * 4] ?? null;
+            if ($betroffen !== []) {
                 $treffer[] = [
-                    'zeugnis' => $gruppe + 1,
-                    'name'    => $ersteSeite ? $this->nameAusZeugnis((string) $ersteSeite->getText()) : null,
-                    'seiten'  => $seiten,
+                    'name'   => $this->nameAusZeugnis($seitenTexte[$g['start']] ?? ''),
+                    'seiten' => $betroffen,
                 ];
             }
-
-            return ['ok' => true, 'treffer' => $treffer, 'fehler' => null];
-        } catch (\Throwable $e) {
-            return ['ok' => false, 'treffer' => [], 'fehler' => $e->getMessage()];
         }
+
+        return ['ok' => true, 'treffer' => $treffer, 'fehler' => null];
     }
 
     /**
