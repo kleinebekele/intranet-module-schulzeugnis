@@ -34,9 +34,17 @@
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
 
-        @if ($readonly)
+        @if ($zeugnis->istAbgeschlossen())
             <div class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">
                 Das Zeugnis ist abgeschlossen – der Text ist schreibgeschützt.
+            </div>
+        @elseif ($berechtigung === 'korrektor')
+            <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+                Du bist als <strong>Korrektor:in</strong> für diesen Text zugewiesen. Du kannst den Text korrigieren und den Status auf „In Korrektur" oder „Korrektur durchgeführt" setzen.
+            </div>
+        @elseif ($berechtigung === 'keine')
+            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                Nur-Ansicht – du bist für diesen Text nicht berechtigt.
             </div>
         @endif
 
@@ -50,7 +58,7 @@
                 <p class="text-xs text-gray-400">Autor: {{ $abschnitt->autor_name }}</p>
             @endif
 
-            @if ($klassentext)
+            @if ($klassentext && $berechtigung === 'voll')
                 <div class="rounded-lg bg-indigo-50/60 p-3">
                     <label class="block text-sm font-medium text-gray-700">Klassenweiter Text
                         <textarea name="klassentext" rows="3" @disabled($readonly)
@@ -83,20 +91,36 @@
                 </label>
             @endif
 
-            <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
-                <textarea name="notiz" rows="2" @disabled($readonly)
-                          class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          placeholder="z. B. Rückfrage, Erinnerung …">{{ old('notiz', $abschnitt->notiz) }}</textarea>
-            </label>
+            @if ($berechtigung === 'voll')
+                <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
+                    <textarea name="notiz" rows="2" @disabled($readonly)
+                              class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              placeholder="z. B. Rückfrage, Erinnerung …">{{ old('notiz', $abschnitt->notiz) }}</textarea>
+                </label>
+            @endif
 
             <label class="block text-sm font-medium text-gray-700">Bearbeitungsstatus
+                @php $statusOptionen = $berechtigung === 'korrektor' ? collect($stati)->only($korrekturStati) : $stati; @endphp
                 <select name="status" @disabled($readonly)
                         class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    @foreach ($stati as $key => $meta)
+                    @foreach ($statusOptionen as $key => $meta)
                         <option value="{{ $key }}" @selected(old('status', $abschnitt->status) === $key)>{{ $meta['label'] }}</option>
                     @endforeach
                 </select>
             </label>
+
+            @if ($berechtigung === 'voll')
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Korrektoren <span class="text-gray-400">(dürfen diesen Text korrigieren)</span></label>
+                    <select name="korrektoren[]" multiple size="5" @disabled($readonly)
+                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        @foreach ($alleLehrer as $l)
+                            <option value="{{ $l->id }}" @selected(in_array($l->id, old('korrektoren', $korrektorIds)))>{{ $l->fullName() }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-400">Mehrfachauswahl (Strg/Cmd). Pflicht, wenn du den Status auf „Frei zur Korrektur" oder „Korrektur nötig" setzt.</p>
+                </div>
+            @endif
 
             @unless ($readonly)
                 <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">

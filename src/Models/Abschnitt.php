@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulzeugnis\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Abschnitt – Baustein eines Zeugnisses (typ: haupttext | fachtext | note).
@@ -57,6 +58,12 @@ class Abschnitt extends Model
     public function fach(): BelongsTo
     {
         return $this->belongsTo(Fach::class, 'fach_id');
+    }
+
+    /** Lehrer, die diesen Abschnitt korrigieren dürfen. */
+    public function korrektoren(): BelongsToMany
+    {
+        return $this->belongsToMany(Lehrer::class, 'zeugnis_abschnitt_korrektoren', 'abschnitt_id', 'lehrer_id');
     }
 
     /** Anzeige-Metadaten (label/icon/farbe) zum aktuellen Status – robust gegen Altwerte. */

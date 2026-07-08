@@ -9,6 +9,8 @@ use Intranet\Modules\Schulzeugnis\Models\Fach;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Klassentext;
+use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
+use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
@@ -20,6 +22,12 @@ use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
  */
 class ZeugnisController
 {
+    /** Status, die ein zugewiesener Korrektor setzen darf. */
+    private const KORREKTUR_STATI = ['in_korrektur', 'korrektur_durchgefuehrt'];
+
+    /** Status, für die beim Speichern Korrektoren ausgewählt sein müssen. */
+    private const BRAUCHT_KORREKTOREN = ['frei_zur_korrektur', 'korrektur_noetig'];
+
     public function index(Klasse $klasse)
     {
         $klasse->load(['schuljahr', 'klassenlehrer']);
@@ -265,46 +273,98 @@ class ZeugnisController
     /** Einzelnen Abschnitt (Fachtext/Haupttext/Note) bearbeiten – mit Änderungsverlauf. */
     public function abschnittEdit(Abschnitt $abschnitt)
     {
-        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach']);
+        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach', 'korrektoren']);
         $zeugnis = $abschnitt->zeugnis;
+        $klasse  = $zeugnis->schueler?->klasse;
 
         $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
             ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'])
             ->orderByDesc('id')
             ->get();
 
-        $klasse = $zeugnis->schueler?->klasse;
-        $klassentext = $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null;
+        $berechtigung = $this->berechtigung($abschnitt, auth()->user());
 
         return view('schulzeugnis::zeugnisse.abschnitt', [
-            'abschnitt'   => $abschnitt,
-            'zeugnis'     => $zeugnis,
-            'schueler'    => $zeugnis->schueler,
-            'stati'       => Abschnitt::STATI,
-            'verlauf'     => $verlauf,
-            'klassentext' => $klassentext,
-            'readonly'    => $zeugnis->istAbgeschlossen(),
+            'abschnitt'      => $abschnitt,
+            'zeugnis'        => $zeugnis,
+            'schueler'       => $zeugnis->schueler,
+            'stati'          => Abschnitt::STATI,
+            'verlauf'        => $verlauf,
+            'klassentext'    => $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null,
+            'berechtigung'   => $berechtigung,
+            'korrekturStati' => self::KORREKTUR_STATI,
+            'alleLehrer'     => $klasse ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->orderBy('nachname')->orderBy('vorname')->get() : collect(),
+            'korrektorIds'   => $abschnitt->korrektoren->pluck('id')->all(),
+            'readonly'       => $zeugnis->istAbgeschlossen() || $berechtigung === 'keine',
         ]);
     }
 
     public function abschnittUpdate(Request $request, Abschnitt $abschnitt)
     {
-        $abschnitt->load('zeugnis.schueler.klasse', 'fach');
+        $abschnitt->load('zeugnis.schueler.klasse', 'fach', 'korrektoren');
         $zeugnis = $abschnitt->zeugnis;
         $klasse  = $zeugnis->schueler?->klasse;
+        $b       = $this->berechtigung($abschnitt, auth()->user());
 
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
         }
+        if ($b === 'keine') {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->with('error', 'Du bist für diesen Text nicht berechtigt.');
+        }
 
+        // Korrektor: nur Text korrigieren + Status auf „in Korrektur"/„Korrektur durchgeführt".
+        if ($b === 'korrektor') {
+            $data = $request->validate([
+                'inhalt' => ['nullable', 'string'],
+                'note'   => ['nullable', 'string', 'max:20'],
+                'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
+            ]);
+
+            $altInhalt = $abschnitt->inhalt;
+            $abschnitt->inhalt = $data['inhalt'] ?? null;
+            if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
+                $abschnitt->note = $data['note'] ?? null;
+            }
+            $abschnitt->status = $data['status'];
+            $abschnitt->save();
+
+            if ((string) $altInhalt !== (string) $abschnitt->inhalt) {
+                Protokoll::log('abschnitt_geaendert', [
+                    'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
+                    'zeugnis_id'   => $zeugnis->id,
+                    'abschnitt_id' => $abschnitt->id,
+                    'beschreibung' => $this->abschnittLabel($abschnitt) . ' korrigiert',
+                    'alt_wert'     => $altInhalt,
+                    'neu_wert'     => $abschnitt->inhalt,
+                ]);
+            }
+
+            $this->ueberlaufNeuBerechnen($zeugnis);
+
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->with('status', 'Korrektur gespeichert.');
+        }
+
+        // Voll berechtigt (Autor / Klassenlehrer / Admin): alles inkl. Korrektoren-Zuweisung.
         $data = $request->validate([
-            'inhalt'      => ['nullable', 'string'],
-            'note'        => ['nullable', 'string', 'max:20'],
-            'status'      => ['required', Rule::in(array_keys(Abschnitt::STATI))],
-            'notiz'       => ['nullable', 'string'],
-            'klassentext' => ['nullable', 'string'],
+            'inhalt'        => ['nullable', 'string'],
+            'note'          => ['nullable', 'string', 'max:20'],
+            'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+            'notiz'         => ['nullable', 'string'],
+            'klassentext'   => ['nullable', 'string'],
+            'korrektoren'   => ['array'],
+            'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
         ]);
+
+        $korrektoren = $data['korrektoren'] ?? [];
+        if (in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->withInput()
+                ->with('error', 'Bitte mindestens einen Korrektor auswählen, wenn der Text zur Korrektur freigegeben wird.');
+        }
 
         $altInhalt = $abschnitt->inhalt;
 
@@ -317,7 +377,8 @@ class ZeugnisController
         $abschnitt->klassentext_neue_zeile = $request->boolean('klassentext_neue_zeile');
         $abschnitt->save();
 
-        // Nur inhaltliche Änderungen kommen in den (append-only) Verlauf.
+        $abschnitt->korrektoren()->sync($korrektoren);
+
         if ((string) $altInhalt !== (string) $abschnitt->inhalt) {
             Protokoll::log('abschnitt_geaendert', [
                 'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
@@ -350,7 +411,6 @@ class ZeugnisController
 
         $this->ueberlaufNeuBerechnen($zeugnis);
 
-        // Klassentext betrifft alle Schüler → deren Überlauf-Cache invalidieren.
         if ($klassentextGeaendert && $klasse) {
             Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
                 ->where('id', '!=', $zeugnis->id)
@@ -364,12 +424,16 @@ class ZeugnisController
     /** Einen früheren Textstand aus dem Verlauf wiederherstellen. */
     public function abschnittWiederherstellen(Request $request, Abschnitt $abschnitt)
     {
-        $abschnitt->load('zeugnis.schueler', 'fach');
+        $abschnitt->load('zeugnis.schueler.klasse', 'fach', 'korrektoren');
         $zeugnis = $abschnitt->zeugnis;
 
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
+        }
+        if ($this->berechtigung($abschnitt, auth()->user()) !== 'voll') {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->with('error', 'Nur die verantwortliche Lehrkraft kann frühere Stände wiederherstellen.');
         }
 
         $eintrag = Protokoll::where('abschnitt_id', $abschnitt->id)
@@ -401,6 +465,52 @@ class ZeugnisController
         return $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT
             ? 'Haupttext'
             : ('Fach: ' . ($abschnitt->fach?->name ?? '—'));
+    }
+
+    /**
+     * Berechtigung des Nutzers für einen Abschnitt: 'voll' | 'korrektor' | 'keine'.
+     * Voll = Admin, Fachlehrer (Lehrauftrag) bzw. Klassenlehrer (Haupttext).
+     * Korrektor = für genau diesen Abschnitt zur Korrektur zugewiesen.
+     */
+    private function berechtigung(Abschnitt $abschnitt, $user): string
+    {
+        if (! $user) {
+            return 'keine';
+        }
+        if ($user->is_admin) {
+            return 'voll';
+        }
+
+        $klasse = $abschnitt->zeugnis?->schueler?->klasse;
+        if (! $klasse) {
+            return 'keine';
+        }
+
+        $meineLehrerIds = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)
+            ->where('core_user_id', $user->id)
+            ->pluck('id');
+
+        if ($abschnitt->typ === Abschnitt::TYP_HAUPTTEXT) {
+            if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
+                return 'voll';
+            }
+        } else {
+            $fachLehrer = Lehrauftrag::where('klasse_id', $klasse->id)
+                ->where('fach_id', $abschnitt->fach_id)
+                ->pluck('lehrer_id');
+            if ($meineLehrerIds->intersect($fachLehrer)->isNotEmpty()) {
+                return 'voll';
+            }
+        }
+
+        $korrektorIds = $abschnitt->relationLoaded('korrektoren')
+            ? $abschnitt->korrektoren->pluck('id')
+            : $abschnitt->korrektoren()->pluck('zeugnis_schuljahr_lehrer.id');
+        if ($meineLehrerIds->intersect($korrektorIds)->isNotEmpty()) {
+            return 'korrektor';
+        }
+
+        return 'keine';
     }
 
     /** Klassenweiter Text für (Klasse, Fach) – fach_id null = Haupttext. */
