@@ -388,6 +388,11 @@ class ZeugnisController
         $klasse  = $zeugnis->schueler?->klasse;
         $b       = $this->berechtigung($abschnitt, auth()->user());
 
+        // Für die Rückmeldung: wessen Text (Name + Fach) tatsächlich gespeichert wurde
+        // – wichtig beim Blättern, wo danach schon der nächste Schüler angezeigt wird.
+        $gespeichertName = $zeugnis->schueler?->fullName() ?: 'Schüler';
+        $gespeichertWas  = $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext');
+
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
@@ -428,7 +433,7 @@ class ZeugnisController
             $this->ueberlaufNeuBerechnen($zeugnis);
 
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $this->naechstesZiel($request, $abschnitt))
-                ->with('status', 'Korrektur gespeichert.');
+                ->with('status', $gespeichertWas . ' für ' . $gespeichertName . ' korrigiert.');
         }
 
         // Voll berechtigt (Autor / Klassenlehrer / Admin): alles inkl. Korrektoren-Zuweisung.
@@ -506,7 +511,7 @@ class ZeugnisController
         }
 
         return redirect()->route('module.schulzeugnis.abschnitte.edit', $this->naechstesZiel($request, $abschnitt))
-            ->with('status', 'Gespeichert.');
+            ->with('status', $gespeichertWas . ' für ' . $gespeichertName . ' gespeichert.');
     }
 
     /** Nach dem Speichern: zum per „weiter_zu" gewählten Nachbar-Abschnitt, sonst zurück zum aktuellen. */
