@@ -123,11 +123,63 @@
             @endif
 
             @unless ($readonly)
-                <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                    Speichern
-                </button>
+                <div class="space-y-1 border-t border-gray-100 pt-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <span>
+                            @if ($navPrev)
+                                <button type="submit" name="weiter_zu" value="{{ $navPrev['id'] }}"
+                                        title="Speichern &amp; vorheriger Schüler: {{ $navPrev['name'] }}"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    &larr; {{ $navPrev['name'] }}
+                                </button>
+                            @endif
+                        </span>
+                        <button type="submit" class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                            Speichern
+                        </button>
+                        <span>
+                            @if ($navNext)
+                                <button type="submit" name="weiter_zu" value="{{ $navNext['id'] }}"
+                                        title="Speichern &amp; nächster Schüler: {{ $navNext['name'] }}"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    {{ $navNext['name'] }} &rarr;
+                                </button>
+                            @endif
+                        </span>
+                    </div>
+                    @if ($navGesamt)
+                        <p class="text-center text-xs text-gray-400">
+                            Schüler {{ $navPosition }} von {{ $navGesamt }} in {{ $titel }} · „Vor/Zurück" speichert und wechselt
+                        </p>
+                    @endif
+                </div>
             @endunless
         </form>
+
+        {{-- Blättern im Nur-Ansicht-Modus (kein Speichern nötig) --}}
+        @if ($readonly && ($navPrev || $navNext))
+            <div class="flex items-center justify-between gap-2">
+                <span>
+                    @if ($navPrev)
+                        <a href="{{ route('module.schulzeugnis.abschnitte.edit', $navPrev['id']) }}"
+                           class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            &larr; {{ $navPrev['name'] }}
+                        </a>
+                    @endif
+                </span>
+                @if ($navGesamt)
+                    <span class="text-xs text-gray-400">Schüler {{ $navPosition }} von {{ $navGesamt }}</span>
+                @endif
+                <span>
+                    @if ($navNext)
+                        <a href="{{ route('module.schulzeugnis.abschnitte.edit', $navNext['id']) }}"
+                           class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            {{ $navNext['name'] }} &rarr;
+                        </a>
+                    @endif
+                </span>
+            </div>
+        @endif
 
         {{-- Änderungsverlauf / Wiederherstellung --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5">

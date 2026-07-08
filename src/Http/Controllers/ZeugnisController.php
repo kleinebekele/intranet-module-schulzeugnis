@@ -317,6 +317,7 @@ class ZeugnisController
             ->get();
 
         $berechtigung = $this->berechtigung($abschnitt, auth()->user());
+        $nachbarn     = $this->abschnittNachbarn($abschnitt);
 
         return view('schulzeugnis::zeugnisse.abschnitt', [
             'abschnitt'      => $abschnitt,
@@ -330,7 +331,54 @@ class ZeugnisController
             'alleLehrer'     => $klasse ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->orderBy('nachname')->orderBy('vorname')->get() : collect(),
             'korrektorIds'   => $abschnitt->korrektoren->pluck('id')->all(),
             'readonly'       => $zeugnis->istAbgeschlossen() || $berechtigung === 'keine',
+            'navPrev'        => $nachbarn['prev'],
+            'navNext'        => $nachbarn['next'],
+            'navPosition'    => $nachbarn['position'],
+            'navGesamt'      => $nachbarn['gesamt'],
         ]);
+    }
+
+    /**
+     * Vorheriger/nächster Schüler mit demselben Abschnitt (gleicher Typ + Fach),
+     * in derselben Klasse und in Tabellen-Reihenfolge (Nachname, Vorname).
+     * Schüler ohne passenden Abschnitt werden übersprungen.
+     *
+     * @return array{prev:?array{id:int,name:string},next:?array{id:int,name:string},position:?int,gesamt:?int}
+     */
+    private function abschnittNachbarn(Abschnitt $abschnitt): array
+    {
+        $leer   = ['prev' => null, 'next' => null, 'position' => null, 'gesamt' => null];
+        $klasse = $abschnitt->zeugnis?->schueler?->klasse;
+        if (! $klasse) {
+            return $leer;
+        }
+
+        $kette = $klasse->schueler()
+            ->with(['zeugnis.abschnitte'])
+            ->orderBy('nachname')
+            ->orderBy('vorname')
+            ->get()
+            ->map(function ($s) use ($abschnitt) {
+                $treffer = $s->zeugnis?->abschnitte->first(
+                    fn ($a) => $a->typ === $abschnitt->typ && $a->fach_id === $abschnitt->fach_id
+                );
+
+                return $treffer ? ['id' => $treffer->id, 'name' => $s->fullName()] : null;
+            })
+            ->filter()
+            ->values();
+
+        $idx = $kette->search(fn ($e) => $e['id'] === $abschnitt->id);
+        if ($idx === false) {
+            return $leer;
+        }
+
+        return [
+            'prev'     => $idx > 0 ? $kette[$idx - 1] : null,
+            'next'     => $idx < $kette->count() - 1 ? $kette[$idx + 1] : null,
+            'position' => $idx + 1,
+            'gesamt'   => $kette->count(),
+        ];
     }
 
     public function abschnittUpdate(Request $request, Abschnitt $abschnitt)
@@ -352,9 +400,10 @@ class ZeugnisController
         // Korrektor: nur Text korrigieren + Status auf „in Korrektur"/„Korrektur durchgeführt".
         if ($b === 'korrektor') {
             $data = $request->validate([
-                'inhalt' => ['nullable', 'string'],
-                'note'   => ['nullable', 'string', 'max:20'],
-                'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
+                'inhalt'    => ['nullable', 'string'],
+                'note'      => ['nullable', 'string', 'max:20'],
+                'status'    => ['required', Rule::in(self::KORREKTUR_STATI)],
+                'weiter_zu' => ['nullable', 'integer'],
             ]);
 
             $altInhalt = $abschnitt->inhalt;
@@ -378,7 +427,7 @@ class ZeugnisController
 
             $this->ueberlaufNeuBerechnen($zeugnis);
 
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $this->naechstesZiel($request, $abschnitt))
                 ->with('status', 'Korrektur gespeichert.');
         }
 
@@ -391,6 +440,7 @@ class ZeugnisController
             'klassentext'   => ['nullable', 'string'],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
+            'weiter_zu'     => ['nullable', 'integer'],
         ]);
 
         $korrektoren = $data['korrektoren'] ?? [];
@@ -451,8 +501,16 @@ class ZeugnisController
                 ->update(['ueberlauf_status' => null]);
         }
 
-        return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+        return redirect()->route('module.schulzeugnis.abschnitte.edit', $this->naechstesZiel($request, $abschnitt))
             ->with('status', 'Gespeichert.');
+    }
+
+    /** Nach dem Speichern: zum per „weiter_zu" gewählten Nachbar-Abschnitt, sonst zurück zum aktuellen. */
+    private function naechstesZiel(Request $request, Abschnitt $fallback): int
+    {
+        $weiter = (int) $request->input('weiter_zu');
+
+        return ($weiter && Abschnitt::whereKey($weiter)->exists()) ? $weiter : $fallback->id;
     }
 
     /** Einen früheren Textstand aus dem Verlauf wiederherstellen. */
