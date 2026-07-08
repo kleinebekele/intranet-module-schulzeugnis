@@ -274,9 +274,7 @@ class ZeugnisController
             ->get();
 
         $klasse = $zeugnis->schueler?->klasse;
-        $klassentext = ($abschnitt->fach_id && $klasse)
-            ? Klassentext::firstOrNew(['klasse_id' => $klasse->id, 'fach_id' => $abschnitt->fach_id])
-            : null;
+        $klassentext = $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null;
 
         return view('schulzeugnis::zeugnisse.abschnitt', [
             'abschnitt'   => $abschnitt,
@@ -331,10 +329,10 @@ class ZeugnisController
             ]);
         }
 
-        // Klassenweiter Text – gilt für alle Schüler der Klasse in diesem Fach.
+        // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Haupttext).
         $klassentextGeaendert = false;
-        if ($abschnitt->fach_id && $klasse) {
-            $kt  = Klassentext::firstOrNew(['klasse_id' => $klasse->id, 'fach_id' => $abschnitt->fach_id]);
+        if ($klasse) {
+            $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
             $neu = $data['klassentext'] ?? null;
             if ((string) $kt->text !== (string) $neu) {
                 $kt->text = $neu;
@@ -344,7 +342,7 @@ class ZeugnisController
                     'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
                     'zeugnis_id'   => $zeugnis->id,
                     'abschnitt_id' => $abschnitt->id,
-                    'beschreibung' => 'Klassenweiter Text (' . ($abschnitt->fach?->name ?? '—') . ') in ' . ($klasse->name ?? '') . ' geändert',
+                    'beschreibung' => 'Klassenweiter Text (' . ($abschnitt->fach?->name ?? 'Haupttext') . ') in ' . ($klasse->name ?? '') . ' geändert',
                     'neu_wert'     => $neu,
                 ]);
             }
@@ -403,6 +401,15 @@ class ZeugnisController
         return $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT
             ? 'Haupttext'
             : ('Fach: ' . ($abschnitt->fach?->name ?? '—'));
+    }
+
+    /** Klassenweiter Text für (Klasse, Fach) – fach_id null = Haupttext. */
+    private function klassentextFuer(int $klasseId, ?int $fachId): Klassentext
+    {
+        $q = Klassentext::where('klasse_id', $klasseId);
+        $fachId ? $q->where('fach_id', $fachId) : $q->whereNull('fach_id');
+
+        return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId]);
     }
 
     /** Überlauf-Analyse neu berechnen und am Zeugnis zwischenspeichern. */

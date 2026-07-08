@@ -109,7 +109,18 @@ class ZeugnisRenderer
         $gebOrt    = $abgeschlossen ? $zeugnis->ausgestellt_geburtsort : $schueler?->geburtsort;
 
         $abschnitte = $zeugnis->abschnitte->sortBy([['reihenfolge', 'asc'], ['id', 'asc']]);
-        $haupttext  = (string) ($abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTTEXT)?->inhalt ?? '');
+
+        // Haupttext = klassenweiter Haupttext (fach_id = null) + Schüler-Haupttext.
+        $hauptAbschnitt = $abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTTEXT);
+        $hauptSchueler  = (string) ($hauptAbschnitt?->inhalt ?? '');
+        $hauptKlasse    = $klasse
+            ? trim((string) Klassentext::where('klasse_id', $klasse->id)->whereNull('fach_id')->value('text'))
+            : '';
+        if ($hauptKlasse !== '' && $hauptSchueler !== '') {
+            $haupttext = $hauptKlasse . ($hauptAbschnitt?->klassentext_neue_zeile ? "\n" : ' ') . $hauptSchueler;
+        } else {
+            $haupttext = $hauptKlasse !== '' ? $hauptKlasse : $hauptSchueler;
+        }
 
         $klassentexte = $klasse
             ? Klassentext::where('klasse_id', $klasse->id)->pluck('text', 'fach_id')

@@ -45,6 +45,10 @@ class Abschnitt extends Model
         'klassentext_neue_zeile' => 'boolean',
     ];
 
+    protected $attributes = [
+        'klassentext_neue_zeile' => false,
+    ];
+
     public function zeugnis(): BelongsTo
     {
         return $this->belongsTo(Zeugnis::class, 'zeugnis_id');

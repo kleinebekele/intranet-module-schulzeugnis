@@ -57,7 +57,7 @@
                                   class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
                     </label>
-                    <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse in diesem Fach und steht auf dem Zeugnis <strong>vor</strong> dem Schülertext.</p>
+                    <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> dem individuellen Text.</p>
                     <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
                         <input type="checkbox" name="klassentext_neue_zeile" value="1" @checked($abschnitt->klassentext_neue_zeile) @disabled($readonly)
                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
