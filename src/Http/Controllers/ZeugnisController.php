@@ -340,7 +340,7 @@ class ZeugnisController
                     'summary'           => $summary,
                     'alt'               => (string) $e->alt_wert,
                     'neu'               => (string) $e->neu_wert,
-                    'restorable'        => in_array($e->aktion, ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'], true),
+                    'restorable'        => in_array($e->aktion, ['abschnitt_geaendert', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext'], true),
                 ];
             });
 
@@ -567,12 +567,32 @@ class ZeugnisController
         }
 
         $eintrag = Protokoll::where('abschnitt_id', $abschnitt->id)
-            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'])
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext'])
             ->findOrFail((int) $request->input('protokoll_id'));
 
-        $altInhalt = $abschnitt->inhalt;
-        $ziel      = $eintrag->alt_wert; // der „Vorher"-Stand dieser Änderung
+        $ziel = $eintrag->alt_wert; // der „Vorher"-Stand dieser Änderung
 
+        // Klassenweiter Text: in den Klassentext (Klasse + Fach) zurückschreiben.
+        if ($eintrag->aktion === 'abschnitt_klassentext') {
+            $klasse = $zeugnis->schueler?->klasse;
+            if ($klasse) {
+                $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
+                $alt = $kt->text;
+                $kt->text = $ziel;
+                $kt->save();
+                $this->logFeld($abschnitt, 'Klassenweiter Text', $alt, $ziel, 'abschnitt_klassentext');
+
+                // Überlauf-Analyse aller Zeugnisse der Klasse verwerfen – sie ist jetzt veraltet.
+                Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+                    ->update(['ueberlauf_status' => null]);
+            }
+
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->with('status', 'Früherer Klassentext-Stand wiederhergestellt.');
+        }
+
+        // Schülertext: in den Abschnitt zurückschreiben.
+        $altInhalt = $abschnitt->inhalt;
         $abschnitt->update(['inhalt' => $ziel]);
 
         Protokoll::log('abschnitt_wiederhergestellt', [
