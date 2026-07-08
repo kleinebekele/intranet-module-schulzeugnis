@@ -7,6 +7,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\KlasseController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\KlassenraumController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
@@ -26,6 +27,9 @@ Route::middleware(['web', 'auth'])
     ->name('module.schulzeugnis.')
     ->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('index');
+
+        // Klassenräume – Lehrer-Einstieg: Klassen des aktiven Schuljahres als Türen.
+        Route::get('klassenraeume', [KlassenraumController::class, 'index'])->name('klassenraeume.index');
 
         // Werkzeug: alte Zeugnis-PDF (je 4 A4-Seiten) in A3-Broschüre umschießen.
         Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');
