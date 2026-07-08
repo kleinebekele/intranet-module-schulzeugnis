@@ -230,7 +230,7 @@
             @else
                 <ul class="mt-3 space-y-2.5">
                     @foreach ($verlauf as $e)
-                        <li class="border-l-2 border-gray-200 pl-3">
+                        <li class="border-l-2 pl-3" style="border-color: {{ $e['wiederhergestellt'] ? '#f59e0b' : '#e5e7eb' }}">
                             <div class="text-xs text-gray-500">
                                 {{ $e['zeit']?->format('d.m.Y H:i') }} Uhr
                                 @if ($e['akteur']) &middot; {{ $e['akteur'] }} @endif
@@ -238,9 +238,20 @@
                                     <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">wiederhergestellt</span>
                                 @endif
                             </div>
-                            <div class="mt-0.5 text-sm text-gray-700">
-                                <span class="font-medium">{{ $e['feld'] }}</span>
-                                <span class="text-gray-500">— {{ $e['summary'] }}</span>
+                            <div class="mt-0.5 flex flex-wrap items-center gap-1 text-sm">
+                                <span class="font-medium text-gray-700">{{ $e['feld'] }}</span>
+                                @if ($e['istStatus'] && $e['status'])
+                                    <span class="text-gray-400">—</span>
+                                    <span class="inline-flex items-center gap-1 text-gray-600">
+                                        <i class="bx {{ $e['status']['altIcon'] }}" style="color: {{ $e['status']['altColor'] }}"></i>{{ $e['status']['altLabel'] }}
+                                    </span>
+                                    <i class="bx bx-right-arrow-alt text-gray-400"></i>
+                                    <span class="inline-flex items-center gap-1 text-gray-700">
+                                        <i class="bx {{ $e['status']['neuIcon'] }}" style="color: {{ $e['status']['neuColor'] }}"></i>{{ $e['status']['neuLabel'] }}
+                                    </span>
+                                @else
+                                    <span class="{{ $e['wiederhergestellt'] ? 'text-amber-700' : 'text-gray-500' }}">— {{ $e['summary'] }}</span>
+                                @endif
                             </div>
                             @unless ($e['istStatus'])
                                 <div class="mt-1 text-xs">

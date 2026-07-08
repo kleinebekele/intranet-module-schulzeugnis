@@ -28,6 +28,9 @@ class ZeugnisController
     /** Status, für die beim Speichern Korrektoren ausgewählt sein müssen. */
     private const BRAUCHT_KORREKTOREN = ['frei_zur_korrektur', 'korrektur_noetig'];
 
+    /** Status-Farbe (farbe-Key aus Abschnitt::STATI) → Hex, für die Verlaufs-Anzeige. */
+    private const STATUS_FARBE_HEX = ['gray' => '#9ca3af', 'amber' => '#f59e0b', 'red' => '#ef4444', 'green' => '#16a34a'];
+
     public function index(Klasse $klasse)
     {
         $klasse->load(['schuljahr', 'klassenlehrer']);
@@ -311,16 +314,32 @@ class ZeugnisController
         $zeugnis = $abschnitt->zeugnis;
         $klasse  = $zeugnis->schueler?->klasse;
 
+        $hex = self::STATUS_FARBE_HEX;
         $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
-            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt'])
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt'])
             ->orderByDesc('id')
             ->get()
-            ->map(function (Protokoll $e) {
-                $istStatus = $e->aktion === 'abschnitt_status';
+            ->map(function (Protokoll $e) use ($hex) {
+                $istStatus  = $e->aktion === 'abschnitt_status';
+                $istRestore = in_array($e->aktion, ['abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt'], true);
                 $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
 
+                $status  = null;
+                $summary = '';
+
                 if ($istStatus) {
-                    $summary = ($e->alt_wert ?: '—') . ' → ' . ($e->neu_wert ?: '—');
+                    $meta = fn ($k) => Abschnitt::STATI[$k] ?? ['label' => $k, 'icon' => 'bx-circle', 'farbe' => 'gray'];
+                    $ma = $meta($e->alt_wert);
+                    $mn = $meta($e->neu_wert);
+                    $status = [
+                        'altLabel' => $ma['label'], 'altIcon' => $ma['icon'], 'altColor' => $hex[$ma['farbe']] ?? '#9ca3af',
+                        'neuLabel' => $mn['label'], 'neuIcon' => $mn['icon'], 'neuColor' => $hex[$mn['farbe']] ?? '#9ca3af',
+                    ];
+                } elseif ($istRestore) {
+                    $n = $wz($e->neu_wert);
+                    $summary = $n > 0
+                        ? ($n . ($n === 1 ? ' Wort' : ' Wörter') . ' wiederhergestellt')
+                        : 'Text geleert (wiederhergestellt)';
                 } else {
                     $delta = $wz($e->neu_wert) - $wz($e->alt_wert);
                     $summary = $delta > 0
@@ -336,11 +355,12 @@ class ZeugnisController
                     'akteur'            => $e->akteur_name,
                     'feld'              => $e->beschreibung,
                     'istStatus'         => $istStatus,
-                    'wiederhergestellt' => $e->aktion === 'abschnitt_wiederhergestellt',
+                    'wiederhergestellt' => $istRestore,
+                    'status'            => $status,
                     'summary'           => $summary,
                     'alt'               => (string) $e->alt_wert,
                     'neu'               => (string) $e->neu_wert,
-                    'restorable'        => in_array($e->aktion, ['abschnitt_geaendert', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext'], true),
+                    'restorable'        => in_array($e->aktion, ['abschnitt_geaendert', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext', 'abschnitt_klassentext_wiederhergestellt'], true),
                 ];
             });
 
@@ -567,20 +587,20 @@ class ZeugnisController
         }
 
         $eintrag = Protokoll::where('abschnitt_id', $abschnitt->id)
-            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext'])
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext', 'abschnitt_klassentext_wiederhergestellt'])
             ->findOrFail((int) $request->input('protokoll_id'));
 
         $ziel = $eintrag->alt_wert; // der „Vorher"-Stand dieser Änderung
 
         // Klassenweiter Text: in den Klassentext (Klasse + Fach) zurückschreiben.
-        if ($eintrag->aktion === 'abschnitt_klassentext') {
+        if (in_array($eintrag->aktion, ['abschnitt_klassentext', 'abschnitt_klassentext_wiederhergestellt'], true)) {
             $klasse = $zeugnis->schueler?->klasse;
             if ($klasse) {
                 $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
                 $alt = $kt->text;
                 $kt->text = $ziel;
                 $kt->save();
-                $this->logFeld($abschnitt, 'Klassenweiter Text', $alt, $ziel, 'abschnitt_klassentext');
+                $this->logFeld($abschnitt, 'Klassenweiter Text', $alt, $ziel, 'abschnitt_klassentext_wiederhergestellt');
 
                 // Überlauf-Analyse aller Zeugnisse der Klasse verwerfen – sie ist jetzt veraltet.
                 Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
@@ -627,15 +647,10 @@ class ZeugnisController
         ]);
     }
 
-    /** Eine Status-Änderung protokollieren (alt/neu als lesbare Labels). */
+    /** Eine Status-Änderung protokollieren (alt/neu als Status-Keys – Label/Icon/Farbe folgen bei der Anzeige). */
     private function logStatus(Abschnitt $abschnitt, string $alt, string $neu): void
     {
-        if ($alt === $neu) {
-            return;
-        }
-
-        $label = fn ($k) => Abschnitt::STATI[$k]['label'] ?? $k;
-        $this->logFeld($abschnitt, 'Status', $label($alt), $label($neu), 'abschnitt_status');
+        $this->logFeld($abschnitt, 'Status', $alt, $neu, 'abschnitt_status');
     }
 
     /**
