@@ -39,6 +39,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.current', icon: 'user')
             ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list')
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category')
-            ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category');
+            ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category')
+            ->item('altfachzeugnisse', 'Alte Fachzeugnisse umwandeln', 'module.schulzeugnis.altfachzeugnisse.form', icon: 'category');
     }
 }

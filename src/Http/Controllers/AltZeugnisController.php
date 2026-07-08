@@ -4,8 +4,8 @@ namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Intranet\Modules\Schulzeugnis\Support\VerarbeitetAlteZeugnisse;
 use setasign\Fpdi\Fpdi;
-use Smalot\PdfParser\Parser;
 
 /**
  * Hilfswerkzeug: PDF des alten Zeugnisprogramms (je 4 A4-Seiten = ein Zeugnis)
@@ -16,6 +16,8 @@ use Smalot\PdfParser\Parser;
  */
 class AltZeugnisController
 {
+    use VerarbeitetAlteZeugnisse;
+
     private const A4_BREITE = 210.0;
     private const A4_HOEHE = 297.0;
 
@@ -140,72 +142,6 @@ class AltZeugnisController
         ])->deleteFileAfterSend();
     }
 
-    /** Dateiname säubern: entfernt dateisystem-/header-kritische Zeichen, behält Umlaute. */
-    private function sichererName(string $name): string
-    {
-        $name = preg_replace('~[\\\\/:*?"<>|\x00-\x1F]~u', '', $name) ?? '';
-
-        return trim(mb_substr($name, 0, 100));
-    }
-
-    /**
-     * Text je Seite (0-basiert) über den PDF-Parser lesen. Null, wenn sich die
-     * PDF nicht als Text lesen lässt (z. B. reine Scan-PDF).
-     *
-     * @return array<int,string>|null
-     */
-    private function seitenTexte(string $pfad): ?array
-    {
-        try {
-            $texte = [];
-            foreach ((new Parser())->parseFile($pfad)->getPages() as $i => $page) {
-                $texte[$i] = (string) $page->getText();
-            }
-
-            return $texte;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /**
-     * Zeugnis-Gruppen anhand der ersten Seiten bestimmen. Eine erste Seite
-     * enthält die Geburtszeile („… geboren am …"); alle Folgeseiten bis zur
-     * nächsten ersten Seite gehören zum selben Zeugnis.
-     *
-     * @param  array<int,string>  $seitenTexte
-     * @return array<int,array{start:int,laenge:int}>
-     */
-    private function zeugnisGruppen(array $seitenTexte): array
-    {
-        $starts = [];
-        foreach ($seitenTexte as $i => $text) {
-            if ($this->istErsteSeite($text)) {
-                $starts[] = $i;
-            }
-        }
-
-        // Sicherstellen, dass die erste Seite der Datei ein Gruppenanfang ist.
-        if ($starts === [] || $starts[0] !== 0) {
-            array_unshift($starts, 0);
-        }
-
-        $anzahl = count($seitenTexte);
-        $gruppen = [];
-        foreach ($starts as $k => $start) {
-            $ende = $starts[$k + 1] ?? $anzahl;
-            $gruppen[] = ['start' => $start, 'laenge' => $ende - $start];
-        }
-
-        return $gruppen;
-    }
-
-    /** Erste Seite eines Zeugnisses? Erkennbar an der Geburtszeile. */
-    private function istErsteSeite(string $text): bool
-    {
-        return (bool) preg_match('/geboren\s+am/iu', $text);
-    }
-
     /**
      * Gültige Zeugnisse, in deren Text eine Raute „#" vorkommt – mit Schülername
      * (von der ersten Seite) und den betroffenen Original-Seiten.
@@ -238,44 +174,6 @@ class AltZeugnisController
         }
 
         return ['ok' => true, 'treffer' => $treffer, 'fehler' => null];
-    }
-
-    /**
-     * Schülername von der ersten Zeugnis-Seite. Muster des alten Programms:
-     *   Julian Lechthoff
-     *   - geboren am 01.08.2018 in Bielefeld -
-     *   erhält für die Klasse 01 im Schuljahr 2025 / 2026 folgendes Zeugnis:
-     * Der Name ist also die Zeile direkt ÜBER „… geboren am …" (Fallback: erste
-     * nicht-leere Zeile).
-     */
-    private function nameAusZeugnis(string $text): ?string
-    {
-        $zeilen = array_values(array_filter(
-            array_map('trim', preg_split('/\r\n|\r|\n/', $text) ?: []),
-            fn ($z) => $z !== ''
-        ));
-
-        if ($zeilen === []) {
-            return null;
-        }
-
-        foreach ($zeilen as $i => $zeile) {
-            if ($i > 0 && preg_match('/geboren\s+am/iu', $zeile)) {
-                return $zeilen[$i - 1];
-            }
-        }
-
-        return $zeilen[0];
-    }
-
-    /** Temporäre Ausgabe-PDFs älter als eine Stunde entfernen. */
-    private function alteDateienAufraeumen(string $dir): void
-    {
-        foreach (glob($dir . '/*.pdf') ?: [] as $datei) {
-            if (is_file($datei) && filemtime($datei) < time() - 3600) {
-                @unlink($datei);
-            }
-        }
     }
 
     /** Einen A3-Querbogen erzeugen: zwei A4-Quellseiten nebeneinander (links | rechts). */

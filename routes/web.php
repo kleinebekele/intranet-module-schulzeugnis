@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\AltFachzeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltZeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
@@ -30,6 +31,11 @@ Route::middleware(['web', 'auth'])
         Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');
         Route::post('alt-zeugnisse/umwandeln', [AltZeugnisController::class, 'umwandeln'])->name('altzeugnisse.umwandeln');
         Route::get('alt-zeugnisse/download/{token}', [AltZeugnisController::class, 'download'])->name('altzeugnisse.download');
+
+        // Werkzeug: alte Fachzeugnisse (A4, duplex) – Leerseite bei ungerader Seitenzahl anhängen.
+        Route::get('alt-fachzeugnisse', [AltFachzeugnisController::class, 'form'])->name('altfachzeugnisse.form');
+        Route::post('alt-fachzeugnisse/umwandeln', [AltFachzeugnisController::class, 'umwandeln'])->name('altfachzeugnisse.umwandeln');
+        Route::get('alt-fachzeugnisse/download/{token}', [AltFachzeugnisController::class, 'download'])->name('altfachzeugnisse.download');
 
         // Schuljahre – Anker des Moduls.
         Route::get('schuljahre', [SchuljahrController::class, 'index'])->name('schuljahre.index');
