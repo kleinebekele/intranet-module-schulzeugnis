@@ -108,26 +108,55 @@ class AltZeugnisController
     }
 
     /**
-     * Original-Seiten, deren Text eine Raute „#" enthält (Platzhalter/abgeschnittene
-     * Felder im alten Programm). Gibt zusätzlich zur Seite die Zeugnis-Nummer aus.
+     * Zeugnisse (4er-Gruppen), in deren Text eine Raute „#" vorkommt – mit dem
+     * Schülernamen (von der ersten Seite, unter der „Zeugnis"-Überschrift) und den
+     * betroffenen Original-Seiten.
      *
-     * @return array{ok:bool,seiten:array<int,int>,fehler:?string}
+     * @return array{ok:bool,treffer:array<int,array{zeugnis:int,name:?string,seiten:array<int,int>}>,fehler:?string}
      */
     private function rautenSeiten(string $pfad): array
     {
         try {
-            $doc = (new Parser())->parseFile($pfad);
-            $treffer = [];
-            foreach ($doc->getPages() as $i => $page) {
+            $pages = (new Parser())->parseFile($pfad)->getPages();
+
+            $proZeugnis = [];
+            foreach ($pages as $i => $page) {
                 if (str_contains((string) $page->getText(), '#')) {
-                    $treffer[] = $i + 1;
+                    $proZeugnis[intdiv($i, 4)][] = $i + 1;
                 }
             }
 
-            return ['ok' => true, 'seiten' => $treffer, 'fehler' => null];
+            $treffer = [];
+            foreach ($proZeugnis as $gruppe => $seiten) {
+                $ersteSeite = $pages[$gruppe * 4] ?? null;
+                $treffer[] = [
+                    'zeugnis' => $gruppe + 1,
+                    'name'    => $ersteSeite ? $this->nameAusZeugnis((string) $ersteSeite->getText()) : null,
+                    'seiten'  => $seiten,
+                ];
+            }
+
+            return ['ok' => true, 'treffer' => $treffer, 'fehler' => null];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'seiten' => [], 'fehler' => $e->getMessage()];
+            return ['ok' => false, 'treffer' => [], 'fehler' => $e->getMessage()];
         }
+    }
+
+    /** Schülername = die Zeile direkt unter der „Zeugnis"-Überschrift (heuristisch). */
+    private function nameAusZeugnis(string $text): ?string
+    {
+        $zeilen = array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $text) ?: []),
+            fn ($z) => $z !== ''
+        ));
+
+        foreach ($zeilen as $i => $zeile) {
+            if (preg_match('/^Zeugnis$/iu', $zeile) && isset($zeilen[$i + 1])) {
+                return $zeilen[$i + 1];
+            }
+        }
+
+        return null;
     }
 
     /** Temporäre Ausgabe-PDFs älter als eine Stunde entfernen. */

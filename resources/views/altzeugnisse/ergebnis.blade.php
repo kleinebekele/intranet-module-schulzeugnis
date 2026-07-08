@@ -21,12 +21,15 @@
                 Hinweis: Die Textprüfung auf Rauten war nicht möglich (die PDF ließ sich nicht als Text lesen).
                 Die Umwandlung selbst hat funktioniert. <span class="text-amber-700">({{ \Illuminate\Support\Str::limit($rauten['fehler'], 120) }})</span>
             </div>
-        @elseif (! empty($rauten['seiten']))
+        @elseif (! empty($rauten['treffer']))
             <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
                 <p class="font-semibold">⚠ Raute „#" gefunden – bitte diese Zeugnisse prüfen:</p>
                 <ul class="mt-2 list-disc pl-5">
-                    @foreach ($rauten['seiten'] as $seite)
-                        <li>Original-Seite {{ $seite }} <span class="text-red-700">(Zeugnis {{ (int) ceil($seite / 4) }}, Blattseite {{ ($seite - 1) % 4 + 1 }})</span></li>
+                    @foreach ($rauten['treffer'] as $t)
+                        <li>
+                            <strong>{{ $t['name'] ?: 'Zeugnis ' . $t['zeugnis'] }}</strong>
+                            <span class="text-red-700">(Zeugnis {{ $t['zeugnis'] }}, Original-Seite{{ count($t['seiten']) > 1 ? 'n' : '' }} {{ implode(', ', $t['seiten']) }})</span>
+                        </li>
                     @endforeach
                 </ul>
                 <p class="mt-2 text-red-700">Eine „#" steht im alten Programm meist für abgeschnittene oder fehlende Feld-Inhalte.</p>
