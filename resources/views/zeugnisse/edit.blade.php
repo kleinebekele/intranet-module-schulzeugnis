@@ -63,12 +63,12 @@
                                 {{ $a->fach?->name ?? 'Fach' }}
                             @endif
                         </h2>
-                        <label class="inline-flex items-center gap-2 text-sm text-gray-600">
-                            <input type="checkbox" name="abschnitte[{{ $a->id }}][status]" value="fertig"
-                                   @checked($a->status === 'fertig') @disabled($readonly)
-                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            fertig
-                        </label>
+                        <select name="abschnitte[{{ $a->id }}][status]" @disabled($readonly)
+                                class="rounded-lg border-gray-300 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            @foreach ($stati as $key => $meta)
+                                <option value="{{ $key }}" @selected($a->status === $key)>{{ $meta['label'] }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     @if ($a->autor_name)

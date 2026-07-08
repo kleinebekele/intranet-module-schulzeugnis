@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
+use Intranet\Modules\Schulzeugnis\Models\Fach;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
@@ -20,13 +21,25 @@ class ZeugnisController
     {
         $klasse->load('schuljahr');
 
+        // Spalten der Tabelle: alle Fächer, die in dieser Klasse einen Lehrauftrag haben.
+        $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
+        $faecher = Fach::whereIn('id', $fachIds)
+            ->orderBy('reihenfolge')
+            ->orderBy('name')
+            ->get();
+
         $schueler = $klasse->schueler()
             ->with(['zeugnis.abschnitte'])
             ->orderBy('nachname')
             ->orderBy('vorname')
             ->get();
 
-        return view('schulzeugnis::zeugnisse.index', compact('klasse', 'schueler'));
+        return view('schulzeugnis::zeugnisse.index', [
+            'klasse'   => $klasse,
+            'faecher'  => $faecher,
+            'schueler' => $schueler,
+            'stati'    => Abschnitt::STATI,
+        ]);
     }
 
     /** Zeugnis für einen Schüler anlegen und die Abschnitte automatisch erzeugen. */
@@ -54,7 +67,7 @@ class ZeugnisController
             'autor_lehrer_id' => $klasse->klassenlehrer_id,
             'autor_name'      => $klasse->klassenlehrer?->fullName(),
             'reihenfolge'     => 0,
-            'status'          => Abschnitt::STATUS_OFFEN,
+            'status'          => Abschnitt::STATUS_STANDARD,
         ]);
 
         // Je Fach mit Lehrauftrag ein Fachtext (bzw. Note bei Noten-Formaten).
@@ -97,6 +110,7 @@ class ZeugnisController
             'zeugnis'    => $zeugnis,
             'schueler'   => $zeugnis->schueler,
             'abschnitte' => $abschnitte,
+            'stati'      => Abschnitt::STATI,
             'istAdmin'   => (bool) auth()->user()?->is_admin,
         ]);
     }
@@ -120,9 +134,10 @@ class ZeugnisController
             if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
                 $abschnitt->note = $row['note'] ?? null;
             }
-            $abschnitt->status = ($row['status'] ?? '') === Abschnitt::STATUS_FERTIG
-                ? Abschnitt::STATUS_FERTIG
-                : Abschnitt::STATUS_OFFEN;
+            $statusEingabe = $row['status'] ?? '';
+            $abschnitt->status = array_key_exists($statusEingabe, Abschnitt::STATI)
+                ? $statusEingabe
+                : Abschnitt::STATUS_STANDARD;
             $abschnitt->save();
         }
 

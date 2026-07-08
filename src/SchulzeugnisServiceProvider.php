@@ -17,6 +17,17 @@ use App\Modules\Support\ModuleServiceProvider;
  */
 class SchulzeugnisServiceProvider extends ModuleServiceProvider
 {
+    public function boot(): void
+    {
+        parent::boot();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Intranet\Modules\Schulzeugnis\Console\Commands\SeedDemo::class,
+            ]);
+        }
+    }
+
     public function manifest(): ModuleManifest
     {
         return ModuleManifest::make('schulzeugnis', 'Schulzeugnis', icon: 'book')
