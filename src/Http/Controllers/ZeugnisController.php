@@ -20,7 +20,7 @@ class ZeugnisController
 {
     public function index(Klasse $klasse)
     {
-        $klasse->load('schuljahr');
+        $klasse->load(['schuljahr', 'klassenlehrer']);
 
         // Spalten der Tabelle: alle Fächer, die in dieser Klasse einen Lehrauftrag haben.
         $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
@@ -35,11 +35,20 @@ class ZeugnisController
             ->orderBy('vorname')
             ->get();
 
+        // „Meine Fächer": Fächer, in denen der eingeloggte Nutzer hier einen Lehrauftrag hat.
+        $userId = auth()->id();
+        $meineFachIds = $klasse->lehrauftraege()
+            ->whereHas('lehrer', fn ($q) => $q->where('core_user_id', $userId))
+            ->pluck('fach_id')->unique()->values()->all();
+        $binKlassenlehrer = $klasse->klassenlehrer && (int) $klasse->klassenlehrer->core_user_id === (int) $userId;
+
         return view('schulzeugnis::zeugnisse.index', [
-            'klasse'   => $klasse,
-            'faecher'  => $faecher,
-            'schueler' => $schueler,
-            'stati'    => Abschnitt::STATI,
+            'klasse'           => $klasse,
+            'faecher'          => $faecher,
+            'schueler'         => $schueler,
+            'stati'            => Abschnitt::STATI,
+            'meineFachIds'     => $meineFachIds,
+            'binKlassenlehrer' => $binKlassenlehrer,
         ]);
     }
 
