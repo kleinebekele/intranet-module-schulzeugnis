@@ -39,6 +39,20 @@
         .zt-chip { border: 1px solid #d1d5db; border-radius: 9999px; padding: 2px 10px; font-size: 12px; color: #374151; background: #fff; cursor: pointer; }
         .zt-chip:hover { background: #f3f4f6; }
         .zt-chip.zt-off { opacity: .45; text-decoration: line-through; }
+        #zt-table th.zt-kopf { cursor: help; }
+        #zt-tip {
+            position: fixed; z-index: 60; max-width: 300px;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+            box-shadow: 0 12px 30px -8px rgba(0,0,0,.35);
+            padding: 10px 12px; font-size: 12px; color: #374151;
+            pointer-events: none; opacity: 0; transform: translateY(4px);
+            transition: opacity .12s ease, transform .12s ease;
+        }
+        #zt-tip.zt-show { opacity: 1; transform: translateY(0); }
+        #zt-tip .zt-tip-fach { font-weight: 700; color: #4f46e5; font-size: 13px; margin-bottom: 2px; }
+        #zt-tip .zt-tip-label { text-transform: uppercase; letter-spacing: .04em; font-size: 10px; font-weight: 600; color: #9ca3af; margin-top: 7px; }
+        #zt-tip .zt-tip-text { white-space: pre-wrap; color: #4b5563; margin-top: 1px; line-height: 1.35; }
+        #zt-tip .zt-tip-muted { color: #9ca3af; font-style: italic; }
     </style>
 
     <div class="space-y-3">
@@ -80,9 +94,17 @@
                 <thead>
                     <tr class="text-gray-600">
                         <th class="border-b border-r border-gray-200 px-4 text-left font-semibold" style="position: sticky; left: 0; top: 0; z-index: 30; background: #f9fafb;">Schüler</th>
-                        <th class="zt-col zt-col-haupt border-b border-gray-200 px-2 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Haupttext (Klassenlehrer)">Haupt</th>
+                        <th class="zt-col zt-col-haupt zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
+                            style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
+                            data-fach="Haupttext" data-rolle="Klassenlehrer"
+                            data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
+                            data-klassentext="{{ $klassentexte['haupt'] ?? '' }}">Haupt</th>
                         @foreach ($faecher as $fach)
-                            <th class="zt-col zt-col-{{ $fach->id }} border-b border-gray-200 px-2 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</th>
+                            <th class="zt-col zt-col-{{ $fach->id }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
+                                style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
+                                data-fach="{{ $fach->name }}" data-rolle="Fachlehrer"
+                                data-lehrer="{{ implode(', ', $fachlehrer[$fach->id] ?? []) }}"
+                                data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}">{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
                         <th class="border-b border-l border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
                         <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">Vorschau</th>
@@ -242,6 +264,45 @@
             if (mineIds.length || mineHaupt) {
                 document.getElementById('zt-mine').click();
             }
+        })();
+
+        // Spaltenkopf-Tooltip: Fachlehrer + Klassentext (an body gehängt, damit der
+        // Overflow der Tabelle ihn nicht abschneidet).
+        (function () {
+            const tip = document.createElement('div');
+            tip.id = 'zt-tip';
+            document.body.appendChild(tip);
+
+            const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+            function position(th) {
+                const r = th.getBoundingClientRect();
+                const tw = tip.offsetWidth, thh = tip.offsetHeight;
+                let left = Math.max(8, Math.min(r.left + r.width / 2 - tw / 2, window.innerWidth - tw - 8));
+                let top = r.bottom + 8;
+                if (top + thh > window.innerHeight - 8) top = r.top - thh - 8;
+                tip.style.left = left + 'px';
+                tip.style.top = top + 'px';
+            }
+
+            function show(th) {
+                const rolle = th.dataset.rolle || 'Fachlehrer';
+                const lehrer = (th.dataset.lehrer || '').trim();
+                const ktext = (th.dataset.klassentext || '').trim();
+                tip.innerHTML =
+                    '<div class="zt-tip-fach">' + esc(th.dataset.fach || '') + '</div>' +
+                    '<div class="zt-tip-label">' + esc(rolle) + '</div>' +
+                    '<div class="zt-tip-text' + (lehrer ? '' : ' zt-tip-muted') + '">' + (lehrer ? esc(lehrer) : '—') + '</div>' +
+                    '<div class="zt-tip-label">Klassentext</div>' +
+                    '<div class="zt-tip-text' + (ktext ? '' : ' zt-tip-muted') + '">' + (ktext ? esc(ktext) : '— kein Klassentext —') + '</div>';
+                position(th);
+                tip.classList.add('zt-show');
+            }
+
+            document.querySelectorAll('#zt-table th.zt-kopf').forEach((th) => {
+                th.addEventListener('mouseenter', () => show(th));
+                th.addEventListener('mouseleave', () => tip.classList.remove('zt-show'));
+            });
         })();
     </script>
 </x-app-layout>

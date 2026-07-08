@@ -52,6 +52,14 @@ class ZeugnisController
             ->pluck('fach_id')->unique()->values()->all();
         $binKlassenlehrer = $klasse->klassenlehrer && (int) $klasse->klassenlehrer->core_user_id === (int) $userId;
 
+        // Für die Spaltenkopf-Tooltips: Fachlehrer je Fach + Klassentext je Fach (und Haupttext).
+        $fachlehrer = $klasse->lehrauftraege()->with('lehrer')->get()
+            ->groupBy('fach_id')
+            ->map(fn ($g) => $g->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->values()->all());
+
+        $klassentexte = Klassentext::where('klasse_id', $klasse->id)->get()
+            ->mapWithKeys(fn ($kt) => [($kt->fach_id === null ? 'haupt' : $kt->fach_id) => (string) $kt->text]);
+
         // Überlauf-/Auto-Verkleinerungs-Analyse je Zeugnis (aus dem Cache; nur beim
         // ersten Mal bzw. nach Inhaltsänderungen wird gerechnet).
         $warnungen = [];
@@ -74,6 +82,8 @@ class ZeugnisController
             'meineFachIds'     => $meineFachIds,
             'binKlassenlehrer' => $binKlassenlehrer,
             'warnungen'        => $warnungen,
+            'fachlehrer'       => $fachlehrer,
+            'klassentexte'     => $klassentexte,
         ]);
     }
 
