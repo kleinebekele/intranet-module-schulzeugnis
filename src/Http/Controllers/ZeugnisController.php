@@ -571,7 +571,7 @@ class ZeugnisController
             ->findOrFail((int) $request->input('protokoll_id'));
 
         $altInhalt = $abschnitt->inhalt;
-        $ziel      = $eintrag->neu_wert;
+        $ziel      = $eintrag->alt_wert; // der „Vorher"-Stand dieser Änderung
 
         $abschnitt->update(['inhalt' => $ziel]);
 

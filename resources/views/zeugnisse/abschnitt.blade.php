@@ -242,23 +242,16 @@
                                 <span class="font-medium">{{ $e['feld'] }}</span>
                                 <span class="text-gray-500">— {{ $e['summary'] }}</span>
                             </div>
-                            <div class="mt-1 flex items-center gap-3 text-xs">
-                                @unless ($e['istStatus'])
+                            @unless ($e['istStatus'])
+                                <div class="mt-1 text-xs">
                                     <button type="button" class="zt-vergleich inline-flex items-center gap-1 text-indigo-600 hover:underline"
                                             data-feld="{{ $e['feld'] }}" data-zeit="{{ $e['zeit']?->format('d.m.Y H:i') }}"
-                                            data-alt="{{ $e['alt'] }}" data-neu="{{ $e['neu'] }}">
+                                            data-alt="{{ $e['alt'] }}" data-neu="{{ $e['neu'] }}"
+                                            @if (! $readonly && $e['restorable']) data-restore="{{ $e['id'] }}" @endif>
                                         <i class="bx bx-git-compare"></i> Vergleichen
                                     </button>
-                                @endunless
-                                @if (! $readonly && $e['restorable'])
-                                    <form method="POST" action="{{ route('module.schulzeugnis.abschnitte.wiederherstellen', $abschnitt) }}"
-                                          onsubmit="return confirm('Diesen Stand wiederherstellen? Der aktuelle Text wird ersetzt (bleibt im Verlauf).');">
-                                        @csrf
-                                        <input type="hidden" name="protokoll_id" value="{{ $e['id'] }}">
-                                        <button type="submit" class="text-gray-500 hover:text-indigo-600 hover:underline">Wiederherstellen</button>
-                                    </form>
-                                @endif
-                            </div>
+                                </div>
+                            @endunless
                         </li>
                     @endforeach
                 </ul>
@@ -283,6 +276,18 @@
                 <div class="zt-modal-col">
                     <div class="zt-modal-label">Vorher</div>
                     <div class="zt-modal-pre" id="zt-modal-alt"></div>
+                    @unless ($readonly)
+                        <form id="zt-restore-form" method="POST" action="{{ route('module.schulzeugnis.abschnitte.wiederherstellen', $abschnitt) }}"
+                              class="zt-modal-restore" hidden
+                              onsubmit="return confirm('Den Vorher-Stand wiederherstellen? Der aktuelle Text wird dadurch ersetzt (bleibt im Verlauf).');">
+                            @csrf
+                            <input type="hidden" name="protokoll_id" id="zt-restore-id" value="">
+                            <button type="submit"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+                                <i class="bx bx-undo"></i> Diesen Vorher-Text wiederherstellen
+                            </button>
+                        </form>
+                    @endunless
                 </div>
                 <div class="zt-modal-col">
                     <div class="zt-modal-label">Nachher</div>
@@ -345,6 +350,7 @@
         .zt-modal-col { background: #fff; display: flex; flex-direction: column; min-height: 0; }
         .zt-modal-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; color: #9ca3af; padding: .55rem .9rem .1rem; }
         .zt-modal-pre { white-space: pre-wrap; word-break: break-word; font-size: .875rem; color: #374151; line-height: 1.5; padding: .2rem .9rem 1rem; overflow: auto; }
+        .zt-modal-restore { padding: 0 .9rem .9rem; border-top: 1px solid #f3f4f6; padding-top: .7rem; }
         @media (max-width: 640px) { .zt-modal-cols { grid-template-columns: 1fr; } }
     </style>
     <script>
@@ -404,6 +410,8 @@
             const zeitEl = document.getElementById('zt-modal-zeit');
             const altEl = document.getElementById('zt-modal-alt');
             const neuEl = document.getElementById('zt-modal-neu');
+            const restoreForm = document.getElementById('zt-restore-form');
+            const restoreId = document.getElementById('zt-restore-id');
             const close = () => { modal.hidden = true; };
 
             document.querySelectorAll('.zt-vergleich').forEach((b) => {
@@ -412,6 +420,10 @@
                     zeitEl.textContent = b.dataset.zeit ? (b.dataset.zeit + ' Uhr') : '';
                     altEl.textContent = b.dataset.alt || '(leer)';
                     neuEl.textContent = b.dataset.neu || '(leer)';
+                    if (restoreForm) {
+                        if (b.dataset.restore) { restoreId.value = b.dataset.restore; restoreForm.hidden = false; }
+                        else { restoreForm.hidden = true; }
+                    }
                     modal.hidden = false;
                 });
             });
