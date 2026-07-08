@@ -18,6 +18,10 @@ class Protokoll extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
     /**
      * Eine Handlung festhalten. Der Akteur kommt aus dem eingeloggten Core-User,
      * wird aber als Klartext-Schnappschuss gespeichert (kein FK).

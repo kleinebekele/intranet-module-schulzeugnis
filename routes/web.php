@@ -56,6 +56,11 @@ Route::middleware(['web', 'auth'])
         Route::post('zeugnisse/{zeugnis}/abschliessen', [ZeugnisController::class, 'abschliessen'])->name('zeugnisse.abschliessen');
         Route::post('zeugnisse/{zeugnis}/wieder-oeffnen', [ZeugnisController::class, 'wiederOeffnen'])->name('zeugnisse.wiederoeffnen');
 
+        // Einzelner Abschnitt (Fachtext/Haupttext) mit Aenderungsverlauf.
+        Route::get('abschnitte/{abschnitt}/bearbeiten', [ZeugnisController::class, 'abschnittEdit'])->name('abschnitte.edit');
+        Route::put('abschnitte/{abschnitt}', [ZeugnisController::class, 'abschnittUpdate'])->name('abschnitte.update');
+        Route::post('abschnitte/{abschnitt}/wiederherstellen', [ZeugnisController::class, 'abschnittWiederherstellen'])->name('abschnitte.wiederherstellen');
+
         // Schüler – je Schuljahr (keine Verbindung zum Core, quell_id lose).
         Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.current');
         Route::get('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'index'])->name('schueler.index');

@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Fach;
 use Intranet\Modules\Schulzeugnis\Models\Format;
@@ -201,5 +202,107 @@ class ZeugnisController
 
         return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
             ->with('status', 'Zeugnis wieder geöffnet – Bearbeitung möglich.');
+    }
+
+    /** Einzelnen Abschnitt (Fachtext/Haupttext/Note) bearbeiten – mit Änderungsverlauf. */
+    public function abschnittEdit(Abschnitt $abschnitt)
+    {
+        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach']);
+        $zeugnis = $abschnitt->zeugnis;
+
+        $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'])
+            ->orderByDesc('id')
+            ->get();
+
+        return view('schulzeugnis::zeugnisse.abschnitt', [
+            'abschnitt' => $abschnitt,
+            'zeugnis'   => $zeugnis,
+            'schueler'  => $zeugnis->schueler,
+            'stati'     => Abschnitt::STATI,
+            'verlauf'   => $verlauf,
+            'readonly'  => $zeugnis->istAbgeschlossen(),
+        ]);
+    }
+
+    public function abschnittUpdate(Request $request, Abschnitt $abschnitt)
+    {
+        $abschnitt->load('zeugnis.schueler', 'fach');
+        $zeugnis = $abschnitt->zeugnis;
+
+        if ($zeugnis->istAbgeschlossen()) {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
+        }
+
+        $data = $request->validate([
+            'inhalt' => ['nullable', 'string'],
+            'note'   => ['nullable', 'string', 'max:20'],
+            'status' => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+        ]);
+
+        $altInhalt = $abschnitt->inhalt;
+
+        $abschnitt->inhalt = $data['inhalt'] ?? null;
+        if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
+            $abschnitt->note = $data['note'] ?? null;
+        }
+        $abschnitt->status = $data['status'];
+        $abschnitt->save();
+
+        // Nur inhaltliche Änderungen kommen in den (append-only) Verlauf.
+        if ((string) $altInhalt !== (string) $abschnitt->inhalt) {
+            Protokoll::log('abschnitt_geaendert', [
+                'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
+                'zeugnis_id'   => $zeugnis->id,
+                'abschnitt_id' => $abschnitt->id,
+                'beschreibung' => $this->abschnittLabel($abschnitt) . ' geändert',
+                'alt_wert'     => $altInhalt,
+                'neu_wert'     => $abschnitt->inhalt,
+            ]);
+        }
+
+        return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            ->with('status', 'Gespeichert.');
+    }
+
+    /** Einen früheren Textstand aus dem Verlauf wiederherstellen. */
+    public function abschnittWiederherstellen(Request $request, Abschnitt $abschnitt)
+    {
+        $abschnitt->load('zeugnis.schueler', 'fach');
+        $zeugnis = $abschnitt->zeugnis;
+
+        if ($zeugnis->istAbgeschlossen()) {
+            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+                ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
+        }
+
+        $eintrag = Protokoll::where('abschnitt_id', $abschnitt->id)
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_wiederhergestellt'])
+            ->findOrFail((int) $request->input('protokoll_id'));
+
+        $altInhalt = $abschnitt->inhalt;
+        $ziel      = $eintrag->neu_wert;
+
+        $abschnitt->update(['inhalt' => $ziel]);
+
+        Protokoll::log('abschnitt_wiederhergestellt', [
+            'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
+            'zeugnis_id'   => $zeugnis->id,
+            'abschnitt_id' => $abschnitt->id,
+            'beschreibung' => $this->abschnittLabel($abschnitt) . ': Stand vom ' . $eintrag->created_at?->format('d.m.Y H:i') . ' wiederhergestellt',
+            'alt_wert'     => $altInhalt,
+            'neu_wert'     => $ziel,
+        ]);
+
+        return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            ->with('status', 'Früherer Stand wiederhergestellt.');
+    }
+
+    private function abschnittLabel(Abschnitt $abschnitt): string
+    {
+        return $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT
+            ? 'Haupttext'
+            : ('Fach: ' . ($abschnitt->fach?->name ?? '—'));
     }
 }

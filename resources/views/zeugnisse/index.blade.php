@@ -24,19 +24,30 @@
         </a>
 
         @if (session('error'))
-            <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-                {{ session('error') }}
-            </div>
+            <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
 
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        {{-- Legende oben --}}
+        <div class="rounded-xl border border-gray-200 bg-white p-3">
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Status:</span>
+                @foreach ($stati as $meta)
+                    <span class="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                        <i class="bx {{ $meta['icon'] }} text-lg {{ $farbeKlasse[$meta['farbe']] ?? 'text-gray-300' }}"></i>
+                        {{ $meta['label'] }}
+                    </span>
+                @endforeach
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 bg-white" style="max-height: 72vh; overflow: auto;">
             <table class="min-w-full border-collapse text-sm">
                 <thead>
-                    <tr class="border-b border-gray-200 bg-gray-50 text-gray-600">
-                        <th class="sticky left-0 z-10 bg-gray-50 px-4 py-2 text-left font-semibold">Schüler</th>
-                        <th class="px-2 py-2 text-center font-semibold" title="Haupttext (Klassenlehrer)">Haupt</th>
+                    <tr class="text-gray-600">
+                        <th class="border-b border-r border-gray-200 px-4 py-2 text-left font-semibold" style="position: sticky; left: 0; top: 0; z-index: 30; background: #f9fafb;">Schüler</th>
+                        <th class="border-b border-gray-200 px-2 py-2 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Haupttext (Klassenlehrer)">Haupt</th>
                         @foreach ($faecher as $fach)
-                            <th class="px-2 py-2 text-center font-semibold" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</th>
+                            <th class="border-b border-gray-200 px-2 py-2 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
                     </tr>
                 </thead>
@@ -49,15 +60,11 @@
                             $fachMap = $abs->whereIn('typ', ['fachtext', 'note'])->keyBy('fach_id');
                         @endphp
                         <tr class="border-b border-gray-100 hover:bg-indigo-50/40">
-                            <td class="sticky left-0 z-10 bg-white px-4 py-2 hover:bg-indigo-50/40">
-                                @if ($z)
-                                    <a href="{{ route('module.schulzeugnis.zeugnisse.edit', $z) }}"
-                                       class="font-medium text-indigo-700 hover:underline">{{ $s->nachname }}, {{ $s->vorname }}</a>
-                                    @if ($z->istAbgeschlossen())
-                                        <span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">fertig</span>
-                                    @endif
-                                @else
-                                    <span class="font-medium text-gray-700">{{ $s->nachname }}, {{ $s->vorname }}</span>
+                            <td class="border-r border-gray-200 px-4 py-2 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10; background: #fff;">
+                                <span class="font-medium text-gray-800">{{ $s->nachname }}, {{ $s->vorname }}</span>
+                                @if ($z && $z->istAbgeschlossen())
+                                    <span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">fertig</span>
+                                @elseif (! $z)
                                     <form method="POST" action="{{ route('module.schulzeugnis.zeugnisse.store', [$klasse, $s]) }}" class="mt-1">
                                         @csrf
                                         <button type="submit" class="text-xs text-indigo-600 hover:underline">Zeugnis anlegen</button>
@@ -65,23 +72,29 @@
                                 @endif
                             </td>
 
-                            {{-- Haupttext-Status --}}
-                            <td class="px-2 py-2 text-center">
+                            {{-- Haupttext-Status (klickbar) --}}
+                            <td class="px-2 py-1.5 text-center">
                                 @if ($haupt)
                                     @php $m = $haupt->statusMeta(); @endphp
-                                    <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}" title="Haupttext – {{ $m['label'] }}"></i>
+                                    <a href="{{ route('module.schulzeugnis.abschnitte.edit', $haupt) }}" title="Haupttext – {{ $m['label'] }} (bearbeiten)"
+                                       class="inline-flex rounded p-1 hover:bg-indigo-100">
+                                        <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
+                                    </a>
                                 @else
                                     <span class="text-gray-200">–</span>
                                 @endif
                             </td>
 
-                            {{-- Status je Fach --}}
+                            {{-- Status je Fach (klickbar → Einzel-Editor) --}}
                             @foreach ($faecher as $fach)
-                                <td class="px-2 py-2 text-center">
+                                <td class="px-2 py-1.5 text-center">
                                     @php $a = $fachMap->get($fach->id); @endphp
                                     @if ($a)
                                         @php $m = $a->statusMeta(); @endphp
-                                        <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}" title="{{ $fach->name }} – {{ $m['label'] }}"></i>
+                                        <a href="{{ route('module.schulzeugnis.abschnitte.edit', $a) }}" title="{{ $fach->name }} – {{ $m['label'] }} (bearbeiten)"
+                                           class="inline-flex rounded p-1 hover:bg-indigo-100">
+                                            <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
+                                        </a>
                                     @else
                                         <span class="text-gray-200">–</span>
                                     @endif
@@ -99,18 +112,6 @@
                 </tbody>
             </table>
         </div>
-
-        {{-- Legende der Bearbeitungs-Status --}}
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Bearbeitungsstatus</p>
-            <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
-                @foreach ($stati as $meta)
-                    <span class="inline-flex items-center gap-1.5 text-sm text-gray-600">
-                        <i class="bx {{ $meta['icon'] }} text-lg {{ $farbeKlasse[$meta['farbe']] ?? 'text-gray-300' }}"></i>
-                        {{ $meta['label'] }}
-                    </span>
-                @endforeach
-            </div>
-        </div>
+        <p class="text-xs text-gray-400">Tipp: Auf ein Status-Symbol klicken, um den jeweiligen Text zu bearbeiten.</p>
     </div>
 </x-app-layout>
