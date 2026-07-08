@@ -40,13 +40,14 @@
             transform: translateX(-50%);
             background: radial-gradient(ellipse at center, rgba(0,0,0,.28), rgba(0,0,0,0) 70%);
         }
-        /* dunkle Öffnung dahinter (wird beim Aufschwingen sichtbar) */
+        /* freundliche, helle Öffnung dahinter (wird beim Aufschwingen sichtbar) */
         .kr-oeffnung {
             position: absolute;
             inset: 9px 9px 0;
-            background: linear-gradient(180deg, #2b2f36, #1b1e23);
+            background: linear-gradient(180deg, #8fd0f5 0%, #c7e9fb 55%, #f3fbff 100%);
             border-radius: 5px 5px 0 0;
-            box-shadow: inset 0 0 18px rgba(0,0,0,.6);
+            /* zarter Schatten oben für Tiefe + warmer Lichtschein am Boden */
+            box-shadow: inset 0 8px 14px -6px rgba(0,0,0,.28), inset 0 -22px 26px -14px rgba(255,244,214,.85);
         }
 
         /* das schwingende Türblatt */
