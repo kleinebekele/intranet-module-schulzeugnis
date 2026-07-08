@@ -101,28 +101,47 @@
                 </label>
             @endif
 
-            <label class="block text-sm font-medium text-gray-700">Bearbeitungsstatus
-                @php $statusOptionen = $berechtigung === 'korrektor' ? collect($stati)->only($korrekturStati) : $stati; @endphp
-                <select name="status" @disabled($readonly)
-                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    @foreach ($statusOptionen as $key => $meta)
-                        <option value="{{ $key }}" @selected(old('status', $abschnitt->status) === $key)>{{ $meta['label'] }}</option>
-                    @endforeach
-                </select>
-            </label>
-
-            @if ($berechtigung === 'voll')
+            @php
+                $statusOptionen = $berechtigung === 'korrektor' ? collect($stati)->only($korrekturStati) : $stati;
+                $statusFarbe = ['gray' => '#9ca3af', 'amber' => '#f59e0b', 'red' => '#ef4444', 'green' => '#16a34a'];
+                $aktStatus = old('status', $abschnitt->status);
+                $aktMeta = $stati[$aktStatus] ?? ['label' => '—', 'icon' => 'bx-circle', 'farbe' => 'gray'];
+            @endphp
+            <div class="zt-two">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Korrektoren <span class="text-gray-400">(dürfen diesen Text korrigieren)</span></label>
-                    <select name="korrektoren[]" multiple size="5" @disabled($readonly)
-                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        @foreach ($alleLehrer as $l)
-                            <option value="{{ $l->id }}" @selected(in_array($l->id, old('korrektoren', $korrektorIds)))>{{ $l->fullName() }}</option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1 text-xs text-gray-400">Mehrfachauswahl (Strg/Cmd). Pflicht, wenn du den Status auf „Frei zur Korrektur" oder „Korrektur nötig" setzt.</p>
+                    <label class="block text-sm font-medium text-gray-700">Bearbeitungsstatus</label>
+                    <div class="zt-status {{ $readonly ? 'zt-status-ro' : '' }}" id="zt-status">
+                        <input type="hidden" name="status" value="{{ $aktStatus }}">
+                        <button type="button" class="zt-status-btn" @disabled($readonly)>
+                            <i class="bx {{ $aktMeta['icon'] }}" style="color: {{ $statusFarbe[$aktMeta['farbe']] ?? '#9ca3af' }}"></i>
+                            <span class="zt-status-label">{{ $aktMeta['label'] }}</span>
+                            <i class="bx bx-chevron-down zt-status-caret"></i>
+                        </button>
+                        <ul class="zt-status-list" hidden>
+                            @foreach ($statusOptionen as $key => $meta)
+                                <li data-value="{{ $key }}" data-icon="{{ $meta['icon'] }}"
+                                    data-color="{{ $statusFarbe[$meta['farbe']] ?? '#9ca3af' }}" data-label="{{ $meta['label'] }}">
+                                    <i class="bx {{ $meta['icon'] }}" style="color: {{ $statusFarbe[$meta['farbe']] ?? '#9ca3af' }}"></i>
+                                    {{ $meta['label'] }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
-            @endif
+
+                @if ($berechtigung === 'voll')
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Korrektoren <span class="text-gray-400">(dürfen diesen Text korrigieren)</span></label>
+                        <select name="korrektoren[]" multiple size="5" @disabled($readonly)
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            @foreach ($alleLehrer as $l)
+                                <option value="{{ $l->id }}" @selected(in_array($l->id, old('korrektoren', $korrektorIds)))>{{ $l->fullName() }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">Mehrfachauswahl (Strg/Cmd). Pflicht, wenn du den Status auf „Frei zur Korrektur" oder „Korrektur nötig" setzt.</p>
+                    </div>
+                @endif
+            </div>
 
             @unless ($readonly)
                 @php
@@ -245,6 +264,36 @@
         @media (min-width: 1024px) {
             .zt-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
         }
+
+        /* Status + Korrektoren nebeneinander (einzeln = volle Breite) */
+        .zt-two { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+        .zt-two > * { flex: 1 1 260px; min-width: 0; }
+
+        /* Eigenes Status-Dropdown mit Icon + Farbe */
+        .zt-status { position: relative; margin-top: .25rem; }
+        .zt-status-btn {
+            display: flex; align-items: center; gap: .5rem; width: 100%;
+            border: 1px solid #d1d5db; border-radius: .5rem; background: #fff;
+            padding: .5rem .75rem; font-size: .875rem; color: #374151; text-align: left;
+            box-shadow: 0 1px 2px rgba(0,0,0,.05); cursor: pointer;
+        }
+        .zt-status-btn:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
+        .zt-status-btn > .bx:first-child { font-size: 1.125rem; }
+        .zt-status-caret { margin-left: auto; color: #9ca3af; }
+        .zt-status-list {
+            position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+            margin: 0; padding: 4px; list-style: none;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .5rem;
+            box-shadow: 0 12px 30px -8px rgba(0,0,0,.35); max-height: 320px; overflow: auto;
+        }
+        .zt-status-list li {
+            display: flex; align-items: center; gap: .5rem;
+            padding: .4rem .5rem; border-radius: .375rem; font-size: .875rem; color: #374151; cursor: pointer;
+        }
+        .zt-status-list li:hover { background: #eef2ff; }
+        .zt-status-list li .bx { font-size: 1.125rem; }
+        .zt-status-ro .zt-status-btn { background: #f9fafb; cursor: default; }
+        .zt-status-ro .zt-status-caret { display: none; }
     </style>
     <script>
         (function () {
@@ -270,6 +319,29 @@
                 const sel = radios.find((x) => x.checked);
                 if (sel && sel.dataset.url) window.location.assign(sel.dataset.url);
             });
+        })();
+
+        // Eigenes Status-Dropdown (Icon + Farbe wie in der Übersicht).
+        (function () {
+            const root = document.getElementById('zt-status');
+            if (!root || root.classList.contains('zt-status-ro')) return;
+            const btn = root.querySelector('.zt-status-btn');
+            const list = root.querySelector('.zt-status-list');
+            const hidden = root.querySelector('input[type=hidden]');
+            const label = root.querySelector('.zt-status-label');
+            const icon = btn.querySelector('.bx');
+
+            btn.addEventListener('click', (e) => { e.stopPropagation(); list.hidden = !list.hidden; });
+            list.querySelectorAll('li').forEach((li) => {
+                li.addEventListener('click', () => {
+                    hidden.value = li.dataset.value;
+                    label.textContent = li.dataset.label;
+                    icon.className = 'bx ' + li.dataset.icon;
+                    icon.style.color = li.dataset.color;
+                    list.hidden = true;
+                });
+            });
+            document.addEventListener('click', (e) => { if (!root.contains(e.target)) list.hidden = true; });
         })();
     </script>
 </x-app-layout>
