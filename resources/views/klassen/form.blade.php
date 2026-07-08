@@ -46,9 +46,22 @@
                 @error('standard_format_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            <p class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                Der Klassenlehrer lässt sich ergänzen, sobald Lehrer angelegt sind.
-            </p>
+            <div>
+                <label for="klassenlehrer_id" class="block text-sm font-medium text-gray-700">Klassenlehrer</label>
+                <select name="klassenlehrer_id" id="klassenlehrer_id"
+                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">— kein Klassenlehrer —</option>
+                    @foreach ($lehrer as $l)
+                        <option value="{{ $l->id }}" @selected(old('klassenlehrer_id', $klasse->klassenlehrer_id) == $l->id)>
+                            {{ $l->fullName() }}
+                        </option>
+                    @endforeach
+                </select>
+                @if ($lehrer->isEmpty())
+                    <p class="mt-1 text-xs text-amber-600">In diesem Schuljahr sind noch keine Lehrer angelegt.</p>
+                @endif
+                @error('klassenlehrer_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
 
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit"

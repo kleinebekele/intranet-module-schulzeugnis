@@ -39,6 +39,18 @@
                             <span class="italic text-gray-400">kein Standard-Format</span>
                         @endif
                     </p>
+                    <p class="mt-0.5 text-sm text-gray-500">
+                        Klassenlehrer:
+                        @if ($klasse->klassenlehrer)
+                            {{ $klasse->klassenlehrer->fullName() }}
+                        @else
+                            <span class="italic text-gray-400">nicht gesetzt</span>
+                        @endif
+                    </p>
+                    <a href="{{ route('module.schulzeugnis.lehrauftraege.index', $klasse) }}"
+                       class="mt-1 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                        {{ $klasse->lehrauftraege_count }} {{ $klasse->lehrauftraege_count === 1 ? 'Lehrauftrag' : 'Lehraufträge' }} &rarr;
+                    </a>
                 </div>
 
                 <div class="flex items-center gap-2">

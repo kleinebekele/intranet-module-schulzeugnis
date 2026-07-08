@@ -5,6 +5,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\KlasseController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
@@ -40,6 +41,11 @@ Route::middleware(['web', 'auth'])
         Route::get('klassen/{klasse}/bearbeiten', [KlasseController::class, 'edit'])->name('klassen.edit');
         Route::put('klassen/{klasse}', [KlasseController::class, 'update'])->name('klassen.update');
         Route::delete('klassen/{klasse}', [KlasseController::class, 'destroy'])->name('klassen.destroy');
+
+        // Lehraufträge einer Klasse (Fach × Lehrer, Team-Teaching möglich).
+        Route::get('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'index'])->name('lehrauftraege.index');
+        Route::post('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'store'])->name('lehrauftraege.store');
+        Route::delete('lehrauftraege/{lehrauftrag}', [LehrauftragController::class, 'destroy'])->name('lehrauftraege.destroy');
 
         // Schüler – je Schuljahr (keine Verbindung zum Core, quell_id lose).
         Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.current');

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
+use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
 
@@ -17,7 +18,11 @@ class KlasseController
 {
     public function index(Schuljahr $schuljahr)
     {
-        $klassen = $schuljahr->klassen()->with('standardFormat')->orderBy('name')->get();
+        $klassen = $schuljahr->klassen()
+            ->with(['standardFormat', 'klassenlehrer'])
+            ->withCount('lehrauftraege')
+            ->orderBy('name')
+            ->get();
 
         return view('schulzeugnis::klassen.index', compact('schuljahr', 'klassen'));
     }
@@ -28,12 +33,13 @@ class KlasseController
             'schuljahr' => $schuljahr,
             'klasse'    => new Klasse(),
             'formate'   => $this->formatOptions(),
+            'lehrer'    => $this->lehrerOptions($schuljahr),
         ]);
     }
 
     public function store(Request $request, Schuljahr $schuljahr)
     {
-        $data = $this->validated($request);
+        $data = $this->validated($request, $schuljahr->id);
 
         $klasse = $schuljahr->klassen()->create($data);
 
@@ -53,12 +59,13 @@ class KlasseController
             'schuljahr' => $klasse->schuljahr,
             'klasse'    => $klasse,
             'formate'   => $this->formatOptions($klasse->standard_format_id),
+            'lehrer'    => $this->lehrerOptions($klasse->schuljahr),
         ]);
     }
 
     public function update(Request $request, Klasse $klasse)
     {
-        $data = $this->validated($request);
+        $data = $this->validated($request, $klasse->schuljahr_id);
         $alt  = $klasse->name;
 
         $klasse->update($data);
@@ -120,12 +127,22 @@ class KlasseController
     }
 
     /** @return array<string,mixed> */
-    private function validated(Request $request): array
+    private function validated(Request $request, int $schuljahrId): array
     {
         return $request->validate([
             'name'               => ['required', 'string', 'max:255'],
             'standard_format_id' => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
+            'klassenlehrer_id'   => ['nullable', 'integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')->where('schuljahr_id', $schuljahrId)],
         ]);
+    }
+
+    /** Lehrer des Schuljahres für die Klassenlehrer-Auswahl. */
+    private function lehrerOptions(Schuljahr $schuljahr)
+    {
+        return Lehrer::where('schuljahr_id', $schuljahr->id)
+            ->orderBy('nachname')
+            ->orderBy('vorname')
+            ->get();
     }
 
     /** Auswählbare Formate: aktive plus das aktuell gesetzte (auch wenn archiviert). */
