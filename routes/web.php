@@ -64,6 +64,10 @@ Route::middleware(['web', 'auth'])
         Route::post('formate/{format}/duplizieren', [FormatController::class, 'duplicate'])->name('formate.duplicate');
         Route::delete('formate/{format}', [FormatController::class, 'destroy'])->name('formate.destroy');
 
+        // Beispiel-Zeugnistexte für die Layout-Vorschau (modulweit, frei pflegbar).
+        Route::put('beispieltexte', [FormatController::class, 'saveTextproben'])->name('beispieltexte.save');
+        Route::delete('beispieltexte', [FormatController::class, 'resetTextproben'])->name('beispieltexte.reset');
+
         // Lehrer – je Schuljahr (Verknüpfung zum Core-Konto über core_user_id, kein FK).
         Route::get('lehrer', [LehrerController::class, 'current'])->name('lehrer.current');
         Route::get('schuljahre/{schuljahr}/lehrer', [LehrerController::class, 'index'])->name('lehrer.index');

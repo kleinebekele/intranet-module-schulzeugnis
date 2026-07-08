@@ -14,24 +14,24 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <span id="dz-status" class="text-sm text-gray-500"></span>
                 <button id="dz-varhelp" type="button">
                     <span style="font-weight:700;">?</span> Variablen erklären
                 </button>
-                <span id="dz-status" class="text-sm text-gray-500"></span>
-                <a href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank"
-                   class="rounded-lg border border-indigo-200 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50">Vorschau</a>
-                <a href="{{ route('module.schulzeugnis.formate.index') }}"
-                   class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">Fertig</a>
-                <button id="dz-save" type="button"
-                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Speichern</button>
+                <a id="dz-vorschau" href="{{ route('module.schulzeugnis.formate.vorschau', $format) }}" target="_blank" title="Vorschau"
+                   class="inline-flex items-center justify-center rounded-lg border border-indigo-200 p-2.5 text-2xl text-indigo-600 hover:bg-indigo-50"><i class="bx bx-show"></i></a>
+                <a href="{{ route('module.schulzeugnis.formate.index') }}" title="Fertig"
+                   class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bx-check"></i></a>
+                <button id="dz-save" type="button" title="Speichern"
+                        class="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-2.5 text-2xl text-white hover:bg-indigo-700"><i class="bx bx-save"></i></button>
             </div>
         </div>
     </x-slot>
 
     <style>
         #dz-app { display: flex; gap: 16px; align-items: flex-start; }
-        #dz-app .dz-side { width: 220px; flex: none; }
-        #dz-app .dz-canvas { flex: 1; overflow: auto; max-height: 78vh; background: #f3f4f6; border-radius: 12px; padding: 24px; }
+        #dz-app .dz-side { width: 220px; flex: none; position: sticky; top: 16px; align-self: flex-start; }
+        #dz-app .dz-canvas { flex: 1; overflow-x: auto; background: #f3f4f6; border-radius: 12px; padding: 24px; }
         #dz-pages { display: flex; flex-direction: column; gap: 22px; align-items: center; }
         .dz-pagelabel { font-size: 12px; color: #6b7280; text-align: center; }
         .dz-pagebar { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px; }
@@ -43,6 +43,10 @@
         .dz-el.dz-sel { border: 1px solid #6366f1; z-index: 5; }
         .dz-el img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
         .dz-el b { display: block; }
+        .dz-el.dz-tb { line-height: 1.35; }
+        .dz-el.dz-tb-of { outline: 2px solid #f59e0b; }
+        .dz-tb-badge { position: absolute; z-index: 6; background: #f59e0b; color: #fff; font: 600 10px/1.2 sans-serif; padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .dz-tb-catch { position: absolute; z-index: 6; background: #6366f1; color: #fff; font: 600 10px/1.2 sans-serif; padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
         .dz-sig { border-top: 1px solid #374151; padding-top: 2px; }
         .dz-h { position: absolute; width: 10px; height: 10px; background: #6366f1; border: 1px solid #fff; box-sizing: border-box; }
         .dz-h-e { right: -5px; top: 50%; margin-top: -5px; cursor: ew-resize; }
@@ -57,8 +61,22 @@
         #dz-props .dz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         #dz-props .dz-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: #374151; }
         #dz-props .dz-check input { margin-top: 0; width: auto; }
-        #dz-props .dz-fmt { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-        #dz-props .dz-fmt .dz-check { margin-top: 0; }
+        #dz-props .dz-fmt { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        /* Umschalt-Buttons (F/K/U): leuchten aktiv */
+        .dz-toggle { position: relative; display: inline-flex; }
+        .dz-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .dz-toggle span { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 34px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; cursor: pointer; font-size: 15px; user-select: none; }
+        .dz-toggle span:hover { background: #f3f4f6; }
+        .dz-toggle input:checked + span { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+        .dz-toggle input:focus-visible + span { outline: 2px solid #a5b4fc; outline-offset: 1px; }
+        /* Ein/Aus-Schalter (Auffangfeld) */
+        #dz-props label.dz-switch { display: flex; align-items: center; gap: 10px; margin-top: 12px; cursor: pointer; font-size: 13px; color: #374151; }
+        .dz-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .dz-switch .dz-track { flex: none; width: 40px; height: 22px; border-radius: 999px; background: #d1d5db; position: relative; transition: background .15s; margin-top: 1px; }
+        .dz-switch .dz-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+        .dz-switch input:checked + .dz-track { background: #4f46e5; }
+        .dz-switch input:checked + .dz-track .dz-thumb { left: 20px; }
+        .dz-switch input:focus-visible + .dz-track { outline: 2px solid #a5b4fc; outline-offset: 2px; }
         #dz-props input[type=color] { width: 100%; height: 30px; margin-top: 2px; padding: 2px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; }
         #dz-props .dz-bg { display: flex; align-items: center; gap: 6px; }
         #dz-props .dz-bg input[type=checkbox] { margin-top: 0; width: auto; }
@@ -81,6 +99,17 @@
         #dz-modal th { color: #6b7280; font-weight: 600; }
         #dz-modal code { background: #eef2ff; color: #4f46e5; padding: 1px 6px; border-radius: 5px; }
         #dz-modal .dz-close { margin-top: 16px; background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+        #dz-tp-editor input[type=text], #dz-tp-editor textarea { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; }
+        #dz-tp-editor textarea { width: 100%; margin-top: 6px; resize: vertical; }
+        .dz-tp-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        .dz-tp-head { display: flex; gap: 8px; align-items: center; }
+        .dz-tp-name { flex: 1; }
+        .dz-tp-del { border: 1px solid #fecaca; color: #dc2626; background: #fff; border-radius: 6px; padding: 4px 9px; font-size: 18px; line-height: 1; cursor: pointer; }
+        .dz-tp-del:hover { background: #fef2f2; }
+        .dz-tp-count { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+        .dz-tp-btn { border: 1px solid #d1d5db; color: #374151; background: #fff; border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+        .dz-tp-btn:hover { background: #f9fafb; }
+        #dz-tp-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
     </style>
 
     <div id="dz-app">
@@ -93,7 +122,7 @@
                 <button class="dz-add" data-typ="unterschrift">+ Unterschrift</button>
                 <button class="dz-add" data-typ="bild">+ Logo / Bild</button>
                 <button class="dz-add" data-typ="linie">+ Linie</button>
-                <button class="dz-add" data-typ="textbereich">+ Textbereich</button>
+                <button class="dz-add" data-typ="textbereich">+ Zeugnistext</button>
                 <input type="file" id="dz-file" accept="image/*" style="display:none">
                 <p class="dz-hint" id="dz-pagehint" style="margin-top:12px;"></p>
                 <p class="dz-hint" style="margin-top:8px;">Element anklicken zum Auswählen, ziehen zum Verschieben, an den blauen Griffen die Größe ändern. Danach <strong>Speichern</strong>.</p>
@@ -117,6 +146,24 @@
             <h2>Variablen in Textfeldern</h2>
             <p>In einem <strong>„Statischer Text"</strong>-Feld kannst du Platzhalter in geschweiften Klammern verwenden – beim Erstellen des Zeugnisses werden sie automatisch mit den echten Daten des Schülers gefüllt.<br><br>Beispiel:<br><code>erhält für die Klasse {Klasse} im Schuljahr {Schuljahr} folgendes Zeugnis:</code></p>
             <table><thead><tr><th>Variable</th><th>Beispiel-Inhalt</th></tr></thead><tbody id="dz-vartable"></tbody></table>
+            <p style="margin-top:16px;"><code>{Zeugnistext}</code> ist ein Sonderfall: Er steht für den kompletten Zeugnistext (Haupttext + Fachtexte) und wird <strong>nicht</strong> in ein Statischer-Text-Feld eingesetzt, sondern über die <strong>Zeugnistext-Felder</strong> ausgegeben. Dort verteilt er sich automatisch der Reihe nach über alle diese Felder – sortiert nach Seite und Position. Passt der Text nicht in alle Felder, wird eine Überlauf-Warnung angezeigt.</p>
+            <label style="display:block; margin-top:16px; font-size:14px; font-weight:600; color:#1f2937;">Beispieltext für die Vorschau
+                <select id="dz-textprobe" style="display:block; width:100%; margin-top:6px; border:1px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:14px; background:#fff;"></select>
+            </label>
+            <p style="margin-top:6px; font-size:12px; color:#9ca3af;">Steuert nur die Layout-Vorschau (Designer und Vorschau/PDF) – ändert das gespeicherte Zeugnis nicht.</p>
+
+            <button id="dz-tp-toggle" class="dz-tp-btn" type="button" style="margin-top:10px;">Beispieltexte bearbeiten …</button>
+            <div id="dz-tp-editor" style="display:none; margin-top:12px; border-top:1px solid #eef2f7; padding-top:12px;">
+                <div id="dz-tp-list"></div>
+                <button id="dz-tp-add" class="dz-tp-btn" type="button">+ Variante hinzufügen</button>
+                <div id="dz-tp-actions">
+                    <button id="dz-tp-save" class="dz-close" type="button" style="margin-top:0;">Texte speichern</button>
+                    <button id="dz-tp-reset" class="dz-tp-btn" type="button">Auf Standard zurücksetzen</button>
+                    <span id="dz-tp-status"></span>
+                </div>
+                <p style="margin-top:8px; font-size:12px; color:#9ca3af;">Gilt modulweit für die Vorschau aller Formate. Die Wörterzahl wird automatisch aus dem Text ermittelt.</p>
+            </div>
+
             <button id="dz-modal-close" class="dz-close" type="button">Verstanden</button>
         </div>
     </div>
@@ -126,15 +173,18 @@
         const BINDUNGEN = @json($bindungen);
         const VARIABLEN = @json($variablen);
         const DATEN = @json($daten);
+        const TEXTPROBEN = @json($textproben);
         const PAGE = @json($designSeite);
         const PAGES = @json($seitenAnzahl);
         const LABELS = @json($seitenLabels);
         const SCALE = 2.5;
         const SAVE_URL = @json(route('module.schulzeugnis.formate.layout', $format));
         const UPLOAD_URL = @json(route('module.schulzeugnis.formate.bild', $format));
+        const TP_SAVE_URL = @json(route('module.schulzeugnis.beispieltexte.save'));
+        const TP_RESET_URL = @json(route('module.schulzeugnis.beispieltexte.reset'));
         const BILD_BASE = '/storage/';
         const CSRF = @json(csrf_token());
-        const TYPLABEL = { text: 'Statischer Text', feld: 'Datenfeld', block: 'Textblock', unterschrift: 'Unterschrift', bild: 'Logo / Bild', linie: 'Linie' };
+        const TYPLABEL = { text: 'Statischer Text', feld: 'Datenfeld', block: 'Textblock', unterschrift: 'Unterschrift', bild: 'Logo / Bild', linie: 'Linie', textbereich: 'Zeugnistext' };
 
         STATE.elements.forEach((e) => { if (!e.seite) e.seite = 1; });
 
@@ -147,6 +197,89 @@
         let fileMode = 'add', fileTarget = -1;
 
         const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+        // --- Live-Textsplit: verteilt {Zeugnistext} auf die Textbereiche wie das PDF ---
+        // Spiegelt FormatController::fuelleTextbereiche() + umbrechen() clientseitig.
+        // measureText ersetzt dompdfs Schriftvermessung – nur Näherung, aber zeigt die
+        // echte Verteilung schon im Designer statt in jedem Rahmen den vollen Text.
+        const MM_TO_PT = 2.83465;
+        let SPLIT = {};
+        let _mctx;
+        const measureCtx = () => (_mctx || (_mctx = document.createElement('canvas').getContext('2d')));
+        const cssFamily = (fam) => {
+            fam = fam || 'DejaVu Sans';
+            const generic = (fam.indexOf('Mono') >= 0) ? 'monospace' : (fam.indexOf('Serif') >= 0) ? 'serif' : 'sans-serif';
+            return '"' + fam + '", ' + generic;
+        };
+        function wrapText(text, breite, fontPt, fam) {
+            const ctx = measureCtx();
+            ctx.font = fontPt + 'px ' + cssFamily(fam); // pt-Zahl als px: konsistent zur Spaltenbreite
+            const zeilen = [];
+            String(text).split('\n').forEach((absatz) => {
+                if (absatz.trim() === '') { zeilen.push(''); return; }
+                let aktuell = '';
+                absatz.trim().split(/\s+/).forEach((w) => {
+                    const probe = aktuell === '' ? w : aktuell + ' ' + w;
+                    if (aktuell === '' || ctx.measureText(probe).width <= breite) {
+                        aktuell = probe;
+                    } else {
+                        zeilen.push(aktuell);
+                        aktuell = w;
+                    }
+                });
+                zeilen.push(aktuell);
+            });
+            return zeilen;
+        }
+        function computeSplit() {
+            const map = {};
+            const alle = [];
+            STATE.elements.forEach((e, i) => { if (e.typ === 'textbereich') alle.push(i); });
+            const text = String(DATEN['zeugnistext'] || '');
+            if (!alle.length || text.trim() === '') return map;
+
+            const byPos = (a, b) => {
+                const ea = STATE.elements[a], eb = STATE.elements[b];
+                return (ea.seite || 1) - (eb.seite || 1) || (ea.y || 0) - (eb.y || 0) || (ea.x || 0) - (eb.x || 0);
+            };
+            const fest = alle.filter((i) => !STATE.elements[i].nurUeberhang).sort(byPos);
+            const bedingt = alle.filter((i) => STATE.elements[i].nurUeberhang);
+
+            // Verteilt den Text der Reihe nach über die gegebenen Felder.
+            const verteile = (order) => {
+                const first = STATE.elements[order[0]];
+                const minBreite = Math.min.apply(null, order.map((i) => (+STATE.elements[i].w || 40) * MM_TO_PT - 4));
+                const zeilen = wrapText(text, Math.max(10, minBreite), +first.size || 11, first.font || 'DejaVu Sans');
+                let pos = 0;
+                const m = {};
+                order.forEach((i) => {
+                    const el = STATE.elements[i];
+                    const maxZeilen = Math.max(1, Math.floor(((+el.h || 10) * MM_TO_PT) / ((+el.size || 11) * 1.35)));
+                    m[i] = { lines: zeilen.slice(pos, pos + maxZeilen) };
+                    pos += m[i].lines.length;
+                });
+                return { m, rest: zeilen.length - pos, order };
+            };
+
+            // Erst nur die festen Felder. Reicht es nicht und es gibt Auffang-/
+            // Zusatzfelder (nurUeberhang), alle Felder in natürlicher Reihenfolge
+            // benutzen – die Zusatzfelder stehen dann an ihrer echten Position.
+            let res;
+            if (fest.length) {
+                res = verteile(fest);
+                if (res.rest > 0 && bedingt.length) {
+                    res = verteile(alle.slice().sort(byPos));
+                }
+            } else {
+                res = verteile(alle.slice().sort(byPos));
+            }
+
+            alle.forEach((i) => { map[i] = res.m[i] || { lines: [] }; });
+            if (res.rest > 0) {
+                map[res.order[res.order.length - 1]].rest = res.rest;
+            }
+            return map;
+        }
         const r1 = (n) => Math.round(n * 10) / 10;
         const substVars = (t) => String(t).replace(/\{(\w+)\}/g, (m, k) => (k in VARIABLEN && VARIABLEN[k] in DATEN) ? DATEN[VARIABLEN[k]] : m);
         const pageLabel = (n) => (PAGES > 1 ? ('Seite ' + n + ' · ' + (LABELS[n - 1] || '')) : 'Seite');
@@ -185,13 +318,19 @@
             }
         }
 
-        function displayHtml(el) {
+        function displayHtml(el, i) {
             if (el.typ === 'text') return esc(substVars(el.text || '(Text)'));
             if (el.typ === 'unterschrift') return '<div class="dz-sig">' + esc(el.text || DATEN['unterschrift'] || '') + '</div>';
             if (el.typ === 'feld') return esc(el.bindung in DATEN ? DATEN[el.bindung] : '{' + (el.bindung || '') + '}');
             if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:#9ca3af;">Bild wählen …</span>';
             if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm ' + (el.stil || 'solid') + ' #374151;"></div>';
-            if (el.typ === 'textbereich') return esc(DATEN['zeugnistext'] || '(Zeugnistext)').replace(/\n/g, '<br>');
+            if (el.typ === 'textbereich') {
+                const part = SPLIT[i];
+                if (!part) return '<span style="color:#9ca3af;">(Zeugnistext)</span>';
+                const inhalt = part.lines.map(esc).join('<br>');
+                if (inhalt) return inhalt;
+                return '<span style="color:#cbd5e1;">' + (el.nurUeberhang ? '(nur bei Überhang)' : '(leer)') + '</span>';
+            }
             if (el.typ === 'block') {
                 if (el.bindung === 'fachtexte') {
                     return (DATEN['fachtexte'] || []).map((f) => '<b>' + esc(f.fach) + '</b>' + esc(f.text)).join('');
@@ -202,6 +341,7 @@
         }
 
         function render() {
+            SPLIT = computeSplit();
             for (let n = 1; n <= PAGES; n++) {
                 pageDivs[n].innerHTML = '';
                 pageDivs[n].classList.toggle('dz-active', PAGES > 1 && n === STATE.activePage);
@@ -210,7 +350,9 @@
                 const pg = pageDivs[el.seite || 1];
                 if (!pg) return;
                 const d = document.createElement('div');
-                d.className = 'dz-el' + (i === STATE.sel ? ' dz-sel' : '');
+                const ueberlauf = el.typ === 'textbereich' && SPLIT[i] && SPLIT[i].rest > 0;
+                d.className = 'dz-el' + (el.typ === 'textbereich' ? ' dz-tb' : '') + (ueberlauf ? ' dz-tb-of' : '') + (i === STATE.sel ? ' dz-sel' : '');
+                if (ueberlauf) d.title = 'Text läuft über: ' + SPLIT[i].rest + ' Zeile(n) passen nicht mehr in die Textbereiche.';
                 d.style.left = (el.x * SCALE) + 'px';
                 d.style.top = (el.y * SCALE) + 'px';
                 d.style.width = (el.w * SCALE) + 'px';
@@ -227,7 +369,7 @@
                     d.style.color = el.color || '#1f2937';
                     d.style.background = el.bg || 'transparent';
                 }
-                d.innerHTML = displayHtml(el);
+                d.innerHTML = displayHtml(el, i);
                 d.addEventListener('mousedown', (e) => startDrag(e, i));
                 if (i === STATE.sel) {
                     ['e', 's', 'se'].forEach((dir) => {
@@ -238,6 +380,22 @@
                     });
                 }
                 pg.appendChild(d);
+                if (el.typ === 'textbereich' && el.nurUeberhang) {
+                    const tag = document.createElement('div');
+                    tag.className = 'dz-tb-catch';
+                    tag.textContent = 'nur bei Überhang';
+                    tag.style.left = (el.x * SCALE) + 'px';
+                    tag.style.top = Math.max(0, el.y * SCALE - 15) + 'px';
+                    pg.appendChild(tag);
+                }
+                if (ueberlauf) {
+                    const badge = document.createElement('div');
+                    badge.className = 'dz-tb-badge';
+                    badge.textContent = '⚠ ' + SPLIT[i].rest + ' Zeile(n) über';
+                    badge.style.left = (el.x * SCALE) + 'px';
+                    badge.style.top = ((el.y + el.h) * SCALE + 2) + 'px';
+                    pg.appendChild(badge);
+                }
             });
             pageHint.textContent = PAGES > 1 ? ('Neue Elemente landen auf: ' + pageLabel(STATE.activePage)) : '';
         }
@@ -317,6 +475,11 @@
                 for (let n = 1; n <= PAGES; n++) copts += '<option value="' + n + '">Seite ' + n + ' (' + esc(LABELS[n - 1] || '') + ')</option>';
                 html += '<label>Kopie auf Seite<select id="dzp-copyseite">' + copts + '</select></label>';
             }
+            if (el.typ === 'textbereich') {
+                html += '<p class="dz-hint" style="margin-top:10px; line-height:1.45;">Hier fließt automatisch die Variable <strong>{Zeugnistext}</strong> hinein (Haupttext + Fachtexte). Sie wird der Reihe nach über <strong>alle Zeugnistext-Felder</strong> dieses Zeugnisses verteilt – sortiert nach Seite und Position. Passt der Text nicht in alle Felder, erscheint eine Überlauf-Warnung.</p>';
+                html += '<label class="dz-switch"><input id="dzp-ueberhang" type="checkbox"' + (el.nurUeberhang ? ' checked' : '') + '><span class="dz-track"><span class="dz-thumb"></span></span><span>Nur bei Überhang benutzen</span></label>';
+                html += '<p class="dz-hint" style="margin-top:6px; line-height:1.45;">Zusatzfeld: wird nur zugeschaltet, wenn der Text sonst nicht in die anderen Felder passt – dann an seiner normalen Position (z. B. zuerst). Passt alles, bleibt es leer.</p>';
+            }
             if (el.typ === 'text') {
                 html += '<label>Text<textarea id="dzp-text" rows="3">' + esc(el.text || '') + '</textarea></label>';
                 html += '<p class="dz-hint" style="margin-top:4px;">Variablen: ' + Object.keys(VARIABLEN).map((k) => '{' + k + '}').join(' ') + '</p>';
@@ -344,6 +507,7 @@
             }
             if (hasFont) {
                 const f = el.font || 'DejaVu Sans';
+                const isTb = el.typ === 'textbereich';
                 html += '<div class="dz-grid">' +
                     '<label>Schrift (pt)<input id="dzp-size" type="number" step="1" value="' + el.size + '"></label>' +
                     '<label>Ausrichtung<select id="dzp-align">' +
@@ -351,13 +515,19 @@
                     '<option value="center"' + (el.align === 'center' ? ' selected' : '') + '>zentriert</option>' +
                     '<option value="right"' + (el.align === 'right' ? ' selected' : '') + '>rechts</option>' +
                     '</select></label>' +
-                    '</div>' +
-                    '<div class="dz-fmt">' +
-                    '<label class="dz-check"><input id="dzp-bold" type="checkbox"' + (el.bold ? ' checked' : '') + '> <b>F</b></label>' +
-                    '<label class="dz-check"><input id="dzp-italic" type="checkbox"' + (el.italic ? ' checked' : '') + '> <i>K</i></label>' +
-                    '<label class="dz-check"><input id="dzp-underline" type="checkbox"' + (el.underline ? ' checked' : '') + '> <u>U</u></label>' +
-                    '</div>' +
-                    '<label>Schriftart<select id="dzp-font">' +
+                    '</div>';
+                if (isTb) {
+                    // Fließtext: F/K/U ergeben je Feld keinen Sinn; Schrift & Ausrichtung
+                    // gelten einheitlich für alle Zeugnistext-Felder.
+                    html += '<p class="dz-hint" style="margin-top:4px;">Schrift &amp; Ausrichtung gelten für <strong>alle</strong> Zeugnistext-Felder.</p>';
+                } else {
+                    html += '<div class="dz-fmt">' +
+                        '<label class="dz-toggle" title="Fett"><input id="dzp-bold" type="checkbox"' + (el.bold ? ' checked' : '') + '><span><b>F</b></span></label>' +
+                        '<label class="dz-toggle" title="Kursiv"><input id="dzp-italic" type="checkbox"' + (el.italic ? ' checked' : '') + '><span><i>K</i></span></label>' +
+                        '<label class="dz-toggle" title="Unterstrichen"><input id="dzp-underline" type="checkbox"' + (el.underline ? ' checked' : '') + '><span><u>U</u></span></label>' +
+                        '</div>';
+                }
+                html += '<label>Schriftart<select id="dzp-font">' +
                     '<option value="DejaVu Sans"' + (f === 'DejaVu Sans' ? ' selected' : '') + '>Standard (Sans)</option>' +
                     '<option value="DejaVu Serif"' + (f === 'DejaVu Serif' ? ' selected' : '') + '>Serif</option>' +
                     '<option value="DejaVu Sans Mono"' + (f === 'DejaVu Sans Mono' ? ' selected' : '') + '>Monospace</option>' +
@@ -390,13 +560,24 @@
             on('dzp-h', 'input', (e) => { el.h = Math.max(4, +e.target.value || 4); render(); });
             on('dzp-staerke', 'input', (e) => { el.staerke = Math.max(0.1, +e.target.value || 0.3); render(); });
             on('dzp-stil', 'change', (e) => { el.stil = e.target.value; render(); });
-            on('dzp-size', 'input', (e) => { el.size = Math.max(5, +e.target.value || 11); render(); });
-            on('dzp-align', 'change', (e) => { el.align = e.target.value; render(); });
+            on('dzp-size', 'input', (e) => {
+                const v = Math.max(5, +e.target.value || 11);
+                if (el.typ === 'textbereich') STATE.elements.forEach((x) => { if (x.typ === 'textbereich') x.size = v; });
+                else el.size = v;
+                render();
+            });
+            on('dzp-align', 'change', (e) => {
+                const v = e.target.value;
+                if (el.typ === 'textbereich') STATE.elements.forEach((x) => { if (x.typ === 'textbereich') x.align = v; });
+                else el.align = v;
+                render();
+            });
             on('dzp-bold', 'change', (e) => { el.bold = e.target.checked; render(); });
             on('dzp-italic', 'change', (e) => { el.italic = e.target.checked; render(); });
             on('dzp-underline', 'change', (e) => { el.underline = e.target.checked; render(); });
             on('dzp-font', 'change', (e) => { el.font = e.target.value; render(); });
             on('dzp-color', 'input', (e) => { el.color = e.target.value; render(); });
+            on('dzp-ueberhang', 'change', (e) => { el.nurUeberhang = e.target.checked; render(); });
             on('dzp-bgon', 'change', (e) => { el.bg = e.target.checked ? document.getElementById('dzp-bg').value : null; render(); });
             on('dzp-bg', 'input', (e) => { if (document.getElementById('dzp-bgon').checked) { el.bg = e.target.value; render(); } });
             on('dzp-bildreplace', 'click', () => { fileMode = 'replace'; fileTarget = STATE.sel; fileInput.value = ''; fileInput.click(); });
@@ -460,6 +641,118 @@
         });
         document.getElementById('dz-modal-close').addEventListener('click', () => document.getElementById('dz-modal').classList.remove('dz-open'));
         document.getElementById('dz-modal').addEventListener('click', (e) => { if (e.target.id === 'dz-modal') e.currentTarget.classList.remove('dz-open'); });
+
+        // --- Beispieltext-Variante für die Vorschau (kurz / mittel / lang) ---
+        const LS_PROBE = 'schulzeugnis.textprobe';
+        const vorschauLink = document.getElementById('dz-vorschau');
+        const textprobeSel = document.getElementById('dz-textprobe');
+        let aktProbe = '1';
+        try { const s = localStorage.getItem(LS_PROBE); if (s && TEXTPROBEN[s]) aktProbe = s; } catch (e) {}
+
+        function fuelleTextprobeSelect() {
+            textprobeSel.innerHTML = Object.keys(TEXTPROBEN).map((k) =>
+                '<option value="' + k + '"' + (k === aktProbe ? ' selected' : '') + '>' + esc(TEXTPROBEN[k].label) + '</option>').join('');
+        }
+        function setzeVorschauLink() {
+            if (!vorschauLink) return;
+            const base = vorschauLink.dataset.base || (vorschauLink.dataset.base = vorschauLink.getAttribute('href'));
+            vorschauLink.setAttribute('href', base + (base.indexOf('?') >= 0 ? '&' : '?') + 'probe=' + aktProbe);
+        }
+        function wechsleTextprobe(k) {
+            if (!TEXTPROBEN[k]) return;
+            aktProbe = k;
+            DATEN['zeugnistext'] = TEXTPROBEN[k].text;
+            try { localStorage.setItem(LS_PROBE, k); } catch (e) {}
+            setzeVorschauLink();
+            render();
+        }
+        if (TEXTPROBEN[aktProbe]) DATEN['zeugnistext'] = TEXTPROBEN[aktProbe].text;
+        fuelleTextprobeSelect();
+        setzeVorschauLink();
+        textprobeSel.addEventListener('change', (e) => wechsleTextprobe(e.target.value));
+
+        // --- Editor für eigene Beispieltexte (modulweit, in der DB gespeichert) ---
+        const woerterJs = (t) => (String(t).trim().match(/\S+/g) || []).length;
+        const tpToggle = document.getElementById('dz-tp-toggle');
+        const tpEditor = document.getElementById('dz-tp-editor');
+        const tpList = document.getElementById('dz-tp-list');
+        const tpStatus = document.getElementById('dz-tp-status');
+        let tpEdit = [];
+
+        function tpEditFromProben() {
+            tpEdit = Object.keys(TEXTPROBEN).map((k) => ({ name: TEXTPROBEN[k].name, text: TEXTPROBEN[k].text }));
+        }
+        function renderTpEditor() {
+            tpList.innerHTML = '';
+            tpEdit.forEach((v, idx) => {
+                const item = document.createElement('div');
+                item.className = 'dz-tp-item';
+                const head = document.createElement('div');
+                head.className = 'dz-tp-head';
+                const name = document.createElement('input');
+                name.type = 'text'; name.className = 'dz-tp-name'; name.value = v.name; name.placeholder = 'Name der Variante';
+                const del = document.createElement('button');
+                del.type = 'button'; del.className = 'dz-tp-del'; del.title = 'Variante löschen'; del.innerHTML = '<i class="bx bx-trash"></i>';
+                head.appendChild(name); head.appendChild(del);
+                const ta = document.createElement('textarea');
+                ta.rows = 5; ta.className = 'dz-tp-text'; ta.value = v.text; ta.placeholder = 'Zeugnistext …';
+                const count = document.createElement('div');
+                count.className = 'dz-tp-count'; count.textContent = woerterJs(v.text) + ' Wörter';
+                name.addEventListener('input', (e) => { v.name = e.target.value; });
+                ta.addEventListener('input', (e) => { v.text = e.target.value; count.textContent = woerterJs(v.text) + ' Wörter'; });
+                del.addEventListener('click', () => { tpEdit.splice(idx, 1); renderTpEditor(); });
+                item.appendChild(head); item.appendChild(ta); item.appendChild(count);
+                tpList.appendChild(item);
+            });
+        }
+        function replaceTextproben(neu) {
+            Object.keys(TEXTPROBEN).forEach((k) => delete TEXTPROBEN[k]);
+            Object.assign(TEXTPROBEN, neu || {});
+            if (!TEXTPROBEN[aktProbe]) aktProbe = Object.keys(TEXTPROBEN)[0] || '1';
+            if (TEXTPROBEN[aktProbe]) DATEN['zeugnistext'] = TEXTPROBEN[aktProbe].text;
+            fuelleTextprobeSelect();
+            setzeVorschauLink();
+            render();
+        }
+        async function tpSenden(url, method, body) {
+            const opt = { method, headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' } };
+            if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+            const res = await fetch(url, opt);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        }
+        tpToggle.addEventListener('click', () => {
+            const open = tpEditor.style.display === 'none';
+            if (open) { tpEditFromProben(); renderTpEditor(); }
+            tpEditor.style.display = open ? 'block' : 'none';
+            tpToggle.textContent = open ? 'Editor schließen' : 'Beispieltexte bearbeiten …';
+        });
+        document.getElementById('dz-tp-add').addEventListener('click', () => {
+            tpEdit.push({ name: 'Variante ' + (tpEdit.length + 1), text: '' });
+            renderTpEditor();
+        });
+        document.getElementById('dz-tp-save').addEventListener('click', async () => {
+            const texte = tpEdit
+                .map((v) => ({ name: (v.name || '').trim(), text: v.text || '' }))
+                .filter((v) => v.name !== '' && v.text.trim() !== '');
+            if (!texte.length) { tpStatus.textContent = 'Bitte mind. eine Variante mit Name und Text.'; return; }
+            tpStatus.textContent = 'Speichere …';
+            try {
+                const data = await tpSenden(TP_SAVE_URL, 'PUT', { texte });
+                replaceTextproben(data.textproben);
+                tpEditFromProben(); renderTpEditor();
+                tpStatus.textContent = 'Gespeichert ✓';
+            } catch (e) { tpStatus.textContent = 'Fehler beim Speichern.'; }
+        });
+        document.getElementById('dz-tp-reset').addEventListener('click', async () => {
+            tpStatus.textContent = 'Setze zurück …';
+            try {
+                const data = await tpSenden(TP_RESET_URL, 'DELETE', null);
+                replaceTextproben(data.textproben);
+                tpEditFromProben(); renderTpEditor();
+                tpStatus.textContent = 'Auf Standard zurückgesetzt ✓';
+            } catch (e) { tpStatus.textContent = 'Fehler beim Zurücksetzen.'; }
+        });
 
         buildPages();
         render();

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Intranet\Modules\Schulzeugnis\Models\Beispieltext;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 
@@ -116,22 +117,28 @@ class FormatController
     }
 
     /** Vorschau als HTML (im Browser) – identisches Markup wie das PDF. */
-    public function vorschau(Format $format)
+    public function vorschau(Request $request, Format $format)
     {
-        return view('schulzeugnis::formate.render', $this->renderDaten($format));
+        return view('schulzeugnis::formate.render', $this->renderDaten($format, $this->probe($request)));
     }
 
     /** Vorschau als PDF (dompdf) – gleiches Layout, echtes Papierformat. */
-    public function pdf(Format $format)
+    public function pdf(Request $request, Format $format)
     {
         [$groesse, $lage] = $format->broschuere
             ? ['a3', 'landscape']
             : [$format->seitenformat === 'a3' ? 'a3' : 'a4', $format->ausrichtung === 'quer' ? 'landscape' : 'portrait'];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulzeugnis::formate.render', $this->renderDaten($format))
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulzeugnis::formate.render', $this->renderDaten($format, $this->probe($request)))
             ->setPaper($groesse, $lage);
 
         return $pdf->stream("zeugnis-vorschau-{$format->id}.pdf");
+    }
+
+    /** Gewählte Beispieltext-Variante (Positions-Schlüssel) aus der Query. */
+    private function probe(Request $request): string
+    {
+        return (string) $request->query('probe', '1');
     }
 
     /** Der visuelle Editor (WYSIWYG). */
@@ -148,7 +155,47 @@ class FormatController
             'bindungen'    => $this->bindungen(),
             'variablen'    => $this->variablen(),
             'daten'        => $this->beispielDaten(),
+            'textproben'   => $this->zeugnistextProben(),
         ]);
+    }
+
+    /** Eigene Beispieltexte speichern (ersetzt die komplette Liste). */
+    public function saveTextproben(Request $request)
+    {
+        $data = $request->validate([
+            'texte'          => ['present', 'array'],
+            'texte.*.name'   => ['required', 'string', 'max:120'],
+            'texte.*.text'   => ['required', 'string'],
+        ]);
+
+        DB::transaction(function () use ($data) {
+            Beispieltext::query()->delete();
+            foreach (array_values($data['texte']) as $i => $t) {
+                Beispieltext::create([
+                    'position' => $i + 1,
+                    'name'     => trim($t['name']),
+                    'text'     => $t['text'],
+                ]);
+            }
+        });
+
+        Protokoll::log('beispieltexte_gespeichert', [
+            'beschreibung' => 'Beispiel-Zeugnistexte für die Vorschau gespeichert (' . count($data['texte']) . ')',
+        ]);
+
+        return response()->json(['ok' => true, 'textproben' => $this->zeugnistextProben()]);
+    }
+
+    /** Eigene Beispieltexte verwerfen – es greifen wieder die Standardtexte. */
+    public function resetTextproben()
+    {
+        Beispieltext::query()->delete();
+
+        Protokoll::log('beispieltexte_zurueckgesetzt', [
+            'beschreibung' => 'Beispiel-Zeugnistexte auf Standard zurückgesetzt',
+        ]);
+
+        return response()->json(['ok' => true, 'textproben' => $this->zeugnistextProben()]);
     }
 
     /** Layout aus dem Editor entgegennehmen und am Format speichern. */
@@ -255,14 +302,21 @@ class FormatController
             $out['staerke'] = round((float) ($e['staerke'] ?? 0.3), 2);
             $out['stil'] = in_array(($e['stil'] ?? 'solid'), ['solid', 'dashed', 'dotted'], true) ? $e['stil'] : 'solid';
         }
+        if ($typ === 'textbereich') {
+            // Auffangfeld: wird in der Füll-Reihenfolge ans Ende gestellt und
+            // fängt nur den Überhang, statt vorne mit dem Zeugnistext zu beginnen.
+            $out['nurUeberhang'] = (bool) ($e['nurUeberhang'] ?? false);
+        }
 
         return $out;
     }
 
     /** @return array<string,mixed> */
-    private function renderDaten(Format $format): array
+    private function renderDaten(Format $format, string $probe = ''): array
     {
-        $daten = $this->beispielDaten();
+        $proben = $this->zeugnistextProben();
+        $key    = isset($proben[$probe]) ? $probe : (string) array_key_first($proben);
+        $daten  = $this->beispielDaten($proben[$key]['text'] ?? '');
         $elemente = $this->ersetzeVariablen($this->resolveBilder($format->layout ?: $this->standardLayout()), $daten);
         $elemente = $this->fuelleTextbereiche($elemente, (string) ($daten['zeugnistext'] ?? ''));
 
@@ -283,53 +337,79 @@ class FormatController
      */
     private function fuelleTextbereiche(array $elemente, string $text): array
     {
-        $order = [];
+        $alle = [];
         foreach ($elemente as $i => $e) {
             if (($e['typ'] ?? '') === 'textbereich') {
-                $order[] = $i;
+                $alle[] = $i;
             }
         }
 
-        if (empty($order) || trim($text) === '') {
+        if (empty($alle) || trim($text) === '') {
             return $elemente;
         }
 
-        usort($order, function ($a, $b) use ($elemente) {
-            $ea = $elemente[$a];
-            $eb = $elemente[$b];
-
-            return [$ea['seite'] ?? 1, $ea['y'] ?? 0, $ea['x'] ?? 0]
-                <=> [$eb['seite'] ?? 1, $eb['y'] ?? 0, $eb['x'] ?? 0];
-        });
-
         $mmToPt = 2.83465;
-        $first  = $elemente[$order[0]];
-        $size   = (float) ($first['size'] ?? 11);
-        $family = $first['font'] ?? 'DejaVu Sans';
+        $fm     = $this->fontMetrics();
 
-        $fm   = $this->fontMetrics();
-        $font = ($fm && method_exists($fm, 'getFont')) ? $fm->getFont($family, 'normal') : null;
-        $mess = function (string $s) use ($fm, $font, $size) {
-            if ($fm && $font) {
-                return (float) $fm->getTextWidth($s, $font, $size);
+        $byPos = fn ($a, $b) => [$elemente[$a]['seite'] ?? 1, $elemente[$a]['y'] ?? 0, $elemente[$a]['x'] ?? 0]
+            <=> [$elemente[$b]['seite'] ?? 1, $elemente[$b]['y'] ?? 0, $elemente[$b]['x'] ?? 0];
+
+        // Feste Felder (immer) und Zusatzfelder (nur bei Überhang) trennen.
+        $fest = array_values(array_filter($alle, fn ($i) => empty($elemente[$i]['nurUeberhang'])));
+        usort($fest, $byPos);
+        $bedingt = array_values(array_filter($alle, fn ($i) => ! empty($elemente[$i]['nurUeberhang'])));
+
+        // Verteilt den Text der Reihe nach über die gegebenen Felder.
+        $verteile = function (array $order) use ($elemente, $mmToPt, $fm, $text) {
+            $first  = $elemente[$order[0]];
+            $size   = (float) ($first['size'] ?? 11);
+            $family = $first['font'] ?? 'DejaVu Sans';
+            $font   = ($fm && method_exists($fm, 'getFont')) ? $fm->getFont($family, 'normal') : null;
+            $mess = function (string $s) use ($fm, $font, $size) {
+                if ($fm && $font) {
+                    return (float) $fm->getTextWidth($s, $font, $size);
+                }
+
+                return mb_strlen($s) * $size * 0.52; // Fallback-Schätzung
+            };
+
+            // Sicherheits-Rand: an der schmalsten Spalte umbrechen, dann passt es überall.
+            $minBreitePt = min(array_map(fn ($i) => ((float) ($elemente[$i]['w'] ?? 40)) * $mmToPt - 4, $order));
+            $zeilen = $this->umbrechen($text, max(10, $minBreitePt), $mess);
+
+            $pos = 0;
+            $inhalt = [];
+            foreach ($order as $i) {
+                $hPt       = ((float) ($elemente[$i]['h'] ?? 10)) * $mmToPt;
+                $sz        = (float) ($elemente[$i]['size'] ?? 11);
+                $maxZeilen = max(1, (int) floor($hPt / ($sz * 1.35)));
+                $anteil    = array_slice($zeilen, $pos, $maxZeilen);
+                $pos      += count($anteil);
+                $inhalt[$i] = implode("\n", $anteil);
             }
 
-            return mb_strlen($s) * $size * 0.52; // Fallback-Schätzung
+            return ['inhalt' => $inhalt, 'rest' => count($zeilen) - $pos];
         };
 
-        // Sicherheits-Rand: Zeilen an der schmalsten Spalte umbrechen, dann passen sie überall.
-        $minBreitePt = min(array_map(fn ($i) => ((float) ($elemente[$i]['w'] ?? 40)) * $mmToPt - 4, $order));
+        // Erst nur die festen Felder. Passt der Text nicht und es gibt Zusatzfelder
+        // (nurUeberhang), werden alle Felder in natürlicher Reihenfolge genutzt –
+        // die Zusatzfelder erscheinen dann an ihrer echten Position (z. B. zuerst).
+        if (! empty($fest)) {
+            $res = $verteile($fest);
+            if ($res['rest'] > 0 && ! empty($bedingt)) {
+                $alleSort = $alle;
+                usort($alleSort, $byPos);
+                $res = $verteile($alleSort);
+            }
+        } else {
+            $alleSort = $alle;
+            usort($alleSort, $byPos);
+            $res = $verteile($alleSort);
+        }
 
-        $zeilen = $this->umbrechen($text, max(10, $minBreitePt), $mess);
-
-        $pos = 0;
-        foreach ($order as $i) {
-            $hPt      = ((float) ($elemente[$i]['h'] ?? 10)) * $mmToPt;
-            $sz       = (float) ($elemente[$i]['size'] ?? 11);
-            $maxZeilen = max(1, (int) floor($hPt / ($sz * 1.35)));
-            $anteil   = array_slice($zeilen, $pos, $maxZeilen);
-            $pos     += count($anteil);
-            $elemente[$i]['inhalt'] = implode("\n", $anteil);
+        // Alle Textbereiche setzen; nicht genutzte Zusatzfelder bleiben leer.
+        foreach ($alle as $i) {
+            $elemente[$i]['inhalt'] = $res['inhalt'][$i] ?? '';
         }
 
         return $elemente;
@@ -388,6 +468,7 @@ class FormatController
             'Klasse'       => 'klasse',
             'Schuljahr'    => 'schuljahr',
             'Schulname'    => 'schulname',
+            'Zeugnisspruch' => 'zeugnisspruch',
         ];
     }
 
@@ -474,13 +555,131 @@ class FormatController
         ];
     }
 
+    /** Wörter zählen (für die Label-Angabe der Beispieltexte). */
+    private function woerter(string $text): int
+    {
+        $text = trim($text);
+
+        return $text === '' ? 0 : count(preg_split('/\s+/u', $text));
+    }
+
+    /**
+     * Verfügbare Beispiel-Zeugnistexte für die Vorschau – zuerst die selbst
+     * gepflegten aus der DB, sonst die eingebauten Standardtexte. Nach Position
+     * geschlüsselt (1..N); das Label ergänzt die berechnete Wörterzahl.
+     *
+     * @return array<string,array{label:string,name:string,text:string}>
+     */
+    private function zeugnistextProben(): array
+    {
+        $rows = Beispieltext::orderBy('position')->orderBy('id')->get();
+
+        $liste = $rows->isNotEmpty()
+            ? $rows->map(fn ($r) => ['name' => $r->name, 'text' => $r->text])->all()
+            : $this->standardProben();
+
+        $proben = [];
+        foreach (array_values($liste) as $i => $p) {
+            $proben[(string) ($i + 1)] = [
+                'label' => $p['name'] . ' (' . $this->woerter($p['text']) . ' Wörter)',
+                'name'  => $p['name'],
+                'text'  => $p['text'],
+            ];
+        }
+
+        return $proben;
+    }
+
+    /**
+     * Fünf eingebaute Beispiel-Zeugnistexte steigender Länge (Standard, falls
+     * keine eigenen gepflegt sind) – zum Testen der Textverteilung/Überlauf.
+     * Die Ziel-Wortzahlen entsprechen ca. 100/200/300/400/450 % von rund einer
+     * Seite (≈ 340 Wörter).
+     *
+     * @return array<int,array{name:string,text:string}>
+     */
+    private function standardProben(): array
+    {
+        $intro = "Lina hat ein arbeitsreiches, frohes und ereignisreiches Schuljahr erlebt. Mit wachem Interesse und großer Ausdauer hat sie am Unterricht teilgenommen und sich in der Klassengemeinschaft hilfsbereit, verlässlich und rücksichtsvoll gezeigt. Besonders in den künstlerischen Fächern ist sie sichtlich aufgeblüht und hat andere Kinder mit ihrer Begeisterung angesteckt.";
+
+        // Fach-/Epochenblöcke in fester Reihenfolge; längere Varianten nehmen
+        // (satzweise) weitere Blöcke hinzu, bis die Ziel-Wortzahl erreicht ist.
+        $bloecke = [
+            'Sozialverhalten und Arbeitshaltung' => "In der Klassengemeinschaft ist Lina eine warmherzige und verlässliche Mitschülerin, die anderen Kindern aufmerksam begegnet und in Streitfragen um Ausgleich bemüht ist. Ihre Aufgaben ergreift sie mit Fleiß und Sorgfalt und bringt begonnene Arbeiten geduldig zu Ende. Auch wenn etwas nicht auf Anhieb gelingt, bleibt sie zuversichtlich und versucht es mit ruhiger Beharrlichkeit erneut. Im Morgenkreis und bei gemeinsamen Vorhaben übernimmt sie gern Verantwortung und denkt an das Wohl der ganzen Gruppe.",
+            'Formenzeichnen' => "Mit ruhiger Hand führt Lina die fließenden und gespiegelten Formen aus und erfasst deren Gesetzmäßigkeiten mit wachem Blick. Gerade und geschwungene Linien setzt sie zunehmend sicher gegeneinander und findet dabei ein feines Gleichgewicht zwischen Spannung und Ruhe. Ihre Blätter gestaltet sie sauber, sorgfältig und mit sichtlicher Freude an Linie, Rhythmus und Farbe. Auch anspruchsvollere Verwandlungsformen greift sie mutig auf und arbeitet sie mit Geduld bis zur stimmigen Gestalt aus.",
+            'Deutsch – Lesen und Sprechen' => "Lina liest sicher, betont und mit echtem Ausdruck und erfasst den Sinn des Gelesenen zuverlässig. Beim Vortragen von Gedichten und Sprüchen spricht sie deutlich, gegliedert und mit lebendiger Stimme. Im Erzählen bringt sie eigene Gedanken anschaulich und in geordneter Folge ein und hört zugleich aufmerksam auf die Beiträge der anderen Kinder. Unbekannte Wörter erschließt sie sich zunehmend selbstständig aus dem Zusammenhang.",
+            'Deutsch – Schreiben und Grammatik' => "Beim freien Schreiben findet Lina eine anschauliche, bildhafte Sprache und achtet zunehmend auf einen sauberen Satzbau und eine übersichtliche Gliederung. Die Regeln der Rechtschreibung wendet sie mit wachsender Sicherheit an und überarbeitet eigene Texte aufmerksam und selbstkritisch. Die Wortarten unterscheidet sie sicher und setzt sie bewusst ein. Ihre Handschrift ist im Laufe des Jahres gleichmäßig, flüssig und gut lesbar geworden.",
+            'Mathematik' => "Im Rechnen arbeitet Lina sorgfältig, ausdauernd und erfasst neue Zusammenhänge rasch. Die schriftlichen Rechenverfahren in den vier Grundrechenarten wendet sie sicher an; beim Sachrechnen entwickelt sie eigene Lösungswege und erklärt diese ruhig, klar und verständlich. Das kleine Einmaleins beherrscht sie geläufig und setzt es beweglich ein. Beim Kopfrechnen zeigt sie zunehmend Schnelligkeit und traut sich auch an anspruchsvolle Knobelaufgaben heran.",
+            'Rechnen – Geometrie' => "In der Freihandgeometrie zeichnet Lina Kreise, Dreiecke und regelmäßige Muster mit ruhiger Hand und wachsender Genauigkeit. Die Gesetzmäßigkeiten der Figuren erfasst sie mit Freude und entdeckt dabei selbst überraschende Zusammenhänge. Ihre Konstruktionen führt sie sauber aus und gestaltet die Blätter mit Sorgfalt, Farbe und einem feinen Sinn für Symmetrie und Rhythmus.",
+            'Rechnen – Sachaufgaben und Messen' => "Beim Messen von Längen, Gewichten und Zeiten geht Lina umsichtig und genau vor und wählt passende Einheiten sicher aus. Sachaufgaben aus dem Alltag durchdringt sie ruhig, erkennt die wesentlichen Angaben und findet eigene Rechenwege. Ihre Ergebnisse prüft sie auf Sinnhaftigkeit und stellt den Lösungsweg klar und übersichtlich dar. Auch mehrschrittige Aufgaben löst sie mit wachsender Selbstständigkeit.",
+            'Sachkunde und Heimatkunde' => "Mit großer Neugier verfolgt Lina die Geschichten und Bilder aus Natur und Heimat und bringt eigene Beobachtungen lebhaft ein. Zusammenhänge in ihrer Umgebung erfasst sie aufmerksam und behält sie anschaulich im Gedächtnis. Bei Ausflügen und Beobachtungsaufgaben ist sie mit Eifer und wachen Sinnen dabei und stellt kluge Fragen. Ihre Hefteinträge gestaltet sie sorgfältig, übersichtlich und mit liebevollen Zeichnungen.",
+            'Tier- und Pflanzenkunde' => "Den Erzählungen über Tiere und Pflanzen folgt Lina mit Anteilnahme und einem feinen Gespür für das Lebendige. Gestalt, Lebensraum und Gewohnheiten der Tiere beschreibt sie treffend und mit Wärme. Ihre Beobachtungen hält sie in sorgfältigen Zeichnungen und kurzen, gut formulierten Texten anschaulich fest. Immer wieder verknüpft sie Neues mit eigenen Erlebnissen aus Garten, Wald und Wiese.",
+            'Geografie' => "In der Heimatkunde und ersten Geografie zeichnet Lina Wege, Wiesen und Höhenzüge der Umgebung mit wachem Blick in einfache Karten ein. Himmelsrichtungen und Maßstab erfasst sie zunehmend sicher und orientiert sich im Gelände aufmerksam. Mit Freude berichtet sie von eigenen Wanderungen und ordnet das Erlebte anschaulich in das größere Bild der Landschaft ein.",
+            'Geschichte' => "Den Bildern und Erzählungen aus alten Zeiten begegnet Lina mit lebhafter Vorstellungskraft und ehrlicher Anteilnahme. Sie merkt sich Namen, Orte und Zusammenhänge gut und gibt Begebenheiten in eigenen Worten lebendig wieder. In Gesprächen bringt sie eigene Fragen ein und verbindet Vergangenes nachdenklich mit dem eigenen Leben und der Gegenwart.",
+            'Englisch' => "Lina beteiligt sich lebhaft an Liedern, Reimen und Sprüchen und nimmt neue Wörter rasch und sicher auf. Kurze Dialoge und kleine Szenen trägt sie mit wachsender Sicherheit und guter Aussprache vor. Sie versteht einfache Anweisungen zuverlässig und antwortet zunehmend mutig und bereitwillig in der fremden Sprache. Auch beim Zählen, bei Farben und im Wortschatz des Alltags ist sie sattelfest geworden.",
+            'Französisch' => "Auch im Französischen singt und spricht Lina mit Freude mit und ahmt Klang und Melodie der Sprache aufmerksam nach. Reime und kleine Verse behält sie gut und trägt sie gern und ausdrucksvoll vor der Gruppe vor. Ihren Wortschatz erweitert sie stetig und setzt ihn in vertrauten Situationen bereits sicher ein. Neue Sprachspiele greift sie mit Eifer auf und hat sichtlich Freude am Klang der Wörter.",
+            'Eurythmie' => "Mit Anmut und Konzentration bewegt sich Lina im Raum und nimmt die Formen und Gesten mit feinem Gespür auf. Laute und Rhythmen setzt sie beweglich in Bewegung um und findet dabei zu einem harmonischen, gesammelten Ausdruck. In der Gruppe ist sie eine aufmerksame, rücksichtsvolle und verlässliche Partnerin. Auch schwierigere Raumformen erfasst sie rasch und führt sie mit Sicherheit und Freude aus.",
+            'Musik – Singen und Flöte' => "Im gemeinsamen Singen und beim Flötenspiel ist Lina mit Hingabe und wacher Aufmerksamkeit dabei. Rhythmen erfasst sie sicher, hält ihre Stimme verlässlich in der Gruppe und hört fein auf ihre Mitspieler. Neue Lieder und Griffe erlernt sie rasch und übt mit erfreulicher Ausdauer und Genauigkeit. Bei Klassenspielen und Monatsfeiern trägt sie mit Freude und Zuverlässigkeit zum Gelingen bei.",
+            'Chor und Orchester' => "Im Klassenchor singt Lina mit klarer Stimme und hält ihre Stimmlage auch im mehrstimmigen Satz verlässlich. Beim gemeinsamen Musizieren fügt sie sich aufmerksam in das Ganze ein und achtet auf Einsatz und Lautstärke. Proben verfolgt sie geduldig und diszipliniert und trägt mit Freude zum festlichen Gelingen der Aufführungen bei.",
+            'Malen und Aquarell' => "Im Malen mit Aquarellfarben ergreift Lina die Farben mutig und mit einer feinen Empfindung für ihre Stimmung. Farbübergänge gestaltet sie behutsam und geduldig, sodass ihre Bilder lebendig, licht und ausgewogen wirken. Sie geht mit Pinsel, Farbe und Papier sorgsam um und freut sich sichtlich am Entstehen der Blätter. Eigene Bildideen entwickelt sie zunehmend selbstständig und mit Ausdauer.",
+            'Plastizieren und Werken' => "Beim Formen mit Bienenwachs und Ton arbeitet Lina mit Ruhe, Geduld und Vorstellungskraft. Aus dem Ganzen heraus entwickelt sie stimmige Gestalten und bringt eigene Ideen behutsam und ausdauernd zum Ausdruck. Beim Werken mit Holz geht sie umsichtig und sicher mit den Werkzeugen um. Sie hilft anderen Kindern bereitwillig weiter und räumt ihren Arbeitsplatz gewissenhaft auf.",
+            'Handarbeit' => "Beim Stricken und Häkeln arbeitet Lina ausdauernd, gewissenhaft und mit großer Geduld. Maschen und Muster führt sie gleichmäßig aus und erkennt eigene Fehler selbstständig, um sie ruhig und ohne Unmut zu berichtigen. Ihre fertigen Stücke zeigen ein feines Gespür für Muster, Farbe und Ordnung und werden mit sichtbarem Stolz vollendet. Auch aufwendige Arbeiten bringt sie mit Freude zu Ende.",
+            'Gartenbau' => "Bei der Arbeit im Garten packt Lina tatkräftig, freudig und mit Sinn für das Ganze an. Sie beobachtet das Wachsen und Reifen der Pflanzen aufmerksam und übernimmt Pflegeaufgaben zuverlässig und selbstständig. Auch anstrengende Arbeiten führt sie ausdauernd und klaglos aus und erlebt die Früchte ihrer Mühe mit sichtlicher Freude. Im Umgang mit Werkzeug und Erde ist sie umsichtig und ordentlich.",
+            'Turnen und Bewegung' => "Bei Spiel und Bewegung zeigt Lina Mut, Geschick und einen fairen, freundlichen Umgang mit den anderen Kindern. Neue Übungen greift sie freudig auf und bleibt auch bei Schwierigkeiten beharrlich, mutig und zuversichtlich. In Mannschaftsspielen ist sie eine rücksichtsvolle Mitspielerin, die sich mit Einsatz für die Gemeinschaft einbringt. Ihre Bewegungen sind sicherer, kräftiger und geschickter geworden.",
+            'Wandertage und Klassenfahrt' => "Auf den Wandertagen und der Klassenfahrt zeigt sich Lina als ausdauernde, fröhliche und rücksichtsvolle Begleiterin. Auch längere Strecken meistert sie klaglos und hilft müden Kindern mit aufmunternden Worten. In der Gemeinschaft übernimmt sie kleine Aufgaben zuverlässig und trägt mit ihrer heiteren Art zu einer guten Stimmung bei. Das gemeinsame Erleben in der Natur genießt sie sichtlich.",
+            'Jahresfeste und Jahreszeitentisch' => "Die Vorbereitung der Jahresfeste begleitet Lina mit Freude, Andacht und tatkräftigem Einsatz. Den Jahreszeitentisch gestaltet sie aufmerksam mit und bringt eigene Fundstücke und Ideen liebevoll ein. Lieder, Sprüche und Reigen der Feste lernt sie gewissenhaft und trägt sie mit innerer Beteiligung vor. Die Stimmung der Feste nimmt sie fein wahr und gibt sie in Bildern und Erzählungen wieder.",
+            'Erzählteil' => "Den Erzählungen und Bildern des Erzählteils folgt Lina mit innerer Anteilnahme und wachem Gemüt. Das Gehörte gibt sie stimmungsvoll und in eigenen Worten treffend wieder und verbindet es mit eigenen Gedanken und Fragen. Immer wieder bringt sie feine Beobachtungen ein, die die ganze Klasse bereichern. Die Stimmung der Bilder trägt sie über den Tag und lässt sie in eigene Erzählungen und Zeichnungen einfließen.",
+            'Ausblick' => "Lina hat sich im Laufe des Schuljahres in vielerlei Hinsicht erfreulich entwickelt und ihre Fähigkeiten mit Freude und Ernst entfaltet. Sie darf mit berechtigtem Vertrauen auf das Erreichte blicken und die kommenden Aufgaben mutig und tatkräftig ergreifen. Ihre herzliche, fleißige und zugewandte Art wird sie auch künftig gut begleiten. Wir wünschen Lina für ihren weiteren Weg viel Freude, Mut und Zuversicht.",
+        ];
+
+        // Satzweiser Aufbau: volle Blöcke werden aufgenommen, der letzte Block
+        // wird satzgenau abgeschnitten, sobald die Ziel-Wortzahl erreicht ist.
+        $bauen = function (int $ziel) use ($intro, $bloecke) {
+            $teile = [$intro];
+            $summe = $this->woerter($intro);
+
+            foreach ($bloecke as $ueberschrift => $absatz) {
+                if ($summe >= $ziel) {
+                    break;
+                }
+                $saetze = preg_split('/(?<=[.!?])\s+/u', $absatz);
+                $genommen = [];
+                foreach ($saetze as $satz) {
+                    $genommen[] = $satz;
+                    $summe += $this->woerter($satz);
+                    if ($summe >= $ziel) {
+                        break;
+                    }
+                }
+                $teile[] = $ueberschrift . "\n" . implode(' ', $genommen);
+            }
+
+            return implode("\n\n", $teile);
+        };
+
+        $proben = [];
+        foreach ([1 => 340, 2 => 680, 3 => 1020, 4 => 1360, 5 => 1530] as $nr => $ziel) {
+            $proben[] = [
+                'name' => 'Variante ' . $nr,
+                'text' => $bauen($ziel),
+            ];
+        }
+
+        return $proben;
+    }
+
     /**
      * Beispiel-Daten für die Vorschau (bis der echte Zeugnis-Datensatz existiert).
      *
      * @return array<string,mixed>
      */
-    private function beispielDaten(): array
+    private function beispielDaten(?string $zeugnistext = null): array
     {
+        if ($zeugnistext === null) {
+            $proben      = $this->zeugnistextProben();
+            $zeugnistext = $proben[array_key_first($proben)]['text'] ?? '';
+        }
+
         return [
             'schulname'             => 'Freie Waldorfschule Musterstadt',
             'titel'                 => 'Zeugnis 2026/2027',
@@ -500,22 +699,9 @@ class FormatController
                 ['fach' => 'Mathematik', 'text' => 'Im Rechnen arbeitet sie sorgfältig und erfasst neue Zusammenhänge rasch.'],
                 ['fach' => 'Eurythmie', 'text' => 'Mit Anmut und Konzentration bewegt sich Lina im Raum.'],
             ],
-            'zeugnistext'           => "Lina hat ein arbeitsreiches und frohes Schuljahr erlebt. Mit wachem Interesse "
-                . "hat sie am Unterricht teilgenommen und sich in der Klassengemeinschaft hilfsbereit und "
-                . "verlässlich gezeigt. Besonders in den künstlerischen Fächern ist sie sichtlich aufgeblüht "
-                . "und hat andere Kinder mit ihrer Begeisterung angesteckt.\n\n"
-                . "Deutsch\n"
-                . "Lina liest sicher und betont und bringt eigene Gedanken lebendig in den Unterricht ein. "
-                . "Beim freien Schreiben findet sie eine anschauliche Sprache und achtet zunehmend auf einen "
-                . "sauberen Satzbau. Ihre Handschrift ist gleichmäßig und gut lesbar geworden.\n\n"
-                . "Mathematik\n"
-                . "Im Rechnen arbeitet Lina sorgfältig und erfasst neue Zusammenhänge rasch. Die schriftlichen "
-                . "Rechenverfahren wendet sie sicher an; beim Sachrechnen entwickelt sie eigene Lösungswege und "
-                . "erklärt diese verständlich.\n\n"
-                . "Eurythmie\n"
-                . "Mit Anmut und Konzentration bewegt sich Lina im Raum und nimmt die Formen mit feinem Gespür auf. "
-                . "In der Gruppe ist sie eine aufmerksame und rücksichtsvolle Partnerin.\n\n"
-                . "Wir wünschen Lina für das kommende Schuljahr weiterhin viel Freude und Zuversicht.",
+            'zeugnistext'           => $zeugnistext,
+            'zeugnisspruch'         => "Wie das Licht am Morgen die Erde neu erweckt,\n"
+                . "so wächst in dir die Kraft, die Mut und Freude weckt.",
             'ausgabe.zeile'         => 'Musterstadt, den 30.06.2027',
             'unterschrift'          => 'Klassenlehrer/in',
         ];
