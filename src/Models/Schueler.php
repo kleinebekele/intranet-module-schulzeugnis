@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulzeugnis\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Schüler je Schuljahr – modul-eigene Zeile pro Schuljahr (zugleich Einschulung:
@@ -37,8 +38,20 @@ class Schueler extends Model
         return $this->belongsTo(Format::class, 'format_override_id');
     }
 
+    public function zeugnis(): HasOne
+    {
+        return $this->hasOne(Zeugnis::class, 'schueler_id');
+    }
+
     public function fullName(): string
     {
         return trim($this->vorname . ' ' . $this->nachname);
     }
+
+    /** Effektives Format: eigener Override, sonst Standard der Klasse. */
+    public function effektivesFormatId(): ?int
+    {
+        return $this->format_override_id ?? $this->klasse?->standard_format_id;
+    }
 }
+

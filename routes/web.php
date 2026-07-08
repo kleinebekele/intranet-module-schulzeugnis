@@ -9,6 +9,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\ZeugnisController;
 
 /*
  | Routen des Schulzeugnis-Moduls.
@@ -46,6 +47,14 @@ Route::middleware(['web', 'auth'])
         Route::get('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'index'])->name('lehrauftraege.index');
         Route::post('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'store'])->name('lehrauftraege.store');
         Route::delete('lehrauftraege/{lehrauftrag}', [LehrauftragController::class, 'destroy'])->name('lehrauftraege.destroy');
+
+        // Befüllte Zeugnisse einer Klasse.
+        Route::get('klassen/{klasse}/zeugnisse', [ZeugnisController::class, 'index'])->name('zeugnisse.index');
+        Route::post('klassen/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('zeugnisse.store');
+        Route::get('zeugnisse/{zeugnis}/bearbeiten', [ZeugnisController::class, 'edit'])->name('zeugnisse.edit');
+        Route::put('zeugnisse/{zeugnis}', [ZeugnisController::class, 'update'])->name('zeugnisse.update');
+        Route::post('zeugnisse/{zeugnis}/abschliessen', [ZeugnisController::class, 'abschliessen'])->name('zeugnisse.abschliessen');
+        Route::post('zeugnisse/{zeugnis}/wieder-oeffnen', [ZeugnisController::class, 'wiederOeffnen'])->name('zeugnisse.wiederoeffnen');
 
         // Schüler – je Schuljahr (keine Verbindung zum Core, quell_id lose).
         Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.current');

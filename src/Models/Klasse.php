@@ -36,4 +36,9 @@ class Klasse extends Model
     {
         return $this->hasMany(Lehrauftrag::class, 'klasse_id');
     }
+
+    public function schueler(): HasMany
+    {
+        return $this->hasMany(Schueler::class, 'klasse_id');
+    }
 }
