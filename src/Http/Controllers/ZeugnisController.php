@@ -443,8 +443,12 @@ class ZeugnisController
             'weiter_zu'     => ['nullable', 'integer'],
         ]);
 
+        // Korrektor-Pflicht nur beim normalen Speichern erzwingen. Beim Blättern
+        // („Speichern & vorheriger/nächster") nicht blockieren – dann wird gespeichert
+        // und einfach zum Nachbarn gewechselt, Korrektoren können später folgen.
         $korrektoren = $data['korrektoren'] ?? [];
-        if (in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
+        $blaettert   = (int) $request->input('weiter_zu') > 0;
+        if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
                 ->withInput()
                 ->with('error', 'Bitte mindestens einen Korrektor auswählen, wenn der Text zur Korrektur freigegeben wird.');
