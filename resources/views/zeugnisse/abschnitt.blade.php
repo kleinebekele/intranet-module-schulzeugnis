@@ -20,7 +20,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-2xl space-y-4">
+    <div class="space-y-4 zt-page">
         <div class="flex items-center justify-between">
             <a href="{{ route('module.schulzeugnis.zeugnisse.index', $schueler?->klasse) }}"
                class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
@@ -48,6 +48,8 @@
             </div>
         @endif
 
+        <div class="zt-cols">
+        <div class="zt-main space-y-4">
         {{-- Bearbeitung --}}
         <form method="POST" action="{{ route('module.schulzeugnis.abschnitte.update', $abschnitt) }}"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
@@ -186,7 +188,9 @@
                 </span>
             </div>
         @endif
+        </div>{{-- /zt-main --}}
 
+        <div class="zt-side">
         {{-- Änderungsverlauf / Wiederherstellung --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5">
             <h2 class="text-sm font-semibold text-gray-700">Änderungsverlauf</h2>
@@ -219,9 +223,16 @@
                 </ul>
             @endif
         </div>
+        </div>{{-- /zt-side --}}
+        </div>{{-- /zt-cols --}}
     </div>
 
     <style>
+        .zt-page { max-width: 92rem; }
+        .zt-cols { display: grid; gap: 1rem; }
+        @media (min-width: 1024px) {
+            .zt-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+        }
         #zt-nav .zt-navbtn.zt-nav-discard {
             border-color: #fcd34d; color: #b45309; background: #fffbeb;
         }
