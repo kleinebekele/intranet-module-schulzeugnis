@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulzeugnis\Support;
 use Illuminate\Support\Facades\Storage;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Format;
+use Intranet\Modules\Schulzeugnis\Models\Klassentext;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 
 /**
@@ -110,12 +111,27 @@ class ZeugnisRenderer
         $abschnitte = $zeugnis->abschnitte->sortBy([['reihenfolge', 'asc'], ['id', 'asc']]);
         $haupttext  = (string) ($abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTTEXT)?->inhalt ?? '');
 
+        $klassentexte = $klasse
+            ? Klassentext::where('klasse_id', $klasse->id)->pluck('text', 'fach_id')
+            : collect();
+
+        // Fachtext = klassenweiter Text + (neue Zeile / Leerzeichen) + Schülertext.
         $fachtexte = $abschnitte
             ->whereIn('typ', [Abschnitt::TYP_FACHTEXT, Abschnitt::TYP_NOTE])
-            ->map(fn ($a) => [
-                'fach' => $a->fach?->name ?? '',
-                'text' => (string) ($a->typ === Abschnitt::TYP_NOTE ? trim(($a->note ? 'Note: ' . $a->note . '  ' : '') . ($a->inhalt ?? '')) : ($a->inhalt ?? '')),
-            ])
+            ->map(function ($a) use ($klassentexte) {
+                $schuelerText = $a->typ === Abschnitt::TYP_NOTE
+                    ? trim(($a->note ? 'Note: ' . $a->note . '  ' : '') . ($a->inhalt ?? ''))
+                    : (string) ($a->inhalt ?? '');
+                $klassenText = trim((string) ($klassentexte[$a->fach_id] ?? ''));
+
+                if ($klassenText !== '' && $schuelerText !== '') {
+                    $text = $klassenText . ($a->klassentext_neue_zeile ? "\n" : ' ') . $schuelerText;
+                } else {
+                    $text = $klassenText !== '' ? $klassenText : $schuelerText;
+                }
+
+                return ['fach' => $a->fach?->name ?? '', 'text' => $text];
+            })
             ->filter(fn ($f) => trim($f['text']) !== '')
             ->values()
             ->all();

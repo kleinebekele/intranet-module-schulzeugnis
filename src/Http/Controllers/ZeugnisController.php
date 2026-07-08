@@ -8,6 +8,7 @@ use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Fach;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
+use Intranet\Modules\Schulzeugnis\Models\Klassentext;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
@@ -272,20 +273,27 @@ class ZeugnisController
             ->orderByDesc('id')
             ->get();
 
+        $klasse = $zeugnis->schueler?->klasse;
+        $klassentext = ($abschnitt->fach_id && $klasse)
+            ? Klassentext::firstOrNew(['klasse_id' => $klasse->id, 'fach_id' => $abschnitt->fach_id])
+            : null;
+
         return view('schulzeugnis::zeugnisse.abschnitt', [
-            'abschnitt' => $abschnitt,
-            'zeugnis'   => $zeugnis,
-            'schueler'  => $zeugnis->schueler,
-            'stati'     => Abschnitt::STATI,
-            'verlauf'   => $verlauf,
-            'readonly'  => $zeugnis->istAbgeschlossen(),
+            'abschnitt'   => $abschnitt,
+            'zeugnis'     => $zeugnis,
+            'schueler'    => $zeugnis->schueler,
+            'stati'       => Abschnitt::STATI,
+            'verlauf'     => $verlauf,
+            'klassentext' => $klassentext,
+            'readonly'    => $zeugnis->istAbgeschlossen(),
         ]);
     }
 
     public function abschnittUpdate(Request $request, Abschnitt $abschnitt)
     {
-        $abschnitt->load('zeugnis.schueler', 'fach');
+        $abschnitt->load('zeugnis.schueler.klasse', 'fach');
         $zeugnis = $abschnitt->zeugnis;
+        $klasse  = $zeugnis->schueler?->klasse;
 
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
@@ -293,9 +301,11 @@ class ZeugnisController
         }
 
         $data = $request->validate([
-            'inhalt' => ['nullable', 'string'],
-            'note'   => ['nullable', 'string', 'max:20'],
-            'status' => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+            'inhalt'      => ['nullable', 'string'],
+            'note'        => ['nullable', 'string', 'max:20'],
+            'status'      => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+            'notiz'       => ['nullable', 'string'],
+            'klassentext' => ['nullable', 'string'],
         ]);
 
         $altInhalt = $abschnitt->inhalt;
@@ -305,6 +315,8 @@ class ZeugnisController
             $abschnitt->note = $data['note'] ?? null;
         }
         $abschnitt->status = $data['status'];
+        $abschnitt->notiz = $data['notiz'] ?? null;
+        $abschnitt->klassentext_neue_zeile = $request->boolean('klassentext_neue_zeile');
         $abschnitt->save();
 
         // Nur inhaltliche Änderungen kommen in den (append-only) Verlauf.
@@ -319,7 +331,33 @@ class ZeugnisController
             ]);
         }
 
+        // Klassenweiter Text – gilt für alle Schüler der Klasse in diesem Fach.
+        $klassentextGeaendert = false;
+        if ($abschnitt->fach_id && $klasse) {
+            $kt  = Klassentext::firstOrNew(['klasse_id' => $klasse->id, 'fach_id' => $abschnitt->fach_id]);
+            $neu = $data['klassentext'] ?? null;
+            if ((string) $kt->text !== (string) $neu) {
+                $kt->text = $neu;
+                $kt->save();
+                $klassentextGeaendert = true;
+                Protokoll::log('klassentext_geaendert', [
+                    'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
+                    'zeugnis_id'   => $zeugnis->id,
+                    'abschnitt_id' => $abschnitt->id,
+                    'beschreibung' => 'Klassenweiter Text (' . ($abschnitt->fach?->name ?? '—') . ') in ' . ($klasse->name ?? '') . ' geändert',
+                    'neu_wert'     => $neu,
+                ]);
+            }
+        }
+
         $this->ueberlaufNeuBerechnen($zeugnis);
+
+        // Klassentext betrifft alle Schüler → deren Überlauf-Cache invalidieren.
+        if ($klassentextGeaendert && $klasse) {
+            Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+                ->where('id', '!=', $zeugnis->id)
+                ->update(['ueberlauf_status' => null]);
+        }
 
         return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
             ->with('status', 'Gespeichert.');

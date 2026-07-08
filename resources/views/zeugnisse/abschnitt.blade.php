@@ -50,6 +50,22 @@
                 <p class="text-xs text-gray-400">Autor: {{ $abschnitt->autor_name }}</p>
             @endif
 
+            @if ($klassentext)
+                <div class="rounded-lg bg-indigo-50/60 p-3">
+                    <label class="block text-sm font-medium text-gray-700">Klassenweiter Text
+                        <textarea name="klassentext" rows="3" @disabled($readonly)
+                                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                  placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
+                    </label>
+                    <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse in diesem Fach und steht auf dem Zeugnis <strong>vor</strong> dem Schülertext.</p>
+                    <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" name="klassentext_neue_zeile" value="1" @checked($abschnitt->klassentext_neue_zeile) @disabled($readonly)
+                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Schülertext in neuer Zeile beginnen (statt direkt anschließen)
+                    </label>
+                </div>
+            @endif
+
             @if ($istNote)
                 <label class="block text-sm font-medium text-gray-700">Note
                     <input type="text" name="note" value="{{ old('note', $abschnitt->note) }}" @disabled($readonly)
@@ -60,12 +76,18 @@
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </label>
             @else
-                <label class="block text-sm font-medium text-gray-700">Text
+                <label class="block text-sm font-medium text-gray-700">{{ $klassentext ? 'Schülertext' : 'Text' }}
                     <textarea name="inhalt" rows="8" @disabled($readonly)
                               class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               placeholder="Text …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
                 </label>
             @endif
+
+            <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
+                <textarea name="notiz" rows="2" @disabled($readonly)
+                          class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          placeholder="z. B. Rückfrage, Erinnerung …">{{ old('notiz', $abschnitt->notiz) }}</textarea>
+            </label>
 
             <label class="block text-sm font-medium text-gray-700">Bearbeitungsstatus
                 <select name="status" @disabled($readonly)
