@@ -43,13 +43,18 @@ class ZeugnisController
             ->pluck('fach_id')->unique()->values()->all();
         $binKlassenlehrer = $klasse->klassenlehrer && (int) $klasse->klassenlehrer->core_user_id === (int) $userId;
 
-        // Überlauf-/Auto-Verkleinerungs-Analyse je Zeugnis (für die Warn-Spalte).
-        $renderer = app(ZeugnisRenderer::class);
+        // Überlauf-/Auto-Verkleinerungs-Analyse je Zeugnis (aus dem Cache; nur beim
+        // ersten Mal bzw. nach Inhaltsänderungen wird gerechnet).
         $warnungen = [];
         foreach ($schueler as $s) {
-            if ($s->zeugnis) {
-                $warnungen[$s->id] = $renderer->analyse($s->zeugnis);
+            if (! $s->zeugnis) {
+                continue;
             }
+            $z = $s->zeugnis;
+            if ($z->ueberlauf_status === null) {
+                $this->ueberlaufNeuBerechnen($z);
+            }
+            $warnungen[$s->id] = ['status' => $z->ueberlauf_status, 'passtBei' => $z->ueberlauf_passt_bei];
         }
 
         return view('schulzeugnis::zeugnisse.index', [
@@ -142,6 +147,8 @@ class ZeugnisController
             'beschreibung' => "Zeugnis für {$schueler->fullName()} angelegt",
         ]);
 
+        $this->ueberlaufNeuBerechnen($zeugnis);
+
         return redirect()
             ->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
             ->with('status', "Zeugnis für {$schueler->fullName()} angelegt.");
@@ -195,6 +202,8 @@ class ZeugnisController
             'zeugnis_id'   => $zeugnis->id,
             'beschreibung' => "Zeugnis für {$zeugnis->schueler?->fullName()} gespeichert",
         ]);
+
+        $this->ueberlaufNeuBerechnen($zeugnis);
 
         return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
             ->with('status', 'Zeugnis gespeichert.');
@@ -310,6 +319,8 @@ class ZeugnisController
             ]);
         }
 
+        $this->ueberlaufNeuBerechnen($zeugnis);
+
         return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
             ->with('status', 'Gespeichert.');
     }
@@ -343,6 +354,8 @@ class ZeugnisController
             'neu_wert'     => $ziel,
         ]);
 
+        $this->ueberlaufNeuBerechnen($zeugnis);
+
         return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
             ->with('status', 'Früherer Stand wiederhergestellt.');
     }
@@ -352,5 +365,16 @@ class ZeugnisController
         return $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT
             ? 'Haupttext'
             : ('Fach: ' . ($abschnitt->fach?->name ?? '—'));
+    }
+
+    /** Überlauf-Analyse neu berechnen und am Zeugnis zwischenspeichern. */
+    private function ueberlaufNeuBerechnen(Zeugnis $zeugnis): void
+    {
+        $a = app(ZeugnisRenderer::class)->analyse($zeugnis);
+
+        $zeugnis->update([
+            'ueberlauf_status'    => $a['status'],
+            'ueberlauf_passt_bei' => $a['passtBei'],
+        ]);
     }
 }
