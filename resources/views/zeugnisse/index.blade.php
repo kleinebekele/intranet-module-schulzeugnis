@@ -8,11 +8,25 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-2">
-            <x-module-icon name="book" class="text-2xl text-indigo-600" />
-            <div>
-                <h1 class="text-xl font-semibold text-gray-800">Zeugnisse</h1>
-                <p class="text-sm text-gray-500">Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }} &middot; {{ $schueler->count() }} Schüler</p>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <x-module-icon name="book" class="text-2xl text-indigo-600" />
+                <div>
+                    <h1 class="text-xl font-semibold text-gray-800">Zeugnisse</h1>
+                    <p class="text-sm text-gray-500">Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }} &middot; {{ $schueler->count() }} Schüler</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-1.5">
+                <i class="bx bxs-user-circle text-3xl text-indigo-500"></i>
+                <div class="leading-tight">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-indigo-400">Klassenlehrer</div>
+                    @if ($klasse->klassenlehrer)
+                        <div class="text-sm font-semibold text-gray-800">{{ $klasse->klassenlehrer->fullName() }}</div>
+                    @else
+                        <div class="text-sm text-gray-400">— nicht gesetzt —</div>
+                    @endif
+                </div>
             </div>
         </div>
     </x-slot>
