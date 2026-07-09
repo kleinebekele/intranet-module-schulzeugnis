@@ -49,7 +49,7 @@ class SchuelerController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.schueler.index', $schuljahr)
+            ->route('module.schulzeugnis.schueler.jahr', $schuljahr)
             ->with('status', "Schüler {$schueler->fullName()} angelegt.");
     }
 
@@ -78,7 +78,7 @@ class SchuelerController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.schueler.index', $schueler->schuljahr_id)
+            ->route('module.schulzeugnis.schueler.jahr', $schueler->schuljahr_id)
             ->with('status', "Schüler {$schueler->fullName()} gespeichert.");
     }
 
@@ -88,7 +88,7 @@ class SchuelerController
         // damit keine Historie verschwindet.
         if (DB::table('zeugnisse')->where('schueler_id', $schueler->id)->exists()) {
             return redirect()
-                ->route('module.schulzeugnis.schueler.index', $schueler->schuljahr_id)
+                ->route('module.schulzeugnis.schueler.jahr', $schueler->schuljahr_id)
                 ->with('error', "{$schueler->fullName()} kann nicht gelöscht werden – es existiert bereits ein Zeugnis.");
         }
 
@@ -103,7 +103,7 @@ class SchuelerController
         $schueler->delete();
 
         return redirect()
-            ->route('module.schulzeugnis.schueler.index', $sjId)
+            ->route('module.schulzeugnis.schueler.jahr', $sjId)
             ->with('status', "Schüler {$name} gelöscht.");
     }
 
@@ -113,7 +113,7 @@ class SchuelerController
         $aktiv = Schuljahr::where('is_active', true)->first();
 
         if ($aktiv) {
-            return redirect()->route('module.schulzeugnis.schueler.index', $aktiv);
+            return redirect()->route('module.schulzeugnis.schueler.jahr', $aktiv);
         }
 
         return redirect()

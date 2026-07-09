@@ -13,7 +13,7 @@
     </x-slot>
 
     <div class="max-w-2xl space-y-4">
-        <a href="{{ route('module.schulzeugnis.zeugnisse.index', $klasse) }}"
+        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
             &larr; Zurück zur Zeugnisliste
         </a>
@@ -27,7 +27,7 @@
             Zeugnis dieser Klasse <strong>vor</strong> dem jeweiligen Schülertext.
         </div>
 
-        <form method="POST" action="{{ route('module.schulzeugnis.klassentexte.update', ['klasse' => $klasse, 'fach' => $fachParam]) }}"
+        <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.klassentexte.update', ['klasse' => $klasse, 'fach' => $fachParam]) }}"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-6">
             @csrf
             @method('PUT')
@@ -47,7 +47,7 @@
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                     Speichern
                 </button>
-                <a href="{{ route('module.schulzeugnis.zeugnisse.index', $klasse) }}"
+                <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
                    class="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">Abbrechen</a>
             </div>
         </form>

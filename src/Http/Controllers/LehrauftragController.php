@@ -47,7 +47,7 @@ class LehrauftragController
 
         if ($doppelt) {
             return redirect()
-                ->route('module.schulzeugnis.lehrauftraege.index', $klasse)
+                ->route('module.schulzeugnis.klassen.lehrauftraege.index', $klasse)
                 ->with('error', 'Dieser Lehrauftrag besteht bereits.');
         }
 
@@ -60,7 +60,7 @@ class LehrauftragController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.lehrauftraege.index', $klasse)
+            ->route('module.schulzeugnis.klassen.lehrauftraege.index', $klasse)
             ->with('status', 'Lehrauftrag hinzugefügt.');
     }
 
@@ -77,7 +77,7 @@ class LehrauftragController
         $lehrauftrag->delete();
 
         return redirect()
-            ->route('module.schulzeugnis.lehrauftraege.index', $klasseId)
+            ->route('module.schulzeugnis.klassen.lehrauftraege.index', $klasseId)
             ->with('status', 'Lehrauftrag entfernt.');
     }
 }

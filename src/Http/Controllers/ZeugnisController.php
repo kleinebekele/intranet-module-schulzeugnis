@@ -123,7 +123,7 @@ class ZeugnisController
     public function store(Klasse $klasse, Schueler $schueler)
     {
         if ($schueler->zeugnis) {
-            return redirect()->route('module.schulzeugnis.zeugnisse.edit', $schueler->zeugnis);
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $schueler->zeugnis);
         }
 
         $schueler->setRelation('klasse', $klasse);
@@ -173,7 +173,7 @@ class ZeugnisController
         $this->ueberlaufNeuBerechnen($zeugnis);
 
         return redirect()
-            ->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
+            ->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
             ->with('status', "Zeugnis für {$schueler->fullName()} angelegt.");
     }
 
@@ -197,7 +197,7 @@ class ZeugnisController
     public function update(Request $request, Zeugnis $zeugnis)
     {
         if ($zeugnis->istAbgeschlossen()) {
-            return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
         }
 
@@ -228,14 +228,14 @@ class ZeugnisController
 
         $this->ueberlaufNeuBerechnen($zeugnis);
 
-        return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
+        return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
             ->with('status', 'Zeugnis gespeichert.');
     }
 
     public function abschliessen(Zeugnis $zeugnis)
     {
         if ($zeugnis->istAbgeschlossen()) {
-            return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis);
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis);
         }
 
         $schueler = $zeugnis->schueler;
@@ -254,7 +254,7 @@ class ZeugnisController
             'beschreibung' => "Zeugnis für {$schueler?->fullName()} abgeschlossen (eingefroren)",
         ]);
 
-        return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
+        return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
             ->with('status', 'Zeugnis abgeschlossen und eingefroren.');
     }
 
@@ -262,7 +262,7 @@ class ZeugnisController
     public function wiederOeffnen(Zeugnis $zeugnis)
     {
         if (! auth()->user()?->is_admin) {
-            return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
                 ->with('error', 'Nur Administratoren können ein abgeschlossenes Zeugnis wieder öffnen.');
         }
 
@@ -280,7 +280,7 @@ class ZeugnisController
             'beschreibung' => "Zeugnis für {$zeugnis->schueler?->fullName()} wieder geöffnet (Admin)",
         ]);
 
-        return redirect()->route('module.schulzeugnis.zeugnisse.edit', $zeugnis)
+        return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
             ->with('status', 'Zeugnis wieder geöffnet – Bearbeitung möglich.');
     }
 
@@ -442,11 +442,11 @@ class ZeugnisController
         $gespeichertWas  = $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext');
 
         if ($zeugnis->istAbgeschlossen()) {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
         }
         if ($b === 'keine') {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                 ->with('error', 'Du bist für diesen Text nicht berechtigt.');
         }
 
@@ -496,7 +496,7 @@ class ZeugnisController
         $korrektoren = $data['korrektoren'] ?? [];
         $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index'], true);
         if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                 ->withInput()
                 ->with('error', 'Bitte mindestens einen Korrektor auswählen, wenn der Text zur Korrektur freigegeben wird.');
         }
@@ -559,16 +559,16 @@ class ZeugnisController
         $klasse   = $abschnitt->zeugnis?->schueler?->klasse;
 
         if ($weiter === 'next' && $nachbarn['next']) {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $nachbarn['next']['id']);
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $nachbarn['next']['id']);
         }
         if ($weiter === 'prev' && $nachbarn['prev']) {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $nachbarn['prev']['id']);
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $nachbarn['prev']['id']);
         }
         if ($weiter === 'index' && $klasse) {
-            return redirect()->route('module.schulzeugnis.zeugnisse.index', $klasse);
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse);
         }
 
-        return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt);
+        return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt);
     }
 
     /** Einen früheren Textstand aus dem Verlauf wiederherstellen. */
@@ -578,11 +578,11 @@ class ZeugnisController
         $zeugnis = $abschnitt->zeugnis;
 
         if ($zeugnis->istAbgeschlossen()) {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
         }
         if ($this->berechtigung($abschnitt, auth()->user()) !== 'voll') {
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                 ->with('error', 'Nur die verantwortliche Lehrkraft kann frühere Stände wiederherstellen.');
         }
 
@@ -607,7 +607,7 @@ class ZeugnisController
                     ->update(['ueberlauf_status' => null]);
             }
 
-            return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                 ->with('status', 'Früherer Klassentext-Stand wiederhergestellt.');
         }
 
@@ -626,7 +626,7 @@ class ZeugnisController
 
         $this->ueberlaufNeuBerechnen($zeugnis);
 
-        return redirect()->route('module.schulzeugnis.abschnitte.edit', $abschnitt)
+        return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
             ->with('status', 'Früherer Stand wiederhergestellt.');
     }
 
@@ -746,7 +746,7 @@ class ZeugnisController
                 ->update(['ueberlauf_status' => null]);
         }
 
-        return redirect()->route('module.schulzeugnis.zeugnisse.index', $klasse)
+        return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
             ->with('status', 'Klassentext (' . ($fachModel?->name ?? 'Haupttext') . ') gespeichert.');
     }
 

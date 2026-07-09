@@ -48,11 +48,11 @@
                         @endif
                     </p>
                     <div class="mt-1 flex items-center gap-4 text-sm font-medium">
-                        <a href="{{ route('module.schulzeugnis.lehrauftraege.index', $klasse) }}"
+                        <a href="{{ route('module.schulzeugnis.klassen.lehrauftraege.index', $klasse) }}"
                            class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
                             {{ $klasse->lehrauftraege_count }} {{ $klasse->lehrauftraege_count === 1 ? 'Lehrauftrag' : 'Lehraufträge' }} &rarr;
                         </a>
-                        <a href="{{ route('module.schulzeugnis.zeugnisse.index', $klasse) }}"
+                        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
                            class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
                             Zeugnisse &rarr;
                         </a>

@@ -29,7 +29,7 @@
                 $titel = $a->typ === 'haupttext' ? 'Haupttext' : ($a->fach?->name ?? 'Fachtext');
                 $abgeschlossen = $a->zeugnis?->istAbgeschlossen();
             @endphp
-            <a href="{{ route('module.schulzeugnis.abschnitte.edit', $a) }}"
+            <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $a) }}"
                class="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 hover:bg-indigo-50/40">
                 <div class="flex items-center gap-3">
                     <i class="bx {{ $m['icon'] }} text-xl {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>

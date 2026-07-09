@@ -10,7 +10,7 @@
     </x-slot>
 
     <div class="max-w-2xl space-y-4">
-        <a href="{{ route('module.schulzeugnis.klassen.index', $klasse->schuljahr_id) }}"
+        <a href="{{ route('module.schulzeugnis.klassen.jahr', $klasse->schuljahr_id) }}"
            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
             &larr; Zurück zu den Klassen
         </a>
@@ -33,7 +33,7 @@
         </div>
 
         {{-- Neuen Lehrauftrag hinzufügen --}}
-        <form method="POST" action="{{ route('module.schulzeugnis.lehrauftraege.store', $klasse) }}"
+        <form method="POST" action="{{ route('module.schulzeugnis.klassen.lehrauftraege.store', $klasse) }}"
               class="rounded-xl border border-gray-200 bg-white p-5">
             @csrf
             <h2 class="text-sm font-semibold text-gray-700">Lehrauftrag hinzufügen</h2>
@@ -83,7 +83,7 @@
                         <span class="text-gray-400"> &middot; </span>
                         <span class="text-gray-600">{{ $la->lehrer?->fullName() ?: '—' }}</span>
                     </div>
-                    <form method="POST" action="{{ route('module.schulzeugnis.lehrauftraege.destroy', $la) }}"
+                    <form method="POST" action="{{ route('module.schulzeugnis.klassen.lehrauftraege.destroy', $la) }}"
                           onsubmit="return confirm('Lehrauftrag {{ $la->fach?->name }} · {{ $la->lehrer?->fullName() }} entfernen?');">
                         @csrf
                         @method('DELETE')

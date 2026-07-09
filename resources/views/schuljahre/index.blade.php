@@ -48,15 +48,15 @@
                     @endif
 
                     <div class="mt-2 flex items-center gap-4 text-sm font-medium">
-                        <a href="{{ route('module.schulzeugnis.klassen.index', $schuljahr) }}"
+                        <a href="{{ route('module.schulzeugnis.klassen.jahr', $schuljahr) }}"
                            class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
                             {{ $schuljahr->klassen_count }} {{ $schuljahr->klassen_count === 1 ? 'Klasse' : 'Klassen' }} &rarr;
                         </a>
-                        <a href="{{ route('module.schulzeugnis.lehrer.index', $schuljahr) }}"
+                        <a href="{{ route('module.schulzeugnis.lehrer.jahr', $schuljahr) }}"
                            class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
                             {{ $schuljahr->lehrer_count }} Lehrer &rarr;
                         </a>
-                        <a href="{{ route('module.schulzeugnis.schueler.index', $schuljahr) }}"
+                        <a href="{{ route('module.schulzeugnis.schueler.jahr', $schuljahr) }}"
                            class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
                             {{ $schuljahr->schueler_count }} {{ $schuljahr->schueler_count === 1 ? 'Schüler' : 'Schüler' }} &rarr;
                         </a>

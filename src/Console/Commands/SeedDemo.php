@@ -162,7 +162,7 @@ class SeedDemo extends Command
 
         $this->newLine();
         $this->info('Demo-Struktur fertig. Lehrer-Login: lehrer01@zeugnis.test … lehrer30@zeugnis.test · Passwort: '.$password);
-        $this->line('Zeugnis-Tabelle z. B. unter: /modules/schulzeugnis/klassen/{id}/zeugnisse');
+        $this->line('Zeugnis-Tabelle z. B. unter: /modules/schulzeugnis/klassenraeume/{id}/zeugnisse');
 
         return self::SUCCESS;
     }

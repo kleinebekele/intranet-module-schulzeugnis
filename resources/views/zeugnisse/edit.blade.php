@@ -21,7 +21,7 @@
     </x-slot>
 
     <div class="max-w-2xl space-y-4">
-        <a href="{{ route('module.schulzeugnis.zeugnisse.index', $schueler->klasse) }}"
+        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $schueler->klasse) }}"
            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
             &larr; Zurück zur Zeugnisliste
         </a>
@@ -48,7 +48,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('module.schulzeugnis.zeugnisse.update', $zeugnis) }}"
+        <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.update', $zeugnis) }}"
               class="space-y-4">
             @csrf
             @method('PUT')
@@ -109,7 +109,7 @@
                 <p class="mt-1 text-sm text-gray-500">
                     Beim Abschließen werden Name, Geburtsdatum und -ort sowie alle Texte eingefroren. Danach ist das Zeugnis schreibgeschützt.
                 </p>
-                <form method="POST" action="{{ route('module.schulzeugnis.zeugnisse.abschliessen', $zeugnis) }}"
+                <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.abschliessen', $zeugnis) }}"
                       onsubmit="return confirm('Zeugnis für {{ $schueler->fullName() }} abschließen und einfrieren?');"
                       class="mt-3">
                     @csrf
@@ -122,7 +122,7 @@
                 <h2 class="text-sm font-semibold text-gray-700">Abschluss zurücknehmen</h2>
                 @if ($istAdmin)
                     <p class="mt-1 text-sm text-gray-500">Als Administrator kannst du das Zeugnis wieder öffnen, um es erneut zu bearbeiten.</p>
-                    <form method="POST" action="{{ route('module.schulzeugnis.zeugnisse.wiederoeffnen', $zeugnis) }}"
+                    <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.wiederoeffnen', $zeugnis) }}"
                           onsubmit="return confirm('Abschluss zurücknehmen und Zeugnis wieder öffnen?');"
                           class="mt-3">
                         @csrf

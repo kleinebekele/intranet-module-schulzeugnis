@@ -29,7 +29,7 @@
                                 $s = $a->zeugnis?->schueler;
                             @endphp
                             <li>
-                                <a href="{{ route('module.schulzeugnis.abschnitte.edit', $a) }}"
+                                <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $a) }}"
                                    class="group flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-indigo-50/60">
                                     <div class="flex min-w-0 items-center gap-2">
                                         <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-400' }}"></i>

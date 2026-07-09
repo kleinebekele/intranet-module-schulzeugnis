@@ -51,7 +51,7 @@ class KlasseController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.klassen.index', $schuljahr)
+            ->route('module.schulzeugnis.klassen.jahr', $schuljahr)
             ->with('status', "Klasse {$klasse->name} angelegt.");
     }
 
@@ -81,7 +81,7 @@ class KlasseController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.klassen.index', $klasse->schuljahr_id)
+            ->route('module.schulzeugnis.klassen.jahr', $klasse->schuljahr_id)
             ->with('status', "Klasse {$klasse->name} gespeichert.");
     }
 
@@ -94,7 +94,7 @@ class KlasseController
 
         if ($hatSchueler || $hatLehrauftrag) {
             return redirect()
-                ->route('module.schulzeugnis.klassen.index', $klasse->schuljahr_id)
+                ->route('module.schulzeugnis.klassen.jahr', $klasse->schuljahr_id)
                 ->with('error', "{$klasse->name} kann nicht gelöscht werden – es hängen bereits Schüler oder Lehraufträge daran.");
         }
 
@@ -109,7 +109,7 @@ class KlasseController
         $klasse->delete();
 
         return redirect()
-            ->route('module.schulzeugnis.klassen.index', $schuljahrId)
+            ->route('module.schulzeugnis.klassen.jahr', $schuljahrId)
             ->with('status', "Klasse {$name} gelöscht.");
     }
 
@@ -121,7 +121,7 @@ class KlasseController
         $aktiv = Schuljahr::where('is_active', true)->first();
 
         if ($aktiv) {
-            return redirect()->route('module.schulzeugnis.klassen.index', $aktiv);
+            return redirect()->route('module.schulzeugnis.klassen.jahr', $aktiv);
         }
 
         return redirect()

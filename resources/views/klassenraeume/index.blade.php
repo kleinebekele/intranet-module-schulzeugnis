@@ -114,7 +114,7 @@
         @if ($klassen->isEmpty())
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-500">
                 In diesem Schuljahr gibt es noch keine Klassen.
-                <a href="{{ route('module.schulzeugnis.klassen.index', $schuljahr) }}" class="text-indigo-600 hover:text-indigo-700">Klassen anlegen</a>.
+                <a href="{{ route('module.schulzeugnis.klassen.jahr', $schuljahr) }}" class="text-indigo-600 hover:text-indigo-700">Klassen anlegen</a>.
             </div>
         @else
             @php $stufenLegende = $klassen->pluck('stufe')->filter()->unique('id')->sortBy('reihenfolge'); @endphp
@@ -131,7 +131,7 @@
 
             <div class="kr-grid">
                 @foreach ($klassen as $klasse)
-                    <a class="kr-tuer" href="{{ route('module.schulzeugnis.zeugnisse.index', $klasse) }}"
+                    <a class="kr-tuer" href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
                        title="Zeugnisliste der Klasse {{ $klasse->name }}{{ $klasse->stufe ? ' · '.$klasse->stufe->name : '' }}">
                         <div class="kr-rahmen">
                             <div class="kr-oeffnung"></div>

@@ -144,14 +144,14 @@
                             data-fach="Haupttext" data-rolle="Klassenlehrer"
                             data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
                             data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
-                            @if ($istAdmin || $binKlassenlehrer) data-editurl="{{ route('module.schulzeugnis.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif>Haupt</th>
+                            @if ($istAdmin || $binKlassenlehrer) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif>Haupt</th>
                         @foreach ($faecher as $fach)
                             <th class="zt-col zt-col-{{ $fach->id }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
                                 data-fach="{{ $fach->name }}" data-rolle="Fachlehrer"
                                 data-lehrer="{{ implode(', ', $fachlehrer[$fach->id] ?? []) }}"
                                 data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}"
-                                @if ($istAdmin || in_array($fach->id, $meineFachIds)) data-editurl="{{ route('module.schulzeugnis.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
+                                @if ($istAdmin || in_array($fach->id, $meineFachIds)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
                         <th class="border-b border-l border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
                         <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">Vorschau</th>
@@ -172,7 +172,7 @@
                                 @if ($z && $z->istAbgeschlossen())
                                     <span class="ml-1 rounded-full bg-green-100 px-1.5 text-[10px] font-medium text-green-700">fertig</span>
                                 @elseif (! $z)
-                                    <form method="POST" action="{{ route('module.schulzeugnis.zeugnisse.store', [$klasse, $s]) }}" class="inline">
+                                    <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.store', [$klasse, $s]) }}" class="inline">
                                         @csrf
                                         <button type="submit" class="ml-1 text-xs text-indigo-600 hover:underline">+ anlegen</button>
                                     </form>
@@ -183,7 +183,7 @@
                             <td class="zt-col zt-col-haupt px-2 text-center" data-status="{{ $haupt?->status ?? '' }}">
                                 @if ($haupt)
                                     @php $m = $haupt->statusMeta(); @endphp
-                                    <a href="{{ route('module.schulzeugnis.abschnitte.edit', $haupt) }}" title="Haupttext – {{ $m['label'] }}"
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $haupt) }}" title="Haupttext – {{ $m['label'] }}"
                                        class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                         <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
                                     </a>
@@ -198,7 +198,7 @@
                                 <td class="zt-col zt-col-{{ $fach->id }} px-2 text-center" data-status="{{ $a?->status ?? '' }}">
                                     @if ($a)
                                         @php $m = $a->statusMeta(); @endphp
-                                        <a href="{{ route('module.schulzeugnis.abschnitte.edit', $a) }}" title="{{ $fach->name }} – {{ $m['label'] }}"
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $a) }}" title="{{ $fach->name }} – {{ $m['label'] }}"
                                            class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                             <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
                                         </a>
@@ -229,7 +229,7 @@
                             {{-- Vorschau / PDF --}}
                             <td class="px-3 text-center">
                                 @if ($z)
-                                    <a href="{{ route('module.schulzeugnis.zeugnisse.vorschau', $z) }}" target="_blank" title="Vorschau (HTML)" class="inline-flex text-indigo-600 hover:text-indigo-800">
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.vorschau', $z) }}" target="_blank" title="Vorschau (HTML)" class="inline-flex text-indigo-600 hover:text-indigo-800">
                                         <i class="bx bx-show text-lg"></i>
                                     </a>
                                 @else
@@ -238,7 +238,7 @@
                             </td>
                             <td class="px-3 text-center">
                                 @if ($z)
-                                    <a href="{{ route('module.schulzeugnis.zeugnisse.pdf', $z) }}" target="_blank" title="Als PDF herunterladen" class="inline-flex text-red-600 hover:text-red-800">
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.pdf', $z) }}" target="_blank" title="Als PDF herunterladen" class="inline-flex text-red-600 hover:text-red-800">
                                         <i class="bx bxs-file-pdf text-lg"></i>
                                     </a>
                                 @else
@@ -250,7 +250,7 @@
                         <tr>
                             <td colspan="{{ $faecher->count() + 5 }}" class="px-4 py-8 text-center text-gray-500">
                                 Noch keine Schüler in dieser Klasse.
-                                <a href="{{ route('module.schulzeugnis.schueler.index', $klasse->schuljahr_id) }}" class="text-indigo-600 hover:text-indigo-700">Schüler anlegen</a>.
+                                <a href="{{ route('module.schulzeugnis.schueler.jahr', $klasse->schuljahr_id) }}" class="text-indigo-600 hover:text-indigo-700">Schüler anlegen</a>.
                             </td>
                         </tr>
                     @endforelse

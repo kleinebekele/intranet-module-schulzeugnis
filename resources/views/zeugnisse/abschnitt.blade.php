@@ -23,11 +23,11 @@
 
     <div class="space-y-4 zt-page">
         <div class="flex items-center justify-between">
-            <a href="{{ route('module.schulzeugnis.zeugnisse.index', $schueler?->klasse) }}"
+            <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $schueler?->klasse) }}"
                class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
                 &larr; Zurück zur Zeugnis-Tabelle
             </a>
-            <a href="{{ route('module.schulzeugnis.zeugnisse.edit', $zeugnis) }}"
+            <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis) }}"
                class="text-sm text-gray-500 hover:text-gray-700">Ganzes Zeugnis &rarr;</a>
         </div>
 
@@ -52,7 +52,7 @@
         <div class="zt-cols">
         <div class="zt-main space-y-4">
         {{-- Bearbeitung --}}
-        <form method="POST" action="{{ route('module.schulzeugnis.abschnitte.update', $abschnitt) }}"
+        <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.abschnitte.update', $abschnitt) }}"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
             @csrf
             @method('PUT')
@@ -147,9 +147,9 @@
             @unless ($readonly)
                 @php
                     $vorauswahl = $navNext ? 'next' : ($navPrev ? 'prev' : 'index');
-                    $urlPrev  = $navPrev ? route('module.schulzeugnis.abschnitte.edit', $navPrev['id']) : '';
-                    $urlNext  = $navNext ? route('module.schulzeugnis.abschnitte.edit', $navNext['id']) : '';
-                    $urlIndex = route('module.schulzeugnis.zeugnisse.index', $schueler?->klasse);
+                    $urlPrev  = $navPrev ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navPrev['id']) : '';
+                    $urlNext  = $navNext ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navNext['id']) : '';
+                    $urlIndex = route('module.schulzeugnis.klassenraeume.zeugnisse.index', $schueler?->klasse);
                     $labelNext = $navNext ? 'Nächster Schüler: ' . $navNext['name'] : 'Nächster Schüler (keiner)';
                     $labelPrev = $navPrev ? 'Vorheriger Schüler: ' . $navPrev['name'] : 'Vorheriger Schüler (keiner)';
                 @endphp
@@ -201,7 +201,7 @@
             <div class="flex items-center justify-between gap-2">
                 <span>
                     @if ($navPrev)
-                        <a href="{{ route('module.schulzeugnis.abschnitte.edit', $navPrev['id']) }}"
+                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navPrev['id']) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             &larr; {{ $navPrev['name'] }}
                         </a>
@@ -212,7 +212,7 @@
                 @endif
                 <span>
                     @if ($navNext)
-                        <a href="{{ route('module.schulzeugnis.abschnitte.edit', $navNext['id']) }}"
+                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navNext['id']) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             {{ $navNext['name'] }} &rarr;
                         </a>
@@ -289,7 +289,7 @@
                     <div class="zt-modal-label">Vorher</div>
                     <div class="zt-modal-pre" id="zt-modal-alt"></div>
                     @unless ($readonly)
-                        <form id="zt-restore-form" method="POST" action="{{ route('module.schulzeugnis.abschnitte.wiederherstellen', $abschnitt) }}"
+                        <form id="zt-restore-form" method="POST" action="{{ route('module.schulzeugnis.klassenraeume.abschnitte.wiederherstellen', $abschnitt) }}"
                               class="zt-modal-restore" hidden
                               onsubmit="return confirm('Den Vorher-Stand wiederherstellen? Der aktuelle Text wird dadurch ersetzt (bleibt im Verlauf).');">
                             @csrf

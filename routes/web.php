@@ -31,7 +31,32 @@ Route::middleware(['web', 'auth'])
         Route::get('/', [DashboardController::class, 'index'])->name('index');
 
         // Klassenräume – Lehrer-Einstieg: Klassen des aktiven Schuljahres als Türen.
+        // Zugleich das Dach für die Beurteilungen (Zeugnisse/Abschnitte/Klassentexte):
+        // Deren Routen tragen bewusst das Namenspräfix `klassenraeume.*`, damit die
+        // Zugriffssteuerung (EnsureModuleAccess) sie diesem Menüpunkt zuordnet – nur
+        // wer „Klassenräume" sehen darf (z. B. Zeugnismoderator), kommt an die
+        // Beurteilungen. Läge das unter „Klassen", wären es technische Endpunkte ohne
+        // eigenen Menüpunkt und damit für jeden mit Modulzugang erreichbar.
         Route::get('klassenraeume', [KlassenraumController::class, 'index'])->name('klassenraeume.index');
+
+        // Beurteilungen einer Klasse (Zeugnisliste) + klassenweiter Text je Fach.
+        Route::get('klassenraeume/{klasse}/zeugnisse', [ZeugnisController::class, 'index'])->name('klassenraeume.zeugnisse.index');
+        Route::get('klassenraeume/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextEdit'])->name('klassenraeume.klassentexte.edit');
+        Route::put('klassenraeume/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextUpdate'])->name('klassenraeume.klassentexte.update');
+        Route::post('klassenraeume/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('klassenraeume.zeugnisse.store');
+
+        // Einzelnes Zeugnis eines Schülers.
+        Route::get('klassenraeume/zeugnis/{zeugnis}/bearbeiten', [ZeugnisController::class, 'edit'])->name('klassenraeume.zeugnisse.edit');
+        Route::get('klassenraeume/zeugnis/{zeugnis}/vorschau', [ZeugnisController::class, 'vorschau'])->name('klassenraeume.zeugnisse.vorschau');
+        Route::get('klassenraeume/zeugnis/{zeugnis}/pdf', [ZeugnisController::class, 'pdf'])->name('klassenraeume.zeugnisse.pdf');
+        Route::put('klassenraeume/zeugnis/{zeugnis}', [ZeugnisController::class, 'update'])->name('klassenraeume.zeugnisse.update');
+        Route::post('klassenraeume/zeugnis/{zeugnis}/abschliessen', [ZeugnisController::class, 'abschliessen'])->name('klassenraeume.zeugnisse.abschliessen');
+        Route::post('klassenraeume/zeugnis/{zeugnis}/wieder-oeffnen', [ZeugnisController::class, 'wiederOeffnen'])->name('klassenraeume.zeugnisse.wiederoeffnen');
+
+        // Einzelner Abschnitt (Fachtext/Haupttext/Note) mit Änderungsverlauf.
+        Route::get('klassenraeume/abschnitt/{abschnitt}/bearbeiten', [ZeugnisController::class, 'abschnittEdit'])->name('klassenraeume.abschnitte.edit');
+        Route::put('klassenraeume/abschnitt/{abschnitt}', [ZeugnisController::class, 'abschnittUpdate'])->name('klassenraeume.abschnitte.update');
+        Route::post('klassenraeume/abschnitt/{abschnitt}/wiederherstellen', [ZeugnisController::class, 'abschnittWiederherstellen'])->name('klassenraeume.abschnitte.wiederherstellen');
 
         // Meine ToDos – offene Aufgaben der Lehrkraft, gruppiert nach Klasse/Fach.
         Route::get('todo', [TodoController::class, 'index'])->name('todo.index');
@@ -55,9 +80,13 @@ Route::middleware(['web', 'auth'])
         Route::post('schuljahre/{schuljahr}/aktiv', [SchuljahrController::class, 'activate'])->name('schuljahre.activate');
         Route::delete('schuljahre/{schuljahr}', [SchuljahrController::class, 'destroy'])->name('schuljahre.destroy');
 
-        // Klassen – immer im Kontext eines Schuljahres.
-        Route::get('klassen', [KlasseController::class, 'current'])->name('klassen.current');
-        Route::get('schuljahre/{schuljahr}/klassen', [KlasseController::class, 'index'])->name('klassen.index');
+        // Klassen (Administration) – immer im Kontext eines Schuljahres.
+        // Menü-/Gating-Anker ist der paramlose `.index` (leitet ins aktive Schuljahr);
+        // die jahresbezogene Liste heißt `.jahr`. So deckt der Menüpunkt „Klassen"
+        // (route …klassen.index) alle klassen.*-Unterseiten ab und gilt nur für die
+        // Rolle, die „Klassen" sehen darf (Zeugnisadmin) – kein Durchgriff mehr.
+        Route::get('klassen', [KlasseController::class, 'current'])->name('klassen.index');
+        Route::get('schuljahre/{schuljahr}/klassen', [KlasseController::class, 'index'])->name('klassen.jahr');
         Route::get('schuljahre/{schuljahr}/klassen/neu', [KlasseController::class, 'create'])->name('klassen.create');
         Route::post('schuljahre/{schuljahr}/klassen', [KlasseController::class, 'store'])->name('klassen.store');
         Route::get('klassen/{klasse}/bearbeiten', [KlasseController::class, 'edit'])->name('klassen.edit');
@@ -65,35 +94,18 @@ Route::middleware(['web', 'auth'])
         Route::delete('klassen/{klasse}', [KlasseController::class, 'destroy'])->name('klassen.destroy');
 
         // Lehraufträge einer Klasse (Fach × Lehrer, Team-Teaching möglich).
-        Route::get('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'index'])->name('lehrauftraege.index');
-        Route::post('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'store'])->name('lehrauftraege.store');
-        Route::delete('lehrauftraege/{lehrauftrag}', [LehrauftragController::class, 'destroy'])->name('lehrauftraege.destroy');
-
-        // Befüllte Zeugnisse einer Klasse.
-        Route::get('klassen/{klasse}/zeugnisse', [ZeugnisController::class, 'index'])->name('zeugnisse.index');
-
-        // Klassenweiter Text je Fach (bzw. Haupttext) – direkt von der Zeugnisliste aus bearbeitbar.
-        Route::get('klassen/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextEdit'])->name('klassentexte.edit');
-        Route::put('klassen/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextUpdate'])->name('klassentexte.update');
-        Route::post('klassen/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('zeugnisse.store');
-        Route::get('zeugnisse/{zeugnis}/bearbeiten', [ZeugnisController::class, 'edit'])->name('zeugnisse.edit');
-        Route::get('zeugnisse/{zeugnis}/vorschau', [ZeugnisController::class, 'vorschau'])->name('zeugnisse.vorschau');
-        Route::get('zeugnisse/{zeugnis}/pdf', [ZeugnisController::class, 'pdf'])->name('zeugnisse.pdf');
-        Route::put('zeugnisse/{zeugnis}', [ZeugnisController::class, 'update'])->name('zeugnisse.update');
-        Route::post('zeugnisse/{zeugnis}/abschliessen', [ZeugnisController::class, 'abschliessen'])->name('zeugnisse.abschliessen');
-        Route::post('zeugnisse/{zeugnis}/wieder-oeffnen', [ZeugnisController::class, 'wiederOeffnen'])->name('zeugnisse.wiederoeffnen');
-
-        // Einzelner Abschnitt (Fachtext/Haupttext) mit Aenderungsverlauf.
-        Route::get('abschnitte/{abschnitt}/bearbeiten', [ZeugnisController::class, 'abschnittEdit'])->name('abschnitte.edit');
-        Route::put('abschnitte/{abschnitt}', [ZeugnisController::class, 'abschnittUpdate'])->name('abschnitte.update');
-        Route::post('abschnitte/{abschnitt}/wiederherstellen', [ZeugnisController::class, 'abschnittWiederherstellen'])->name('abschnitte.wiederherstellen');
+        // Namen unter `klassen.*`, damit sie derselben Klassen-Administration unterliegen.
+        Route::get('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'index'])->name('klassen.lehrauftraege.index');
+        Route::post('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'store'])->name('klassen.lehrauftraege.store');
+        Route::delete('lehrauftraege/{lehrauftrag}', [LehrauftragController::class, 'destroy'])->name('klassen.lehrauftraege.destroy');
 
         // Meine Korrekturen – Einstieg für Lehrer (nur die ihnen zugewiesenen Texte).
         Route::get('korrekturen', [ZeugnisController::class, 'korrekturenIndex'])->name('korrekturen.index');
 
-        // Schüler – je Schuljahr (keine Verbindung zum Core, quell_id lose).
-        Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.current');
-        Route::get('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'index'])->name('schueler.index');
+        // Schüler (Administration) – je Schuljahr. Anker analog zu Klassen: paramloser
+        // `.index` fürs Menü/Gating, jahresbezogene Liste als `.jahr`.
+        Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.index');
+        Route::get('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'index'])->name('schueler.jahr');
         Route::get('schuljahre/{schuljahr}/schueler/neu', [SchuelerController::class, 'create'])->name('schueler.create');
         Route::post('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'store'])->name('schueler.store');
         Route::get('schueler/{schueler}/bearbeiten', [SchuelerController::class, 'edit'])->name('schueler.edit');
@@ -136,9 +148,11 @@ Route::middleware(['web', 'auth'])
         Route::put('beispieltexte', [FormatController::class, 'saveTextproben'])->name('beispieltexte.save');
         Route::delete('beispieltexte', [FormatController::class, 'resetTextproben'])->name('beispieltexte.reset');
 
-        // Lehrer – je Schuljahr (Verknüpfung zum Core-Konto über core_user_id, kein FK).
-        Route::get('lehrer', [LehrerController::class, 'current'])->name('lehrer.current');
-        Route::get('schuljahre/{schuljahr}/lehrer', [LehrerController::class, 'index'])->name('lehrer.index');
+        // Lehrer (Administration) – je Schuljahr (Verknüpfung zum Core-Konto über
+        // core_user_id, kein FK). Anker analog zu Klassen: paramloser `.index`,
+        // jahresbezogene Liste als `.jahr`.
+        Route::get('lehrer', [LehrerController::class, 'current'])->name('lehrer.index');
+        Route::get('schuljahre/{schuljahr}/lehrer', [LehrerController::class, 'index'])->name('lehrer.jahr');
         Route::get('schuljahre/{schuljahr}/lehrer/neu', [LehrerController::class, 'create'])->name('lehrer.create');
         Route::post('schuljahre/{schuljahr}/lehrer', [LehrerController::class, 'store'])->name('lehrer.store');
         Route::get('lehrer/{lehrer}/bearbeiten', [LehrerController::class, 'edit'])->name('lehrer.edit');

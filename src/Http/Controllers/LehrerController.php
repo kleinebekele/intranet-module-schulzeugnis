@@ -47,7 +47,7 @@ class LehrerController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.lehrer.index', $schuljahr)
+            ->route('module.schulzeugnis.lehrer.jahr', $schuljahr)
             ->with('status', "Lehrer {$lehrer->fullName()} angelegt.");
     }
 
@@ -74,7 +74,7 @@ class LehrerController
         ]);
 
         return redirect()
-            ->route('module.schulzeugnis.lehrer.index', $lehrer->schuljahr_id)
+            ->route('module.schulzeugnis.lehrer.jahr', $lehrer->schuljahr_id)
             ->with('status', "Lehrer {$lehrer->fullName()} gespeichert.");
     }
 
@@ -87,7 +87,7 @@ class LehrerController
 
         if ($verwendet) {
             return redirect()
-                ->route('module.schulzeugnis.lehrer.index', $lehrer->schuljahr_id)
+                ->route('module.schulzeugnis.lehrer.jahr', $lehrer->schuljahr_id)
                 ->with('error', "{$lehrer->fullName()} kann nicht gelöscht werden – bereits als Klassenlehrer, in Lehraufträgen oder als Autor verwendet.");
         }
 
@@ -102,7 +102,7 @@ class LehrerController
         $lehrer->delete();
 
         return redirect()
-            ->route('module.schulzeugnis.lehrer.index', $schuljahrId)
+            ->route('module.schulzeugnis.lehrer.jahr', $schuljahrId)
             ->with('status', "Lehrer {$name} gelöscht.");
     }
 
@@ -114,7 +114,7 @@ class LehrerController
         $aktiv = Schuljahr::where('is_active', true)->first();
 
         if ($aktiv) {
-            return redirect()->route('module.schulzeugnis.lehrer.index', $aktiv);
+            return redirect()->route('module.schulzeugnis.lehrer.jahr', $aktiv);
         }
 
         return redirect()
