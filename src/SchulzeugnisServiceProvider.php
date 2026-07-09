@@ -38,7 +38,6 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.index', icon: 'users')
             ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'category')
             ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user')
-            ->item('korrekturen', 'Meine Korrekturen', 'module.schulzeugnis.korrekturen.index', icon: 'edit')
             ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user')
             ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list')
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category')

@@ -284,29 +284,6 @@ class ZeugnisController
             ->with('status', 'Zeugnis wieder geöffnet – Bearbeitung möglich.');
     }
 
-    /** „Meine Korrekturen": Abschnitte, für die der eingeloggte Nutzer als Korrektor zugewiesen ist. */
-    public function korrekturenIndex()
-    {
-        $userId = auth()->id();
-        $meineLehrerIds = Lehrer::where('core_user_id', $userId)->pluck('id');
-
-        $abschnitte = Abschnitt::whereHas('korrektoren', fn ($q) => $q->whereIn('zeugnis_schuljahr_lehrer.id', $meineLehrerIds))
-            ->with(['fach', 'zeugnis.schueler.klasse.schuljahr'])
-            ->get()
-            ->sortBy(fn ($a) => sprintf(
-                '%s|%s|%s',
-                $a->zeugnis?->schueler?->klasse?->name ?? '',
-                $a->zeugnis?->schueler?->nachname ?? '',
-                $a->fach?->name ?? ''
-            ))
-            ->values();
-
-        return view('schulzeugnis::korrekturen.index', [
-            'abschnitte' => $abschnitte,
-            'stati'      => Abschnitt::STATI,
-        ]);
-    }
-
     /** Einzelnen Abschnitt (Fachtext/Haupttext/Note) bearbeiten – mit Änderungsverlauf. */
     public function abschnittEdit(Abschnitt $abschnitt)
     {

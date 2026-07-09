@@ -99,9 +99,6 @@ Route::middleware(['web', 'auth'])
         Route::post('klassen/{klasse}/lehrauftraege', [LehrauftragController::class, 'store'])->name('klassen.lehrauftraege.store');
         Route::delete('lehrauftraege/{lehrauftrag}', [LehrauftragController::class, 'destroy'])->name('klassen.lehrauftraege.destroy');
 
-        // Meine Korrekturen – Einstieg für Lehrer (nur die ihnen zugewiesenen Texte).
-        Route::get('korrekturen', [ZeugnisController::class, 'korrekturenIndex'])->name('korrekturen.index');
-
         // Schüler (Administration) – je Schuljahr. Anker analog zu Klassen: paramloser
         // `.index` fürs Menü/Gating, jahresbezogene Liste als `.jahr`.
         Route::get('schueler', [SchuelerController::class, 'current'])->name('schueler.index');

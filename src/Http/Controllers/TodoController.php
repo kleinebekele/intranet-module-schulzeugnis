@@ -38,15 +38,17 @@ class TodoController
         $modus = request('gruppierung') === 'fach' ? 'fach' : 'klasse';
 
         $leer = [
-            'schuljahr'        => $schuljahr,
-            'istAdmin'         => $istAdmin,
-            'modus'            => $modus,
-            'eigeneGruppen'    => [],
-            'korrekturGruppen' => [],
-            'eigeneAnzahl'     => 0,
-            'korrekturAnzahl'  => 0,
-            'letzteAenderung'  => collect(),
-            'stati'            => Abschnitt::STATI,
+            'schuljahr'             => $schuljahr,
+            'istAdmin'              => $istAdmin,
+            'modus'                 => $modus,
+            'meineTexteGruppen'     => [],
+            'korrigierteGruppen'    => [],
+            'zuKorrigierenGruppen'  => [],
+            'meineTexteAnzahl'      => 0,
+            'korrigierteAnzahl'     => 0,
+            'zuKorrigierenAnzahl'   => 0,
+            'letzteAenderung'       => collect(),
+            'stati'                 => Abschnitt::STATI,
         ];
 
         // Admin: nur Einsicht → keine ToDos. Ebenso ohne aktives Schuljahr.
@@ -106,6 +108,11 @@ class TodoController
             ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
             ->get();
 
+        // Eigene Texte aufteilen: „Korrigierte" = Status „Korrektur durchgeführt",
+        // der Rest bleibt „Meine Zeugnistexte" (noch zu bearbeiten).
+        $korrigierte = $eigene->filter(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
+        $meineTexte  = $eigene->reject(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
+
         // Letzte protokollierte Änderung je Abschnitt (was zuletzt, wann, von wem) –
         // als Referenz auf den Änderungsverlauf direkt in der Aufgabenliste.
         $alleIds = $eigene->pluck('id')->merge($korrektur->pluck('id'))->unique();
@@ -120,15 +127,17 @@ class TodoController
             ->map(fn (Collection $g) => $g->first());
 
         return view('schulzeugnis::todo.index', [
-            'schuljahr'        => $schuljahr,
-            'istAdmin'         => false,
-            'modus'            => $modus,
-            'eigeneGruppen'    => $this->gruppiere($eigene, $modus),
-            'korrekturGruppen' => $this->gruppiere($korrektur, $modus),
-            'eigeneAnzahl'     => $eigene->count(),
-            'korrekturAnzahl'  => $korrektur->count(),
-            'letzteAenderung'  => $letzteAenderung,
-            'stati'            => Abschnitt::STATI,
+            'schuljahr'            => $schuljahr,
+            'istAdmin'             => false,
+            'modus'                => $modus,
+            'meineTexteGruppen'    => $this->gruppiere($meineTexte, $modus),
+            'korrigierteGruppen'   => $this->gruppiere($korrigierte, $modus),
+            'zuKorrigierenGruppen' => $this->gruppiere($korrektur, $modus),
+            'meineTexteAnzahl'     => $meineTexte->count(),
+            'korrigierteAnzahl'    => $korrigierte->count(),
+            'zuKorrigierenAnzahl'  => $korrektur->count(),
+            'letzteAenderung'      => $letzteAenderung,
+            'stati'                => Abschnitt::STATI,
         ]);
     }
 

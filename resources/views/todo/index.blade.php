@@ -69,14 +69,29 @@
         .todo-inhalt { padding: .15rem 1rem .55rem 2.1rem; background: #fff; }
         .todo-inhalt[hidden] { display: none; }
 
-        .todo-zeile:hover { background: #eef2ff66; }
-        .todo-oeffnen { opacity: 0; transition: opacity .12s ease; }
-        .todo-zeile:hover .todo-oeffnen { opacity: 1; }
+        .todo-zeile { transition: background .12s ease; }
+        .todo-zeile:hover { background: #f9fafb; }
+        .todo-name { transition: color .12s ease; }
+        .todo-zeile:hover .todo-name { color: #4f46e5; }
+        .todo-verlauf { max-width: 58%; }
 
         /* Umschalter der Gruppierung. */
         .todo-toggle { display: inline-flex; gap: 2px; border: 1px solid #e5e7eb; border-radius: .6rem; background: #fff; padding: 3px; }
         .todo-toggle a { padding: .3rem .75rem; border-radius: .45rem; font-size: .8rem; font-weight: 500; color: #6b7280; text-decoration: none; }
         .todo-toggle a.aktiv { background: #4f46e5; color: #fff; }
+
+        /* Tabs. */
+        .todo-tabs { display: flex; gap: .25rem; border-bottom: 1px solid #e5e7eb; }
+        .todo-tab-btn {
+            display: inline-flex; align-items: center; gap: .45rem; margin-bottom: -1px;
+            padding: .5rem .9rem; border: 0; border-bottom: 2px solid transparent;
+            background: transparent; cursor: pointer; font-size: .875rem; font-weight: 500; color: #6b7280;
+        }
+        .todo-tab-btn:hover { color: #374151; }
+        .todo-tab-btn.aktiv { color: #4f46e5; border-bottom-color: #4f46e5; }
+        .todo-tab-anzahl { border-radius: 9999px; background: #f3f4f6; color: #6b7280; padding: 0 .5rem; font-size: .7rem; font-weight: 600; }
+        .todo-tab-btn.aktiv .todo-tab-anzahl { background: #e0e7ff; color: #4f46e5; }
+        .todo-panel[hidden] { display: none; }
     </style>
 
     <div class="max-w-4xl space-y-6">
@@ -98,57 +113,84 @@
             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
                 Es ist kein Schuljahr aktiv geschaltet.
             </div>
-        @elseif ($eigeneAnzahl === 0 && $korrekturAnzahl === 0)
+        @elseif ($meineTexteAnzahl === 0 && $korrigierteAnzahl === 0 && $zuKorrigierenAnzahl === 0)
             <div class="rounded-xl border border-gray-200 bg-white p-8 text-center">
                 <i class="bx bx-check-circle text-3xl text-green-500"></i>
                 <p class="mt-2 font-medium text-gray-800">Alles erledigt.</p>
                 <p class="text-sm text-gray-500">Für dich sind aktuell keine offenen ToDos hinterlegt.</p>
             </div>
         @else
-            {{-- Umschalter der Gruppierungsrichtung --}}
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Gruppieren nach</span>
-                <div class="todo-toggle">
-                    <a href="{{ route('module.schulzeugnis.todo.index', ['gruppierung' => 'klasse']) }}" class="{{ $modus === 'klasse' ? 'aktiv' : '' }}">Klasse › Fach</a>
-                    <a href="{{ route('module.schulzeugnis.todo.index', ['gruppierung' => 'fach']) }}" class="{{ $modus === 'fach' ? 'aktiv' : '' }}">Fach › Klasse</a>
+            {{-- Tabs + Gruppierungs-Umschalter --}}
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <div class="todo-tabs">
+                    <button type="button" class="todo-tab-btn" data-tab="meine">
+                        Meine Zeugnistexte <span class="todo-tab-anzahl">{{ $meineTexteAnzahl }}</span>
+                    </button>
+                    <button type="button" class="todo-tab-btn" data-tab="korrigierte">
+                        Korrigierte <span class="todo-tab-anzahl">{{ $korrigierteAnzahl }}</span>
+                    </button>
+                    <button type="button" class="todo-tab-btn" data-tab="zu">
+                        zu Korrigieren <span class="todo-tab-anzahl">{{ $zuKorrigierenAnzahl }}</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Gruppieren nach</span>
+                    <div class="todo-toggle">
+                        <a href="{{ route('module.schulzeugnis.todo.index', ['gruppierung' => 'klasse']) }}" data-gruppierung="klasse" class="{{ $modus === 'klasse' ? 'aktiv' : '' }}">Klasse › Fach</a>
+                        <a href="{{ route('module.schulzeugnis.todo.index', ['gruppierung' => 'fach']) }}" data-gruppierung="fach" class="{{ $modus === 'fach' ? 'aktiv' : '' }}">Fach › Klasse</a>
+                    </div>
                 </div>
             </div>
 
-            {{-- Bereich 1: Eigene Zeugnistexte --}}
-            <section>
-                <div class="mb-2 flex items-center gap-2">
-                    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Meine Zeugnistexte</h2>
-                    <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">{{ $eigeneAnzahl }}</span>
+            @php
+                $panels = [
+                    'meine'       => ['gruppen' => $meineTexteGruppen,    'leer' => 'Keine offenen eigenen Texte.'],
+                    'korrigierte' => ['gruppen' => $korrigierteGruppen,   'leer' => 'Noch nichts mit „Korrektur durchgeführt".'],
+                    'zu'          => ['gruppen' => $zuKorrigierenGruppen, 'leer' => 'Aktuell nichts zu korrigieren.'],
+                ];
+            @endphp
+            @foreach ($panels as $key => $panel)
+                <div class="todo-panel" data-panel="{{ $key }}" hidden>
+                    @if (empty($panel['gruppen']))
+                        <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+                            {{ $panel['leer'] }}
+                        </div>
+                    @else
+                        @include('schulzeugnis::todo._gruppen', ['gruppen' => $panel['gruppen'], 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
+                    @endif
                 </div>
-
-                @if (empty($eigeneGruppen))
-                    <div class="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
-                        Keine offenen eigenen Texte – alles vollständig.
-                    </div>
-                @else
-                    @include('schulzeugnis::todo._gruppen', ['gruppen' => $eigeneGruppen, 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
-                @endif
-            </section>
-
-            {{-- Bereich 2: Korrektur-Anfragen --}}
-            <section>
-                <div class="mb-2 flex items-center gap-2">
-                    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Um Korrektur gebeten</h2>
-                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{{ $korrekturAnzahl }}</span>
-                </div>
-
-                @if (empty($korrekturGruppen))
-                    <div class="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
-                        Aktuell keine offenen Korrektur-Anfragen an dich.
-                    </div>
-                @else
-                    @include('schulzeugnis::todo._gruppen', ['gruppen' => $korrekturGruppen, 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
-                @endif
-            </section>
+            @endforeach
         @endif
     </div>
 
     <script>
+        // Tabs: gewählten Bereich anzeigen (Auswahl bleibt über den Gruppierungs-Wechsel erhalten).
+        (function () {
+            var tabs   = document.querySelectorAll('.todo-tab-btn');
+            var panels = document.querySelectorAll('.todo-panel');
+            if (!tabs.length) { return; }
+
+            function aktiviere(name) {
+                tabs.forEach(function (t) { t.classList.toggle('aktiv', t.dataset.tab === name); });
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+                // Gruppierungs-Links den aktuellen Tab mitgeben, damit er nach dem Reload bleibt.
+                document.querySelectorAll('.todo-toggle a').forEach(function (a) {
+                    var url = new URL(a.href, window.location.origin);
+                    url.searchParams.set('tab', name);
+                    a.href = url.pathname + url.search;
+                });
+            }
+
+            var gewuenscht = new URLSearchParams(window.location.search).get('tab');
+            var start = Array.prototype.some.call(tabs, function (t) { return t.dataset.tab === gewuenscht; }) ? gewuenscht : 'meine';
+            aktiviere(start);
+
+            tabs.forEach(function (t) {
+                t.addEventListener('click', function () { aktiviere(t.dataset.tab); });
+            });
+        })();
+
         // Akkordeon der zweiten Ebene: pro Kopfzeile ist immer nur ein Eintrag offen.
         document.querySelectorAll('.todo-akk').forEach(function (btn) {
             btn.addEventListener('click', function () {
