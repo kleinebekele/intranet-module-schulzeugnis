@@ -93,7 +93,7 @@
         .todo-tab-btn.aktiv .todo-tab-anzahl { background: #e0e7ff; color: #4f46e5; }
         .todo-tab-gruen, .todo-tab-btn.aktiv .todo-tab-gruen { background: #dcfce7; color: #16a34a; }
         .todo-panel[hidden] { display: none; }
-        .todo-erledigt[hidden] { display: none; }
+        .todo-erledigt-liste[hidden] { display: none; }
     </style>
 
     <div class="space-y-6">
@@ -149,33 +149,9 @@
                 </div>
             </div>
 
-            {{-- Tab: Meine Zeugnistexte (offen) + einblendbare Erledigte --}}
-            <div class="todo-panel space-y-4" data-panel="meine" hidden>
-                @if (empty($meineTexteGruppen))
-                    <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
-                        Keine offenen eigenen Texte.
-                    </div>
-                @else
-                    @include('schulzeugnis::todo._gruppen', ['gruppen' => $meineTexteGruppen, 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
-                @endif
-
-                @if (! empty($erledigtGruppen))
-                    <div>
-                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
-                            <input type="checkbox" class="todo-erledigt-toggle rounded border-gray-300 text-green-600 focus:ring-green-500">
-                            <i class="bx bxs-check-circle text-green-500"></i>
-                            Erledigte anzeigen ({{ $erledigtAnzahl }})
-                        </label>
-                        <div class="todo-erledigt mt-2" hidden>
-                            @include('schulzeugnis::todo._gruppen', ['gruppen' => $erledigtGruppen, 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
-                        </div>
-                    </div>
-                @endif
-            </div>
-
-            {{-- Weitere Tabs --}}
             @php
                 $panels = [
+                    'meine'       => ['gruppen' => $meineTexteGruppen,    'leer' => 'Keine eigenen Texte.'],
                     'korrigierte' => ['gruppen' => $korrigierteGruppen,   'leer' => 'Noch nichts mit „Korrektur durchgeführt".'],
                     'zu'          => ['gruppen' => $zuKorrigierenGruppen, 'leer' => 'Aktuell nichts zu korrigieren.'],
                 ];
@@ -221,10 +197,11 @@
             });
         })();
 
-        // „Erledigte anzeigen" ein-/ausblenden.
+        // „Erledigte anzeigen" ein-/ausblenden – je Gruppe (Fach bzw. Klasse) einzeln.
         document.querySelectorAll('.todo-erledigt-toggle').forEach(function (cb) {
             cb.addEventListener('change', function () {
-                var box = cb.closest('div').querySelector('.todo-erledigt');
+                var leaf = cb.closest('.todo-inhalt');
+                var box  = leaf ? leaf.querySelector('.todo-erledigt-liste') : null;
                 if (box) { box.hidden = !cb.checked; }
             });
         });

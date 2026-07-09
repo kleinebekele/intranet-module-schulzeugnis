@@ -42,7 +42,6 @@ class TodoController
             'istAdmin'              => $istAdmin,
             'modus'                 => $modus,
             'meineTexteGruppen'     => [],
-            'erledigtGruppen'       => [],
             'korrigierteGruppen'    => [],
             'zuKorrigierenGruppen'  => [],
             'meineTexteAnzahl'      => 0,
@@ -112,13 +111,13 @@ class TodoController
 
         // Eigene Texte aufteilen:
         //  - „Korrigierte" = Status „Korrektur durchgeführt" (eigener Tab)
-        //  - „Erledigt"    = Status „Vollständig" (in „Meine Zeugnistexte" einblendbar)
-        //  - „Meine Zeugnistexte" = der offene Rest.
+        //  - „Meine Zeugnistexte" = der Rest (offen + erledigt); die Erledigten sind
+        //    je Gruppe einzeln einblendbar (Aufteilung passiert in gruppiere()).
         $korrigierte = $eigene->filter(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
-        $erledigt    = $eigene->filter(fn (Abschnitt $a) => $a->status === 'vollstaendig')->values();
-        $meineTexte  = $eigene
-            ->reject(fn (Abschnitt $a) => in_array($a->status, ['korrektur_durchgefuehrt', 'vollstaendig'], true))
-            ->values();
+        $meineTexte  = $eigene->reject(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
+
+        $offenAnzahl    = $meineTexte->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig')->count();
+        $erledigtAnzahl = $meineTexte->count() - $offenAnzahl;
 
         // Letzte protokollierte Änderung je Abschnitt (was zuletzt, wann, von wem) –
         // als Referenz auf den Änderungsverlauf direkt in der Aufgabenliste.
@@ -138,11 +137,10 @@ class TodoController
             'istAdmin'             => false,
             'modus'                => $modus,
             'meineTexteGruppen'    => $this->gruppiere($meineTexte, $modus),
-            'erledigtGruppen'      => $this->gruppiere($erledigt, $modus),
             'korrigierteGruppen'   => $this->gruppiere($korrigierte, $modus),
             'zuKorrigierenGruppen' => $this->gruppiere($korrektur, $modus),
-            'meineTexteAnzahl'     => $meineTexte->count(),
-            'erledigtAnzahl'       => $erledigt->count(),
+            'meineTexteAnzahl'     => $offenAnzahl,
+            'erledigtAnzahl'       => $erledigtAnzahl,
             'korrigierteAnzahl'    => $korrigierte->count(),
             'zuKorrigierenAnzahl'  => $korrektur->count(),
             'letzteAenderung'      => $letzteAenderung,
@@ -205,8 +203,10 @@ class TodoController
                 $kinder = $proPrim
                     ->groupBy(fn (Abschnitt $a) => $sekundaer($a)['key'])
                     ->map(function (Collection $proSek) use ($sekundaer) {
-                        $sm    = $sekundaer($proSek->first());
-                        $items = $proSek
+                        $sm = $sekundaer($proSek->first());
+
+                        // Innerhalb eines Blattes offen vs. erledigt (Status „Vollständig") trennen.
+                        $sortiert = fn (Collection $c) => $c
                             ->sortBy(fn (Abschnitt $a) => sprintf(
                                 '%s|%s',
                                 $a->zeugnis->schueler->nachname ?? '',
@@ -214,13 +214,18 @@ class TodoController
                             ))
                             ->values();
 
+                        $offen    = $sortiert($proSek->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig'));
+                        $erledigt = $sortiert($proSek->filter(fn (Abschnitt $a) => $a->status === 'vollstaendig'));
+
                         return [
-                            'label'  => $sm['label'],
-                            'farbe'  => $sm['farbe'],
-                            'sub'    => $sm['sub'],
-                            'sort'   => $sm['sort'],
-                            'anzahl' => $items->count(),
-                            'items'  => $items,
+                            'label'          => $sm['label'],
+                            'farbe'          => $sm['farbe'],
+                            'sub'            => $sm['sub'],
+                            'sort'           => $sm['sort'],
+                            'anzahl'         => $offen->count(),
+                            'erledigtAnzahl' => $erledigt->count(),
+                            'offen'          => $offen,
+                            'erledigt'       => $erledigt,
                         ];
                     })
                     ->sortBy('sort', $sekundaerNatural ? SORT_NATURAL : SORT_REGULAR)
@@ -232,7 +237,7 @@ class TodoController
                     'farbe'  => $pm['farbe'],
                     'sub'    => $pm['sub'],
                     'sort'   => $pm['sort'],
-                    'anzahl' => $proPrim->count(),
+                    'anzahl' => $proPrim->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig')->count(),
                     'kinder' => $kinder,
                 ];
             })
