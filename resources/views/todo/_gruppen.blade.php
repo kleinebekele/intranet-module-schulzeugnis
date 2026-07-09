@@ -1,41 +1,46 @@
-{{-- Eine Bereichs-Liste: je Klasse eine Karte mit vollflächig farbiger Kopfzeile
-     (Stufenfarbe). Darunter sind die Fächer ein Akkordeon – eingeklappt; beim
-     Öffnen erscheinen die Schüler-Aufgaben inkl. Referenz auf die letzte Änderung
-     (was/wann/wer). Erwartet: $gruppen, $farbeKlasse, $letzteAenderung. --}}
-@php
-    // Textfarbe je nach Helligkeit der Stufenfarbe (wie in der Zeugnisliste).
-    $kontrast = function (string $hex): string {
-        $h = ltrim($hex, '#');
-        $r = hexdec(substr($h, 0, 2)); $g = hexdec(substr($h, 2, 2)); $b = hexdec(substr($h, 4, 2));
-        return ((0.299 * $r + 0.587 * $g + 0.114 * $b) / 255) < 0.5 ? 'weiss' : 'schwarz';
-    };
-@endphp
+{{-- Zweistufige Aufgaben-Liste. Die oberste Ebene ist eine sichtbare Kopfzeile,
+     die zweite Ebene ein Akkordeon. Je nach Gruppierung ist die farbige Ebene die
+     Klasse (Stufenfarbe, weiße Schrift) und die neutrale Ebene das Fach.
+     Erwartet: $gruppen (Baum aus TodoController::gruppiere), $farbeKlasse, $letzteAenderung. --}}
 <div class="space-y-3">
-    @foreach ($gruppen as $gruppe)
-        @php $klasse = $gruppe['klasse']; $farbe = $klasse->stufe?->farbe ?: '#64748b'; $ct = $kontrast($farbe); @endphp
-        <div class="todo-klasse">
-            {{-- Farbige Klassenzeile (immer sichtbar) --}}
-            <div class="todo-kopf-klasse todo-kopf-{{ $ct }}" style="--kr: {{ $farbe }}">
-                <span class="font-semibold">Klasse {{ $klasse->name }}</span>
-                @if ($klasse->stufe)
-                    <span class="todo-dim text-xs">{{ $klasse->stufe->name }}</span>
-                @endif
-                <span class="todo-badge ml-auto">{{ $gruppe['anzahl'] }} offen</span>
-            </div>
+    @foreach ($gruppen as $node)
+        <div class="todo-node">
+            {{-- Oberste Ebene: Kopfzeile (immer sichtbar) --}}
+            @if ($node['farbe'])
+                <div class="todo-head todo-farbe" style="--kr: {{ $node['farbe'] }}">
+                    <span class="font-semibold">{{ $node['label'] }}</span>
+                    @if ($node['sub'])
+                        <span class="todo-dim text-xs">{{ $node['sub'] }}</span>
+                    @endif
+                    <span class="todo-badge ml-auto">{{ $node['anzahl'] }} offen</span>
+                </div>
+            @else
+                <div class="todo-head todo-neutral-head">
+                    <i class="bx bx-bookmark text-lg"></i>
+                    <span class="font-semibold">{{ $node['label'] }}</span>
+                    <span class="todo-badge ml-auto">{{ $node['anzahl'] }} offen</span>
+                </div>
+            @endif
 
-            {{-- Fächer-Akkordeon --}}
-            <div class="todo-faecher">
-                @foreach ($gruppe['faecher'] as $fach)
-                    <div class="todo-fach">
-                        <button type="button" class="todo-fach-kopf" aria-expanded="false">
+            {{-- Zweite Ebene: Akkordeon --}}
+            <div class="todo-kinder">
+                @foreach ($node['kinder'] as $kind)
+                    <div class="todo-kind">
+                        <button type="button"
+                                class="todo-akk {{ $kind['farbe'] ? 'todo-farbe todo-akk-farbe' : 'todo-akk-neutral' }}"
+                                @if ($kind['farbe']) style="--kr: {{ $kind['farbe'] }}" @endif
+                                aria-expanded="false">
                             <i class="bx bx-chevron-right todo-chevron text-lg"></i>
-                            <span class="text-sm font-medium">{{ $fach['label'] }}</span>
-                            <span class="todo-fach-badge ml-auto">{{ $fach['anzahl'] }} offen</span>
+                            <span class="text-sm font-medium">{{ $kind['label'] }}</span>
+                            @if ($kind['sub'])
+                                <span class="todo-dim text-xs">{{ $kind['sub'] }}</span>
+                            @endif
+                            <span class="todo-badge ml-auto">{{ $kind['anzahl'] }} offen</span>
                         </button>
 
-                        <div class="todo-fach-inhalt" hidden>
+                        <div class="todo-inhalt" hidden>
                             <ul class="space-y-0.5">
-                                @foreach ($fach['items'] as $a)
+                                @foreach ($kind['items'] as $a)
                                     @php
                                         $m   = $a->statusMeta();
                                         $s   = $a->zeugnis?->schueler;

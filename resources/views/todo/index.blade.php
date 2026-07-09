@@ -25,39 +25,58 @@
     </x-slot>
 
     <style>
-        /* Klasse als Karte mit vollflächig farbiger Kopfzeile (Stufenfarbe); die
-           Fächer darunter sind ein Akkordeon – je Klasse ist immer nur eines offen. */
-        .todo-klasse { border: 1px solid #e5e7eb; border-radius: .75rem; overflow: hidden; }
-        .todo-kopf-klasse {
-            display: flex; align-items: center; gap: .625rem; padding: .7rem 1rem;
-            background: linear-gradient(135deg, var(--kr), color-mix(in srgb, var(--kr) 78%, black));
-        }
-        .todo-kopf-weiss   { color: #fff; }
-        .todo-kopf-weiss   .todo-dim   { color: rgba(255,255,255,.82); }
-        .todo-kopf-weiss   .todo-badge { background: rgba(255,255,255,.22); color: #fff; }
-        .todo-kopf-schwarz { color: #1f2937; }
-        .todo-kopf-schwarz .todo-dim   { color: rgba(31,41,55,.7); }
-        .todo-kopf-schwarz .todo-badge { background: rgba(0,0,0,.12); color: #1f2937; }
-        .todo-badge { border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+        /* Zweistufige Karte: oberste Ebene als sichtbare Kopfzeile, zweite Ebene als
+           Akkordeon. Je nach Gruppierung ist die farbige Ebene die Klasse (Stufen-
+           farbe, Schrift IMMER weiß) und die neutrale Ebene das Fach. */
+        .todo-node { border: 1px solid #e5e7eb; border-radius: .75rem; overflow: hidden; }
 
-        .todo-faecher { background: #fff; }
-        .todo-fach + .todo-fach { border-top: 1px solid #f3f4f6; }
-        .todo-fach-kopf {
+        /* Farbige Elemente (Klasse) – Stufenfarbe, weiße Schrift, dunkler Badge. */
+        .todo-farbe {
+            color: #fff;
+            background: linear-gradient(135deg,
+                color-mix(in srgb, var(--kr) 85%, black),
+                color-mix(in srgb, var(--kr) 60%, black));
+        }
+        .todo-farbe .todo-dim    { color: rgba(255,255,255,.85); }
+        .todo-farbe .todo-badge  { background: rgba(0,0,0,.3); color: #fff; }
+        .todo-farbe .todo-chevron { color: rgba(255,255,255,.9); }
+
+        /* Neutrale Kopfzeile (Fach als oberste Ebene). */
+        .todo-neutral-head { background: #eef2ff; color: #3730a3; }
+        .todo-neutral-head .todo-badge { background: #fff; color: #4f46e5; }
+
+        /* Kopfzeile (oberste, nicht klappbar). */
+        .todo-head { display: flex; align-items: center; gap: .625rem; padding: .7rem 1rem; }
+
+        /* Akkordeon-Kopf (zweite Ebene, klappbar). */
+        .todo-kinder { background: #fff; }
+        .todo-kind + .todo-kind { border-top: 1px solid #f3f4f6; }
+        .todo-akk {
             width: 100%; display: flex; align-items: center; gap: .5rem;
             padding: .55rem 1rem; border: 0; text-align: left; cursor: pointer;
-            background: transparent; color: #374151;
         }
-        .todo-fach-kopf:hover,
-        .todo-fach-kopf[aria-expanded="true"] { background: #f9fafb; }
-        .todo-chevron { transition: transform .18s ease; color: #9ca3af; }
-        .todo-fach-kopf[aria-expanded="true"] .todo-chevron { transform: rotate(90deg); }
-        .todo-fach-badge { border-radius: 9999px; background: #f3f4f6; color: #6b7280; padding: 1px 8px; font-size: 11px; font-weight: 600; }
-        .todo-fach-inhalt { padding: 0 1rem .55rem 2.1rem; }
-        .todo-fach-inhalt[hidden] { display: none; }
+        .todo-akk-neutral { background: transparent; color: #374151; }
+        .todo-akk-neutral:hover,
+        .todo-akk-neutral[aria-expanded="true"] { background: #f9fafb; }
+        .todo-akk-neutral .todo-badge  { background: #f3f4f6; color: #6b7280; }
+        .todo-akk-neutral .todo-chevron { color: #9ca3af; }
+        .todo-akk-farbe:hover { filter: brightness(1.07); }
+
+        .todo-chevron { transition: transform .18s ease; }
+        .todo-akk[aria-expanded="true"] .todo-chevron { transform: rotate(90deg); }
+        .todo-badge { border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+        .todo-inhalt { padding: .15rem 1rem .55rem 2.1rem; background: #fff; }
+        .todo-inhalt[hidden] { display: none; }
 
         .todo-zeile:hover { background: #eef2ff66; }
         .todo-oeffnen { opacity: 0; transition: opacity .12s ease; }
         .todo-zeile:hover .todo-oeffnen { opacity: 1; }
+
+        /* Umschalter der Gruppierung. */
+        .todo-toggle { display: inline-flex; gap: 2px; border: 1px solid #e5e7eb; border-radius: .6rem; background: #fff; padding: 3px; }
+        .todo-toggle a { padding: .3rem .75rem; border-radius: .45rem; font-size: .8rem; font-weight: 500; color: #6b7280; text-decoration: none; }
+        .todo-toggle a.aktiv { background: #4f46e5; color: #fff; }
     </style>
 
     <div class="max-w-4xl space-y-6">
@@ -86,6 +105,15 @@
                 <p class="text-sm text-gray-500">Für dich sind aktuell keine offenen ToDos hinterlegt.</p>
             </div>
         @else
+            {{-- Umschalter der Gruppierungsrichtung --}}
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Gruppieren nach</span>
+                <div class="todo-toggle">
+                    <a href="{{ route('module.schulzeugnis.todo.index', ['gruppierung' => 'klasse']) }}" class="{{ $modus === 'klasse' ? 'aktiv' : '' }}">Klasse › Fach</a>
+                    <a href="{{ route('module.schulzeugnis.todo.index', ['gruppierung' => 'fach']) }}" class="{{ $modus === 'fach' ? 'aktiv' : '' }}">Fach › Klasse</a>
+                </div>
+            </div>
+
             {{-- Bereich 1: Eigene Zeugnistexte --}}
             <section>
                 <div class="mb-2 flex items-center gap-2">
@@ -121,17 +149,17 @@
     </div>
 
     <script>
-        // Fächer-Akkordeon: innerhalb einer Klasse ist immer nur ein Fach offen.
-        document.querySelectorAll('.todo-fach-kopf').forEach(function (btn) {
+        // Akkordeon der zweiten Ebene: pro Kopfzeile ist immer nur ein Eintrag offen.
+        document.querySelectorAll('.todo-akk').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var scope  = btn.closest('.todo-faecher');
-                var inhalt = btn.parentElement.querySelector('.todo-fach-inhalt');
+                var scope  = btn.closest('.todo-kinder');
+                var inhalt = btn.parentElement.querySelector('.todo-inhalt');
                 var offen  = btn.getAttribute('aria-expanded') === 'true';
 
                 if (!offen && scope) {
-                    scope.querySelectorAll('.todo-fach-kopf[aria-expanded="true"]').forEach(function (other) {
+                    scope.querySelectorAll('.todo-akk[aria-expanded="true"]').forEach(function (other) {
                         other.setAttribute('aria-expanded', 'false');
-                        other.parentElement.querySelector('.todo-fach-inhalt').hidden = true;
+                        other.parentElement.querySelector('.todo-inhalt').hidden = true;
                     });
                 }
 
