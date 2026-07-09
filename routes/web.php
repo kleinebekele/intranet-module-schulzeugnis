@@ -12,6 +12,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\StufeController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\ZeugnisController;
 
 /*
@@ -103,6 +104,14 @@ Route::middleware(['web', 'auth'])
         Route::put('faecher/{fach}', [FachController::class, 'update'])->name('faecher.update');
         Route::post('faecher/{fach}/archivieren', [FachController::class, 'toggle'])->name('faecher.toggle');
         Route::delete('faecher/{fach}', [FachController::class, 'destroy'])->name('faecher.destroy');
+
+        // Schulstufen – feste, jahresübergreifende Liste mit Türfarbe.
+        Route::get('stufen', [StufeController::class, 'index'])->name('stufen.index');
+        Route::get('stufen/neu', [StufeController::class, 'create'])->name('stufen.create');
+        Route::post('stufen', [StufeController::class, 'store'])->name('stufen.store');
+        Route::get('stufen/{stufe}/bearbeiten', [StufeController::class, 'edit'])->name('stufen.edit');
+        Route::put('stufen/{stufe}', [StufeController::class, 'update'])->name('stufen.update');
+        Route::delete('stufen/{stufe}', [StufeController::class, 'destroy'])->name('stufen.destroy');
 
         // Zeugnisformate – Vorlagen (Text/Noten).
         Route::get('formate', [FormatController::class, 'index'])->name('formate.index');

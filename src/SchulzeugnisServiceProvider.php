@@ -35,6 +35,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'home')
             ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar')
             ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.current', icon: 'users')
+            ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'category')
             ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.current', icon: 'user')
             ->item('korrekturen', 'Meine Korrekturen', 'module.schulzeugnis.korrekturen.index', icon: 'edit')
             ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.current', icon: 'user')

@@ -10,6 +10,7 @@ use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
+use Intranet\Modules\Schulzeugnis\Models\Stufe;
 
 /**
  * Verwaltung der Klassen – immer im Kontext eines Schuljahres (die URL trägt es).
@@ -34,6 +35,7 @@ class KlasseController
             'klasse'    => new Klasse(),
             'formate'   => $this->formatOptions(),
             'lehrer'    => $this->lehrerOptions($schuljahr),
+            'stufen'    => $this->stufenOptions(),
         ]);
     }
 
@@ -60,6 +62,7 @@ class KlasseController
             'klasse'    => $klasse,
             'formate'   => $this->formatOptions($klasse->standard_format_id),
             'lehrer'    => $this->lehrerOptions($klasse->schuljahr),
+            'stufen'    => $this->stufenOptions(),
         ]);
     }
 
@@ -131,6 +134,7 @@ class KlasseController
     {
         return $request->validate([
             'name'               => ['required', 'string', 'max:255'],
+            'stufe_id'           => ['nullable', 'integer', Rule::exists('zeugnis_stufen', 'id')],
             'standard_format_id' => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
             'klassenlehrer_id'   => ['nullable', 'integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')->where('schuljahr_id', $schuljahrId)],
         ]);
@@ -152,5 +156,11 @@ class KlasseController
             ->when($currentId, fn ($q) => $q->orWhere('id', $currentId))
             ->orderBy('name')
             ->get();
+    }
+
+    /** Schulstufen für die Stufen-Auswahl (nach Reihenfolge sortiert). */
+    private function stufenOptions()
+    {
+        return Stufe::orderBy('reihenfolge')->orderBy('name')->get();
     }
 }

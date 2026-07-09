@@ -32,6 +32,25 @@
             </div>
 
             <div>
+                <label for="stufe_id" class="block text-sm font-medium text-gray-700">Schulstufe</label>
+                <select name="stufe_id" id="stufe_id"
+                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">— keine Stufe —</option>
+                    @foreach ($stufen as $stufe)
+                        <option value="{{ $stufe->id }}" @selected(old('stufe_id', $klasse->stufe_id) == $stufe->id)>
+                            {{ $stufe->name }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-gray-400">Bestimmt die Türfarbe in den Klassenräumen.
+                    @if ($stufen->isEmpty())
+                        <a href="{{ route('module.schulzeugnis.stufen.create') }}" class="text-indigo-600 hover:text-indigo-700">Erst eine Stufe anlegen</a>.
+                    @endif
+                </p>
+                @error('stufe_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            <div>
                 <label for="standard_format_id" class="block text-sm font-medium text-gray-700">Standard-Zeugnisformat</label>
                 <select name="standard_format_id" id="standard_format_id"
                         class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">

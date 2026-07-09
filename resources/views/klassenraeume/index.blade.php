@@ -62,8 +62,13 @@
             box-shadow: inset 0 0 0 2px rgba(0,0,0,.08);
             cursor: pointer;
         }
-        .kr-blau  { background: linear-gradient(135deg, #5b87ac 0%, #3f6588 55%, #375a79 100%); }
-        .kr-gruen { background: linear-gradient(135deg, #5aa15a 0%, #418141 55%, #3a743a 100%); }
+        /* Türfarbe kommt aus der Schulstufe (--kr); Fallback für Klassen ohne Stufe. */
+        .kr-blatt {
+            background: linear-gradient(135deg,
+                color-mix(in srgb, var(--kr, #64748b) 78%, white),
+                var(--kr, #64748b) 55%,
+                color-mix(in srgb, var(--kr, #64748b) 80%, black));
+        }
 
         .kr-tuer:hover .kr-blatt,
         .kr-tuer:focus-visible .kr-blatt {
@@ -112,14 +117,25 @@
                 <a href="{{ route('module.schulzeugnis.klassen.index', $schuljahr) }}" class="text-indigo-600 hover:text-indigo-700">Klassen anlegen</a>.
             </div>
         @else
+            @php $stufenLegende = $klassen->pluck('stufe')->filter()->unique('id')->sortBy('reihenfolge'); @endphp
+            @if ($stufenLegende->isNotEmpty())
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 pb-1 text-xs text-gray-500">
+                    @foreach ($stufenLegende as $stufe)
+                        <span class="inline-flex items-center gap-1.5">
+                            <span class="inline-block h-3 w-3 rounded-sm ring-1 ring-black/10" style="background: {{ $stufe->farbe }}"></span>
+                            {{ $stufe->name }}
+                        </span>
+                    @endforeach
+                </div>
+            @endif
+
             <div class="kr-grid">
                 @foreach ($klassen as $klasse)
-                    @php $gruen = is_numeric($klasse->name) && (int) $klasse->name >= 9; @endphp
                     <a class="kr-tuer" href="{{ route('module.schulzeugnis.zeugnisse.index', $klasse) }}"
-                       title="Zeugnisliste der Klasse {{ $klasse->name }}">
+                       title="Zeugnisliste der Klasse {{ $klasse->name }}{{ $klasse->stufe ? ' · '.$klasse->stufe->name : '' }}">
                         <div class="kr-rahmen">
                             <div class="kr-oeffnung"></div>
-                            <div class="kr-blatt {{ $gruen ? 'kr-gruen' : 'kr-blau' }}">
+                            <div class="kr-blatt" style="--kr: {{ $klasse->stufe?->farbe ?: '#64748b' }}">
                                 <div class="kr-panels">
                                     <div class="kr-panel"></div>
                                     <div class="kr-panel"></div>

@@ -21,6 +21,12 @@ class Klasse extends Model
         return $this->belongsTo(Schuljahr::class, 'schuljahr_id');
     }
 
+    /** Schulstufe der Klasse – bestimmt u. a. die Türfarbe in den Klassenräumen. */
+    public function stufe(): BelongsTo
+    {
+        return $this->belongsTo(Stufe::class, 'stufe_id');
+    }
+
     public function standardFormat(): BelongsTo
     {
         return $this->belongsTo(Format::class, 'standard_format_id');
