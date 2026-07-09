@@ -5,33 +5,73 @@
         'red'   => 'text-red-500',
         'green' => 'text-green-600',
     ];
+
+    // Titelzeile in der Stufenfarbe (wie die Türen in den Klassenräumen).
+    // Textfarbe je nach Helligkeit der Grundfarbe automatisch hell/dunkel wählen,
+    // damit jede frei gewählte Stufenfarbe lesbar bleibt.
+    $stufe     = $klasse->stufe;
+    $kopfFarbe = $stufe?->farbe ?: '#64748b';
+    $hex       = ltrim($kopfFarbe, '#');
+    $r = hexdec(substr($hex, 0, 2)); $g = hexdec(substr($hex, 2, 2)); $b = hexdec(substr($hex, 4, 2));
+    $helligkeit  = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
+    $weisseSchrift = $helligkeit < 0.5; // dunkle Fläche → weiße Schrift, sonst dunkle
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <x-module-icon name="book" class="text-2xl text-indigo-600" />
-                <div>
-                    <h1 class="text-xl font-semibold text-gray-800">Zeugnisse</h1>
-                    <p class="text-sm text-gray-500">Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }} &middot; {{ $schueler->count() }} Schüler</p>
+        <div class="zi-kopf {{ $weisseSchrift ? 'zi-kopf-weiss' : 'zi-kopf-schwarz' }}"
+             style="--kr: {{ $kopfFarbe }}">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <x-module-icon name="book" class="zi-kopf-icon text-2xl" />
+                    <div>
+                        <h1 class="zi-kopf-titel text-xl font-semibold">Zeugnisse</h1>
+                        <p class="zi-kopf-sub text-sm">Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }} &middot; {{ $schueler->count() }} Schüler @if ($stufe) &middot; {{ $stufe->name }} @endif</p>
+                    </div>
                 </div>
-            </div>
 
-            <div class="flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-1.5">
-                <i class="bx bxs-user-circle text-3xl text-indigo-500"></i>
-                <div class="leading-tight">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-indigo-400">Klassenlehrer</div>
-                    @if ($klasse->klassenlehrer)
-                        <div class="text-sm font-semibold text-gray-800">{{ $klasse->klassenlehrer->fullName() }}</div>
-                    @else
-                        <div class="text-sm text-gray-400">— nicht gesetzt —</div>
-                    @endif
+                <div class="zi-kopf-box flex items-center gap-2 rounded-xl px-3 py-1.5">
+                    <i class="bx bxs-user-circle zi-kopf-icon text-3xl"></i>
+                    <div class="leading-tight">
+                        <div class="zi-kopf-boxlabel text-xs font-semibold uppercase tracking-wide">Klassenlehrer</div>
+                        @if ($klasse->klassenlehrer)
+                            <div class="zi-kopf-titel text-sm font-semibold">{{ $klasse->klassenlehrer->fullName() }}</div>
+                        @else
+                            <div class="zi-kopf-sub text-sm">— nicht gesetzt —</div>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
     </x-slot>
 
     <style>
+        /* Titelzeile in der Stufenfarbe (gleiche Grundfarbe wie die Klassenraum-Tür).
+           Vollflächig bis an die Kanten – die negativen Ränder heben das Padding des
+           Core-Headers (px-4/sm:px-6/lg:px-8, py-5) auf. Bewusst als eigenes CSS, weil
+           die negativen Tailwind-Margin-Utilities in dieser Instanz nicht kompiliert sind. */
+        .zi-kopf {
+            margin: -1.25rem -1rem;
+            padding: 1.25rem 1rem;
+            background: linear-gradient(135deg, var(--kr), color-mix(in srgb, var(--kr) 78%, black));
+        }
+        @media (min-width: 640px) {
+            .zi-kopf { margin-left: -1.5rem; margin-right: -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; }
+        }
+        @media (min-width: 1024px) {
+            .zi-kopf { margin-left: -2rem; margin-right: -2rem; padding-left: 2rem; padding-right: 2rem; }
+        }
+        .zi-kopf-weiss .zi-kopf-titel  { color: #fff; }
+        .zi-kopf-weiss .zi-kopf-sub    { color: rgba(255,255,255,.82); }
+        .zi-kopf-weiss .zi-kopf-icon   { color: rgba(255,255,255,.92); }
+        .zi-kopf-weiss .zi-kopf-box    { background: rgba(255,255,255,.15); box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
+        .zi-kopf-weiss .zi-kopf-boxlabel { color: rgba(255,255,255,.72); }
+
+        .zi-kopf-schwarz .zi-kopf-titel  { color: #1f2937; }
+        .zi-kopf-schwarz .zi-kopf-sub    { color: rgba(31,41,55,.75); }
+        .zi-kopf-schwarz .zi-kopf-icon   { color: rgba(31,41,55,.85); }
+        .zi-kopf-schwarz .zi-kopf-box    { background: rgba(255,255,255,.35); box-shadow: inset 0 0 0 1px rgba(31,41,55,.15); }
+        .zi-kopf-schwarz .zi-kopf-boxlabel { color: rgba(31,41,55,.6); }
+
         #zt-table td, #zt-table th { padding-top: 1px; padding-bottom: 1px; }
         #zt-table i.bx { line-height: 1; vertical-align: middle; }
         #zt-table tbody a { padding: 0; }
