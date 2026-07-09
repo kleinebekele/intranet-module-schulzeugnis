@@ -4,19 +4,20 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <x-module-icon name="book" class="text-2xl text-indigo-600" />
-                <div>
-                    <h1 class="text-xl font-semibold text-gray-800">{{ $titel }}</h1>
-                    <p class="text-sm text-gray-500">
-                        {{ $schueler?->fullName() }} &middot; Klasse {{ $schueler?->klasse?->name ?? '—' }} &middot; Schuljahr {{ $schueler?->klasse?->schuljahr?->name ?? '—' }}
-                    </p>
-                </div>
+        <div class="flex items-start justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+                <x-module-icon name="book" class="shrink-0 text-2xl text-indigo-600" />
+                <h1 class="truncate text-3xl font-bold tracking-tight text-gray-800">{{ $schueler?->fullName() ?: $titel }}</h1>
             </div>
-            @if ($readonly)
-                <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Zeugnis abgeschlossen</span>
-            @endif
+            <div class="shrink-0 text-right">
+                <div class="text-base font-semibold text-gray-700">{{ $titel }}</div>
+                <div class="text-sm text-gray-500">
+                    Klasse {{ $schueler?->klasse?->name ?? '—' }} &middot; Schuljahr {{ $schueler?->klasse?->schuljahr?->name ?? '—' }}
+                </div>
+                @if ($readonly)
+                    <span class="mt-1 inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Zeugnis abgeschlossen</span>
+                @endif
+            </div>
         </div>
     </x-slot>
 
@@ -228,9 +229,9 @@
             @if ($verlauf->isEmpty())
                 <p class="mt-2 text-sm text-gray-400">Noch keine Änderungen protokolliert.</p>
             @else
-                <ul class="mt-3 space-y-2.5">
+                <ul class="zt-log">
                     @foreach ($verlauf as $e)
-                        <li class="border-l-2 pl-3" style="border-color: {{ $e['wiederhergestellt'] ? '#f59e0b' : '#e5e7eb' }}">
+                        <li class="zt-log-item {{ $e['wiederhergestellt'] ? 'is-restored' : '' }}">
                             <div class="text-xs text-gray-500">
                                 {{ $e['zeit']?->format('d.m.Y H:i') }} Uhr
                                 @if ($e['akteur']) &middot; {{ $e['akteur'] }} @endif
@@ -314,6 +315,13 @@
         @media (min-width: 1024px) {
             .zt-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
         }
+
+        /* Änderungsverlauf: klar getrennte Zeilen (Divider + Zebra) */
+        .zt-log { margin-top: .75rem; padding: 0; list-style: none; border: 1px solid #e5e7eb; border-radius: .5rem; overflow: hidden; }
+        .zt-log-item { padding: .625rem .75rem; border-left: 3px solid #e5e7eb; }
+        .zt-log-item + .zt-log-item { border-top: 1px solid #e5e7eb; }
+        .zt-log-item:nth-child(even) { background: #f9fafb; }
+        .zt-log-item.is-restored { border-left-color: #f59e0b; background: #fffbeb; }
 
         /* Status + Korrektoren nebeneinander (einzeln = volle Breite) */
         .zt-two { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
