@@ -23,9 +23,11 @@
 
     <div class="space-y-4 zt-page">
         <div class="flex items-center justify-between">
-            <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $schueler?->klasse) }}"
-               class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-                &larr; Zurück zur Zeugnis-Tabelle
+            <a href="{{ $zurueck['url'] }}"
+               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+                <i class="bx bx-arrow-back text-lg"></i>
+                <i class="bx {{ $zurueck['icon'] }} text-lg"></i>
+                Zurück zu {{ $zurueck['label'] }}
             </a>
             <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis) }}"
                class="text-sm text-gray-500 hover:text-gray-700">Ganzes Zeugnis &rarr;</a>
@@ -56,6 +58,7 @@
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
             @csrf
             @method('PUT')
+            <input type="hidden" name="quelle" value="{{ $quelle }}">
 
             @if ($abschnitt->autor_name)
                 <p class="text-xs text-gray-400">Autor: {{ $abschnitt->autor_name }}</p>
@@ -147,9 +150,9 @@
             @unless ($readonly)
                 @php
                     $vorauswahl = $navNext ? 'next' : ($navPrev ? 'prev' : 'index');
-                    $urlPrev  = $navPrev ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navPrev['id']) : '';
-                    $urlNext  = $navNext ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navNext['id']) : '';
-                    $urlIndex = route('module.schulzeugnis.klassenraeume.zeugnisse.index', $schueler?->klasse);
+                    $urlPrev  = $navPrev ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $navPrev['id'], 'quelle' => $quelle]) : '';
+                    $urlNext  = $navNext ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $navNext['id'], 'quelle' => $quelle]) : '';
+                    $urlIndex = $zurueck['url'];
                     $labelNext = $navNext ? 'Nächster Schüler: ' . $navNext['name'] : 'Nächster Schüler (keiner)';
                     $labelPrev = $navPrev ? 'Vorheriger Schüler: ' . $navPrev['name'] : 'Vorheriger Schüler (keiner)';
                 @endphp
@@ -174,8 +177,8 @@
                             <input type="radio" name="weiter" value="index" data-url="{{ $urlIndex }}"
                                    @checked($vorauswahl === 'index')
                                    class="text-indigo-600 focus:ring-indigo-500">
-                            <i class="bx bx-list-ul text-lg text-indigo-500"></i>
-                            Zurück zur Übersicht
+                            <i class="bx {{ $zurueck['icon'] }} text-lg text-indigo-500"></i>
+                            Zurück zu {{ $zurueck['label'] }}
                         </label>
                     </div>
 
@@ -201,7 +204,7 @@
             <div class="flex items-center justify-between gap-2">
                 <span>
                     @if ($navPrev)
-                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navPrev['id']) }}"
+                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $navPrev['id'], 'quelle' => $quelle]) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             &larr; {{ $navPrev['name'] }}
                         </a>
@@ -212,7 +215,7 @@
                 @endif
                 <span>
                     @if ($navNext)
-                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $navNext['id']) }}"
+                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $navNext['id'], 'quelle' => $quelle]) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             {{ $navNext['name'] }} &rarr;
                         </a>

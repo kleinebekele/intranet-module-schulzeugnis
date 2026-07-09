@@ -344,7 +344,18 @@ class ZeugnisController
         $berechtigung = $this->berechtigung($abschnitt, auth()->user());
         $nachbarn     = $this->abschnittNachbarn($abschnitt);
 
+        // Herkunft merken (?quelle=todo|zeugnisse) → passender „Zurück"-Button.
+        $quelle  = request('quelle') === 'todo' ? 'todo' : 'zeugnisse';
+        $zurueck = $quelle === 'todo'
+            ? ['url' => route('module.schulzeugnis.todo.index'), 'label' => 'Meine ToDos', 'icon' => 'bx-list-check']
+            : ['url' => $klasse
+                    ? route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                    : route('module.schulzeugnis.klassenraeume.index'),
+               'label' => 'Zeugnis-Tabelle', 'icon' => 'bx-table'];
+
         return view('schulzeugnis::zeugnisse.abschnitt', [
+            'quelle'         => $quelle,
+            'zurueck'        => $zurueck,
             'abschnitt'      => $abschnitt,
             'zeugnis'        => $zeugnis,
             'schueler'       => $zeugnis->schueler,
@@ -532,20 +543,28 @@ class ZeugnisController
     private function zielNachSpeichern(Request $request, Abschnitt $abschnitt)
     {
         $weiter   = (string) $request->input('weiter');
+        $quelle   = $request->input('quelle') === 'todo' ? 'todo' : 'zeugnisse';
         $nachbarn = $this->abschnittNachbarn($abschnitt);
         $klasse   = $abschnitt->zeugnis?->schueler?->klasse;
 
         if ($weiter === 'next' && $nachbarn['next']) {
-            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $nachbarn['next']['id']);
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $nachbarn['next']['id'], 'quelle' => $quelle]);
         }
         if ($weiter === 'prev' && $nachbarn['prev']) {
-            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $nachbarn['prev']['id']);
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $nachbarn['prev']['id'], 'quelle' => $quelle]);
         }
-        if ($weiter === 'index' && $klasse) {
-            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse);
+        if ($weiter === 'index') {
+            // „Zurück zur Übersicht" führt zur Herkunft (ToDos bzw. Zeugnis-Tabelle).
+            if ($quelle === 'todo') {
+                return redirect()->route('module.schulzeugnis.todo.index');
+            }
+
+            return $klasse
+                ? redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                : redirect()->route('module.schulzeugnis.klassenraeume.index');
         }
 
-        return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt);
+        return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $abschnitt, 'quelle' => $quelle]);
     }
 
     /** Einen früheren Textstand aus dem Verlauf wiederherstellen. */
