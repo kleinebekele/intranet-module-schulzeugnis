@@ -94,7 +94,7 @@
         .todo-panel[hidden] { display: none; }
     </style>
 
-    <div class="max-w-4xl space-y-6">
+    <div class="space-y-6">
         @if (session('error'))
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
