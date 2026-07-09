@@ -91,7 +91,9 @@
         .todo-tab-btn.aktiv { color: #4f46e5; border-bottom-color: #4f46e5; }
         .todo-tab-anzahl { border-radius: 9999px; background: #f3f4f6; color: #6b7280; padding: 0 .5rem; font-size: .7rem; font-weight: 600; }
         .todo-tab-btn.aktiv .todo-tab-anzahl { background: #e0e7ff; color: #4f46e5; }
+        .todo-tab-gruen, .todo-tab-btn.aktiv .todo-tab-gruen { background: #dcfce7; color: #16a34a; }
         .todo-panel[hidden] { display: none; }
+        .todo-erledigt[hidden] { display: none; }
     </style>
 
     <div class="space-y-6">
@@ -113,7 +115,7 @@
             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
                 Es ist kein Schuljahr aktiv geschaltet.
             </div>
-        @elseif ($meineTexteAnzahl === 0 && $korrigierteAnzahl === 0 && $zuKorrigierenAnzahl === 0)
+        @elseif ($meineTexteAnzahl === 0 && $erledigtAnzahl === 0 && $korrigierteAnzahl === 0 && $zuKorrigierenAnzahl === 0)
             <div class="rounded-xl border border-gray-200 bg-white p-8 text-center">
                 <i class="bx bx-check-circle text-3xl text-green-500"></i>
                 <p class="mt-2 font-medium text-gray-800">Alles erledigt.</p>
@@ -124,13 +126,17 @@
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div class="todo-tabs">
                     <button type="button" class="todo-tab-btn" data-tab="meine">
-                        Meine Zeugnistexte <span class="todo-tab-anzahl">{{ $meineTexteAnzahl }}</span>
+                        Meine Zeugnistexte
+                        <span class="todo-tab-anzahl" title="offen">{{ $meineTexteAnzahl }}</span>
+                        @if ($erledigtAnzahl > 0)
+                            <span class="todo-tab-anzahl todo-tab-gruen" title="erledigt">{{ $erledigtAnzahl }}</span>
+                        @endif
                     </button>
                     <button type="button" class="todo-tab-btn" data-tab="korrigierte">
-                        Korrigierte <span class="todo-tab-anzahl">{{ $korrigierteAnzahl }}</span>
+                        Korrigierte <span class="todo-tab-anzahl" title="offen">{{ $korrigierteAnzahl }}</span>
                     </button>
                     <button type="button" class="todo-tab-btn" data-tab="zu">
-                        zu Korrigieren <span class="todo-tab-anzahl">{{ $zuKorrigierenAnzahl }}</span>
+                        zu Korrigieren <span class="todo-tab-anzahl" title="offen">{{ $zuKorrigierenAnzahl }}</span>
                     </button>
                 </div>
 
@@ -143,9 +149,33 @@
                 </div>
             </div>
 
+            {{-- Tab: Meine Zeugnistexte (offen) + einblendbare Erledigte --}}
+            <div class="todo-panel space-y-4" data-panel="meine" hidden>
+                @if (empty($meineTexteGruppen))
+                    <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+                        Keine offenen eigenen Texte.
+                    </div>
+                @else
+                    @include('schulzeugnis::todo._gruppen', ['gruppen' => $meineTexteGruppen, 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
+                @endif
+
+                @if (! empty($erledigtGruppen))
+                    <div>
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+                            <input type="checkbox" class="todo-erledigt-toggle rounded border-gray-300 text-green-600 focus:ring-green-500">
+                            <i class="bx bxs-check-circle text-green-500"></i>
+                            Erledigte anzeigen ({{ $erledigtAnzahl }})
+                        </label>
+                        <div class="todo-erledigt mt-2" hidden>
+                            @include('schulzeugnis::todo._gruppen', ['gruppen' => $erledigtGruppen, 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            {{-- Weitere Tabs --}}
             @php
                 $panels = [
-                    'meine'       => ['gruppen' => $meineTexteGruppen,    'leer' => 'Keine offenen eigenen Texte.'],
                     'korrigierte' => ['gruppen' => $korrigierteGruppen,   'leer' => 'Noch nichts mit „Korrektur durchgeführt".'],
                     'zu'          => ['gruppen' => $zuKorrigierenGruppen, 'leer' => 'Aktuell nichts zu korrigieren.'],
                 ];
@@ -190,6 +220,14 @@
                 t.addEventListener('click', function () { aktiviere(t.dataset.tab); });
             });
         })();
+
+        // „Erledigte anzeigen" ein-/ausblenden.
+        document.querySelectorAll('.todo-erledigt-toggle').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var box = cb.closest('div').querySelector('.todo-erledigt');
+                if (box) { box.hidden = !cb.checked; }
+            });
+        });
 
         // Akkordeon der zweiten Ebene: pro Kopfzeile ist immer nur ein Eintrag offen.
         document.querySelectorAll('.todo-akk').forEach(function (btn) {

@@ -42,9 +42,11 @@ class TodoController
             'istAdmin'              => $istAdmin,
             'modus'                 => $modus,
             'meineTexteGruppen'     => [],
+            'erledigtGruppen'       => [],
             'korrigierteGruppen'    => [],
             'zuKorrigierenGruppen'  => [],
             'meineTexteAnzahl'      => 0,
+            'erledigtAnzahl'        => 0,
             'korrigierteAnzahl'     => 0,
             'zuKorrigierenAnzahl'   => 0,
             'letzteAenderung'       => collect(),
@@ -77,11 +79,11 @@ class TodoController
 
         $relevanteKlassen = $klassenAlsKL->merge($faecherJeKlasse->keys())->unique();
 
-        // 1) Eigene, noch nicht vollständige Abschnitte (Zeugnis nicht abgeschlossen).
+        // 1) Alle eigenen Abschnitte (Zeugnis nicht abgeschlossen) – inkl. erledigte,
+        //    damit man sie in „Meine Zeugnistexte" bei Bedarf wieder anfassen kann.
         $eigene = collect();
         if ($relevanteKlassen->isNotEmpty()) {
-            $eigene = Abschnitt::where('status', '!=', 'vollstaendig')
-                ->whereHas('zeugnis', fn ($q) => $q
+            $eigene = Abschnitt::whereHas('zeugnis', fn ($q) => $q
                     ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
                     ->whereHas('schueler', fn ($s) => $s->whereIn('klasse_id', $relevanteKlassen)))
                 ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
@@ -108,10 +110,15 @@ class TodoController
             ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
             ->get();
 
-        // Eigene Texte aufteilen: „Korrigierte" = Status „Korrektur durchgeführt",
-        // der Rest bleibt „Meine Zeugnistexte" (noch zu bearbeiten).
+        // Eigene Texte aufteilen:
+        //  - „Korrigierte" = Status „Korrektur durchgeführt" (eigener Tab)
+        //  - „Erledigt"    = Status „Vollständig" (in „Meine Zeugnistexte" einblendbar)
+        //  - „Meine Zeugnistexte" = der offene Rest.
         $korrigierte = $eigene->filter(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
-        $meineTexte  = $eigene->reject(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
+        $erledigt    = $eigene->filter(fn (Abschnitt $a) => $a->status === 'vollstaendig')->values();
+        $meineTexte  = $eigene
+            ->reject(fn (Abschnitt $a) => in_array($a->status, ['korrektur_durchgefuehrt', 'vollstaendig'], true))
+            ->values();
 
         // Letzte protokollierte Änderung je Abschnitt (was zuletzt, wann, von wem) –
         // als Referenz auf den Änderungsverlauf direkt in der Aufgabenliste.
@@ -131,9 +138,11 @@ class TodoController
             'istAdmin'             => false,
             'modus'                => $modus,
             'meineTexteGruppen'    => $this->gruppiere($meineTexte, $modus),
+            'erledigtGruppen'      => $this->gruppiere($erledigt, $modus),
             'korrigierteGruppen'   => $this->gruppiere($korrigierte, $modus),
             'zuKorrigierenGruppen' => $this->gruppiere($korrektur, $modus),
             'meineTexteAnzahl'     => $meineTexte->count(),
+            'erledigtAnzahl'       => $erledigt->count(),
             'korrigierteAnzahl'    => $korrigierte->count(),
             'zuKorrigierenAnzahl'  => $korrektur->count(),
             'letzteAenderung'      => $letzteAenderung,
