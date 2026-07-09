@@ -136,13 +136,16 @@
                 @if ($berechtigung === 'voll')
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Korrektoren <span class="text-gray-400">(dürfen diesen Text korrigieren)</span></label>
-                        <select name="korrektoren[]" multiple size="5" @disabled($readonly)
-                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            @foreach ($alleLehrer as $l)
-                                <option value="{{ $l->id }}" @selected(in_array($l->id, old('korrektoren', $korrektorIds)))>{{ $l->fullName() }}</option>
-                            @endforeach
-                        </select>
-                        <p class="mt-1 text-xs text-gray-400">Mehrfachauswahl (Strg/Cmd). Pflicht, wenn du den Status auf „Frei zur Korrektur" oder „Korrektur nötig" setzt.</p>
+                        <div id="zt-korr" class="zt-korr {{ $readonly ? 'zt-korr-ro' : '' }}">
+                            <div class="zt-korr-box">
+                                {{-- Chips + versteckte korrektoren[]-Felder werden per JS eingefügt --}}
+                                <input type="text" class="zt-korr-input" placeholder="Lehrer suchen …" autocomplete="off" @disabled($readonly)>
+                            </div>
+                            <ul class="zt-korr-list" hidden></ul>
+                        </div>
+                        <script type="application/json" id="zt-korr-data">@json($alleLehrer->map(fn ($l) => ['id' => $l->id, 'name' => $l->fullName()])->values())</script>
+                        <script type="application/json" id="zt-korr-selected">@json(collect(old('korrektoren', $korrektorIds))->map(fn ($v) => (int) $v)->values())</script>
+                        <p class="mt-1 text-xs text-gray-400">Tippen zum Suchen, Klick zum Hinzufügen. Pflicht, wenn du den Status auf „Frei zur Korrektur" oder „Korrektur nötig" setzt.</p>
                     </div>
                 @endif
             </div>
@@ -330,6 +333,31 @@
         .zt-two { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
         .zt-two > * { flex: 1 1 260px; min-width: 0; }
 
+        /* Korrektoren – durchsuchbare Mehrfachauswahl mit Chips */
+        .zt-korr { position: relative; margin-top: .25rem; }
+        .zt-korr-box {
+            display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; min-height: 2.5rem;
+            padding: .3rem .45rem; border: 1px solid #d1d5db; border-radius: .5rem; background: #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,.05); cursor: text;
+        }
+        .zt-korr-box:focus-within { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
+        .zt-korr-chip {
+            display: inline-flex; align-items: center; gap: .25rem; background: #eef2ff; color: #4338ca;
+            border-radius: 9999px; padding: .15rem .3rem .15rem .6rem; font-size: .8rem; font-weight: 500;
+        }
+        .zt-korr-x { display: inline-flex; align-items: center; border: 0; background: transparent; color: #6366f1; cursor: pointer; padding: 0; border-radius: 9999px; }
+        .zt-korr-x:hover { color: #4338ca; background: rgba(99,102,241,.15); }
+        .zt-korr-input { flex: 1; min-width: 8rem; border: 0; outline: none; background: transparent; font-size: .875rem; padding: .2rem; color: #374151; }
+        .zt-korr-list {
+            position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+            margin: 0; padding: 4px; list-style: none; background: #fff; border: 1px solid #e5e7eb;
+            border-radius: .5rem; box-shadow: 0 12px 30px -8px rgba(0,0,0,.35); max-height: 240px; overflow: auto;
+        }
+        .zt-korr-list li { padding: .4rem .55rem; border-radius: .375rem; font-size: .875rem; color: #374151; cursor: pointer; }
+        .zt-korr-list li.zt-korr-active, .zt-korr-list li:not(.zt-korr-empty):hover { background: #eef2ff; }
+        .zt-korr-empty { color: #9ca3af; font-size: .8rem; cursor: default; }
+        .zt-korr-ro .zt-korr-box { background: #f9fafb; cursor: default; }
+
         /* Eigenes Status-Dropdown mit Icon + Farbe */
         .zt-status { position: relative; margin-top: .25rem; }
         .zt-status-btn {
@@ -422,6 +450,93 @@
                 });
             });
             document.addEventListener('click', (e) => { if (!root.contains(e.target)) list.hidden = true; });
+        })();
+
+        // Korrektoren – durchsuchbare Mehrfachauswahl mit Chips.
+        (function () {
+            const root = document.getElementById('zt-korr');
+            if (!root) return;
+            const box = root.querySelector('.zt-korr-box');
+            const input = root.querySelector('.zt-korr-input');
+            const list = root.querySelector('.zt-korr-list');
+            const alle = JSON.parse(document.getElementById('zt-korr-data').textContent);
+            const readonly = root.classList.contains('zt-korr-ro');
+            let selected = JSON.parse(document.getElementById('zt-korr-selected').textContent).map(Number);
+
+            const nameOf = (id) => { const t = alle.find((a) => a.id === id); return t ? t.name : ''; };
+
+            function renderChips() {
+                box.querySelectorAll('.zt-korr-chip, input[type=hidden]').forEach((e) => e.remove());
+                selected.forEach((id) => {
+                    const chip = document.createElement('span');
+                    chip.className = 'zt-korr-chip';
+                    const nm = document.createElement('span');
+                    nm.textContent = nameOf(id);
+                    chip.appendChild(nm);
+                    if (!readonly) {
+                        const x = document.createElement('button');
+                        x.type = 'button'; x.className = 'zt-korr-x';
+                        x.innerHTML = '<i class="bx bx-x"></i>';
+                        x.addEventListener('click', () => { selected = selected.filter((s) => s !== id); renderChips(); });
+                        chip.appendChild(x);
+                    }
+                    box.insertBefore(chip, input);
+                    const h = document.createElement('input');
+                    h.type = 'hidden'; h.name = 'korrektoren[]'; h.value = id;
+                    box.appendChild(h);
+                });
+            }
+
+            function renderList() {
+                const q = input.value.trim().toLowerCase();
+                const verf = alle.filter((a) => selected.indexOf(a.id) === -1 && (q === '' || a.name.toLowerCase().indexOf(q) !== -1));
+                list.innerHTML = '';
+                if (verf.length === 0) {
+                    const li = document.createElement('li');
+                    li.className = 'zt-korr-empty';
+                    li.textContent = q ? 'Kein Treffer' : 'Alle ausgewählt';
+                    list.appendChild(li); list.hidden = false; return;
+                }
+                verf.forEach((a, i) => {
+                    const li = document.createElement('li');
+                    li.dataset.id = a.id; li.textContent = a.name;
+                    if (i === 0) li.classList.add('zt-korr-active');
+                    li.addEventListener('mousedown', (e) => { e.preventDefault(); add(a.id); });
+                    list.appendChild(li);
+                });
+                list.hidden = false;
+            }
+
+            function add(id) { if (selected.indexOf(id) === -1) selected.push(id); input.value = ''; renderChips(); renderList(); input.focus(); }
+            function moveActive(dir) {
+                const items = [...list.querySelectorAll('li[data-id]')];
+                if (!items.length) return;
+                let idx = items.findIndex((li) => li.classList.contains('zt-korr-active'));
+                items.forEach((li) => li.classList.remove('zt-korr-active'));
+                idx = (idx + dir + items.length) % items.length;
+                items[idx].classList.add('zt-korr-active');
+                items[idx].scrollIntoView({ block: 'nearest' });
+            }
+
+            if (!readonly) {
+                box.addEventListener('click', () => input.focus());
+                input.addEventListener('focus', renderList);
+                input.addEventListener('input', renderList);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const act = list.querySelector('.zt-korr-active') || list.querySelector('li[data-id]');
+                        if (act && act.dataset.id) add(Number(act.dataset.id));
+                    } else if (e.key === 'Backspace' && input.value === '' && selected.length) {
+                        selected.pop(); renderChips(); renderList();
+                    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                        e.preventDefault(); moveActive(e.key === 'ArrowDown' ? 1 : -1);
+                    } else if (e.key === 'Escape') { list.hidden = true; }
+                });
+                document.addEventListener('click', (e) => { if (!root.contains(e.target)) list.hidden = true; });
+            }
+
+            renderChips();
         })();
 
         // Vergleichs-Modal (Vorher/Nachher).
