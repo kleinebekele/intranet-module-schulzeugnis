@@ -25,15 +25,13 @@
     </x-slot>
 
     <style>
-        /* Klassen-Akkordeon: eingeklappt, eine Klasse öffnet ihre Fächer/Aufgaben. */
+        /* Klasse als Karte mit vollflächig farbiger Kopfzeile (Stufenfarbe); die
+           Fächer darunter sind ein Akkordeon – je Klasse ist immer nur eines offen. */
         .todo-klasse { border: 1px solid #e5e7eb; border-radius: .75rem; overflow: hidden; }
-        .todo-kopf {
-            width: 100%; display: flex; align-items: center; gap: .625rem;
-            padding: .7rem 1rem; border: 0; text-align: left; cursor: pointer;
+        .todo-kopf-klasse {
+            display: flex; align-items: center; gap: .625rem; padding: .7rem 1rem;
             background: linear-gradient(135deg, var(--kr), color-mix(in srgb, var(--kr) 78%, black));
         }
-        .todo-chevron { transition: transform .18s ease; opacity: .9; }
-        .todo-kopf[aria-expanded="true"] .todo-chevron { transform: rotate(90deg); }
         .todo-kopf-weiss   { color: #fff; }
         .todo-kopf-weiss   .todo-dim   { color: rgba(255,255,255,.82); }
         .todo-kopf-weiss   .todo-badge { background: rgba(255,255,255,.22); color: #fff; }
@@ -41,10 +39,22 @@
         .todo-kopf-schwarz .todo-dim   { color: rgba(31,41,55,.7); }
         .todo-kopf-schwarz .todo-badge { background: rgba(0,0,0,.12); color: #1f2937; }
         .todo-badge { border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
-        .todo-inhalt { background: #fff; }
-        .todo-inhalt[hidden] { display: none; }
+
+        .todo-faecher { background: #fff; }
         .todo-fach + .todo-fach { border-top: 1px solid #f3f4f6; }
-        .todo-fach { padding: .6rem 1rem; }
+        .todo-fach-kopf {
+            width: 100%; display: flex; align-items: center; gap: .5rem;
+            padding: .55rem 1rem; border: 0; text-align: left; cursor: pointer;
+            background: transparent; color: #374151;
+        }
+        .todo-fach-kopf:hover,
+        .todo-fach-kopf[aria-expanded="true"] { background: #f9fafb; }
+        .todo-chevron { transition: transform .18s ease; color: #9ca3af; }
+        .todo-fach-kopf[aria-expanded="true"] .todo-chevron { transform: rotate(90deg); }
+        .todo-fach-badge { border-radius: 9999px; background: #f3f4f6; color: #6b7280; padding: 1px 8px; font-size: 11px; font-weight: 600; }
+        .todo-fach-inhalt { padding: 0 1rem .55rem 2.1rem; }
+        .todo-fach-inhalt[hidden] { display: none; }
+
         .todo-zeile:hover { background: #eef2ff66; }
         .todo-oeffnen { opacity: 0; transition: opacity .12s ease; }
         .todo-zeile:hover .todo-oeffnen { opacity: 1; }
@@ -111,17 +121,17 @@
     </div>
 
     <script>
-        // Klassen-Akkordeon: pro Bereich öffnet sich immer nur eine Klasse.
-        document.querySelectorAll('.todo-kopf').forEach(function (btn) {
+        // Fächer-Akkordeon: innerhalb einer Klasse ist immer nur ein Fach offen.
+        document.querySelectorAll('.todo-fach-kopf').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var akkordeon = btn.closest('.todo-akkordeon');
-                var inhalt    = btn.parentElement.querySelector('.todo-inhalt');
-                var offen     = btn.getAttribute('aria-expanded') === 'true';
+                var scope  = btn.closest('.todo-faecher');
+                var inhalt = btn.parentElement.querySelector('.todo-fach-inhalt');
+                var offen  = btn.getAttribute('aria-expanded') === 'true';
 
-                if (!offen && akkordeon) {
-                    akkordeon.querySelectorAll('.todo-kopf[aria-expanded="true"]').forEach(function (other) {
+                if (!offen && scope) {
+                    scope.querySelectorAll('.todo-fach-kopf[aria-expanded="true"]').forEach(function (other) {
                         other.setAttribute('aria-expanded', 'false');
-                        other.parentElement.querySelector('.todo-inhalt').hidden = true;
+                        other.parentElement.querySelector('.todo-fach-inhalt').hidden = true;
                     });
                 }
 
