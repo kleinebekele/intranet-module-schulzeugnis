@@ -13,6 +13,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\StufeController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\TodoController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\ZeugnisController;
 
 /*
@@ -31,6 +32,9 @@ Route::middleware(['web', 'auth'])
 
         // Klassenräume – Lehrer-Einstieg: Klassen des aktiven Schuljahres als Türen.
         Route::get('klassenraeume', [KlassenraumController::class, 'index'])->name('klassenraeume.index');
+
+        // Meine ToDos – offene Aufgaben der Lehrkraft, gruppiert nach Klasse/Fach.
+        Route::get('todo', [TodoController::class, 'index'])->name('todo.index');
 
         // Werkzeug: alte Zeugnis-PDF (je 4 A4-Seiten) in A3-Broschüre umschießen.
         Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');

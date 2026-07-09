@@ -33,6 +33,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
         return ModuleManifest::make('schulzeugnis', 'Schulzeugnis', icon: 'book')
             ->item('start', 'Übersicht', 'module.schulzeugnis.index', icon: 'book')
             ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'home')
+            ->item('todo', 'Meine ToDos', 'module.schulzeugnis.todo.index', icon: 'list')
             ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar')
             ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.current', icon: 'users')
             ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'category')
