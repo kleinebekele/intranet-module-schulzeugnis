@@ -345,11 +345,12 @@ class ZeugnisController
         $nachbarn     = $this->abschnittNachbarn($abschnitt);
 
         // Herkunft merken (?quelle=todo|zeugnisse) → passender „Zurück"-Button.
+        // focus = zuletzt bearbeiteter Abschnitt → Zielseite scrollt/klappt ihn auf.
         $quelle  = request('quelle') === 'todo' ? 'todo' : 'zeugnisse';
         $zurueck = $quelle === 'todo'
-            ? ['url' => route('module.schulzeugnis.todo.index'), 'label' => 'Meine ToDos', 'icon' => 'bx-list-check']
+            ? ['url' => route('module.schulzeugnis.todo.index', ['focus' => $abschnitt->id]), 'label' => 'Meine ToDos', 'icon' => 'bx-list-check']
             : ['url' => $klasse
-                    ? route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                    ? route('module.schulzeugnis.klassenraeume.zeugnisse.index', ['klasse' => $klasse, 'focus' => $abschnitt->id])
                     : route('module.schulzeugnis.klassenraeume.index'),
                'label' => 'Zeugnis-Tabelle', 'icon' => 'bx-table'];
 
@@ -554,13 +555,14 @@ class ZeugnisController
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $nachbarn['prev']['id'], 'quelle' => $quelle]);
         }
         if ($weiter === 'index') {
-            // „Zurück zur Übersicht" führt zur Herkunft (ToDos bzw. Zeugnis-Tabelle).
+            // „Zurück zur Übersicht" führt zur Herkunft (ToDos bzw. Zeugnis-Tabelle),
+            // mit Fokus auf den gerade gespeicherten Abschnitt.
             if ($quelle === 'todo') {
-                return redirect()->route('module.schulzeugnis.todo.index');
+                return redirect()->route('module.schulzeugnis.todo.index', ['focus' => $abschnitt->id]);
             }
 
             return $klasse
-                ? redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                ? redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', ['klasse' => $klasse, 'focus' => $abschnitt->id])
                 : redirect()->route('module.schulzeugnis.klassenraeume.index');
         }
 

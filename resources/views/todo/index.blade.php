@@ -69,8 +69,9 @@
         .todo-inhalt { padding: .15rem 1rem .55rem 2.1rem; background: #fff; }
         .todo-inhalt[hidden] { display: none; }
 
-        .todo-zeile { transition: background .12s ease; }
+        .todo-zeile { transition: background .12s ease, box-shadow .2s ease; }
         .todo-zeile:hover { background: #f9fafb; }
+        .todo-zeile.todo-focus { background: #fffbeb; box-shadow: inset 0 0 0 2px #f59e0b; }
         .todo-name { transition: color .12s ease; }
         .todo-zeile:hover .todo-name { color: #4f46e5; }
         .todo-verlauf { max-width: 58%; }
@@ -224,5 +225,54 @@
                 if (inhalt) { inhalt.hidden = offen; }
             });
         });
+
+        // Fokus: zuletzt bearbeiteten Schüler (?focus=Abschnitt-ID) sichtbar machen –
+        // richtigen Tab wählen, Gruppe (und ggf. Erledigt-Liste) aufklappen, hinscrollen.
+        (function () {
+            var focus = new URLSearchParams(window.location.search).get('focus');
+            if (!focus) { return; }
+            var row = document.querySelector('.todo-zeile[data-ab="' + CSS.escape(focus) + '"]');
+            if (!row) { return; }
+
+            // Aufklappen (defensiv – ein Fehler hier darf das Hervorheben nicht verhindern).
+            try {
+                var panel = row.closest('.todo-panel');
+                if (panel) {
+                    var tabBtn = document.querySelector('.todo-tab-btn[data-tab="' + panel.dataset.panel + '"]');
+                    if (tabBtn) { tabBtn.click(); }
+                }
+                var inhalt = row.closest('.todo-inhalt');
+                if (inhalt) {
+                    var akk = inhalt.parentElement.querySelector('.todo-akk');
+                    if (akk && akk.getAttribute('aria-expanded') !== 'true') { akk.click(); }
+                    if (row.closest('.todo-erledigt-liste')) {
+                        var cb = inhalt.querySelector('.todo-erledigt-toggle');
+                        if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+                    }
+                }
+            } catch (e) { /* Aufklappen best effort */ }
+
+            // Hervorheben + hinscrollen. Beim Laden bauen andere Skripte die Zeilen
+            // einmalig neu auf (die Markierung ginge verloren), daher in der ersten
+            // Sekunde per Intervall immer wieder setzen (mit erneuter Suche), danach
+            // stehen lassen und nach ein paar Sekunden entfernen.
+            var sel = '.todo-zeile[data-ab="' + CSS.escape(focus) + '"]';
+            var gescrollt = false;
+            var iv = setInterval(function () {
+                var ziel = document.querySelector(sel);
+                if (ziel) {
+                    ziel.classList.add('todo-focus');
+                    if (!gescrollt) {
+                        gescrollt = true;
+                        try { ziel.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { ziel.scrollIntoView(); }
+                    }
+                }
+            }, 120);
+            setTimeout(function () {
+                clearInterval(iv);
+                var ziel = document.querySelector(sel);
+                if (ziel) { ziel.classList.remove('todo-focus'); }
+            }, 4500);
+        })();
     </script>
 </x-app-layout>

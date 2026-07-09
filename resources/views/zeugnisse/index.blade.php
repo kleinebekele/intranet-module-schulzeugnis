@@ -76,6 +76,8 @@
         #zt-table i.bx { line-height: 1; vertical-align: middle; }
         #zt-table tbody a { padding: 0; }
         .zt-hidden-col { display: none !important; }
+        #zt-table tr.zt-focus td { background: #fffbeb !important; transition: background .3s ease; }
+        #zt-table td.zt-focus-cell { box-shadow: inset 0 0 0 2px #f59e0b; border-radius: 4px; }
         .zt-chip { border: 1px solid #d1d5db; border-radius: 9999px; padding: 2px 10px; font-size: 12px; color: #374151; background: #fff; cursor: pointer; }
         .zt-chip:hover { background: #f3f4f6; }
         .zt-chip.zt-off { opacity: .45; text-decoration: line-through; }
@@ -184,6 +186,7 @@
                                 @if ($haupt)
                                     @php $m = $haupt->statusMeta(); @endphp
                                     <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $haupt) }}" title="Haupttext – {{ $m['label'] }}"
+                                       data-ab="{{ $haupt->id }}"
                                        class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                         <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
                                     </a>
@@ -199,6 +202,7 @@
                                     @if ($a)
                                         @php $m = $a->statusMeta(); @endphp
                                         <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $a) }}" title="{{ $fach->name }} – {{ $m['label'] }}"
+                                           data-ab="{{ $a->id }}"
                                            class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                             <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
                                         </a>
@@ -311,6 +315,41 @@
             if (mineIds.length || mineHaupt) {
                 document.getElementById('zt-mine').click();
             }
+
+            // Fokus: zuletzt bearbeiteten Abschnitt (?focus=ID) sichtbar machen –
+            // ggf. Spalte einblenden, Status-Filter lösen, hinscrollen, hervorheben.
+            (function () {
+                const focus = new URLSearchParams(window.location.search).get('focus');
+                if (!focus) { return; }
+                const linkSel = 'a[data-ab="' + CSS.escape(focus) + '"]';
+                const link = table.querySelector(linkSel);
+                if (!link) { return; }
+
+                const cell0 = link.closest('td');
+                if (cell0 && cell0.classList.contains('zt-hidden-col')) {
+                    const colClass = [...cell0.classList].find((c) => c.startsWith('zt-col-') && c !== 'zt-col');
+                    if (colClass) { setCol(colClass.replace('zt-col-', ''), true); }
+                }
+                if (link.closest('tr') && link.closest('tr').style.display === 'none') { statusSel.value = ''; applyRows(); }
+
+                // Markierung in der ersten Sekunde wiederholt setzen (überlebt ein
+                // einmaliges Neu-Rendern der Zeilen beim Laden), dann wieder entfernen.
+                let gescrollt = false;
+                const iv = setInterval(function () {
+                    const l = table.querySelector(linkSel);
+                    if (l) {
+                        const tr = l.closest('tr'), td = l.closest('td');
+                        if (tr) { tr.classList.add('zt-focus'); }
+                        if (td) { td.classList.add('zt-focus-cell'); }
+                        if (!gescrollt && tr) { gescrollt = true; tr.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+                    }
+                }, 120);
+                setTimeout(function () {
+                    clearInterval(iv);
+                    const l = table.querySelector(linkSel);
+                    if (l) { const tr = l.closest('tr'), td = l.closest('td'); if (tr) tr.classList.remove('zt-focus'); if (td) td.classList.remove('zt-focus-cell'); }
+                }, 4500);
+            })();
         })();
 
         // Spaltenkopf-Tooltip: Fachlehrer + Klassentext (an body gehängt, damit der
