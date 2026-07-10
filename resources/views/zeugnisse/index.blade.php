@@ -78,6 +78,15 @@
         .zt-hidden-col { display: none !important; }
         #zt-table tr.zt-focus td { background: #fffbeb !important; transition: background .3s ease; }
         #zt-table td.zt-focus-cell { box-shadow: inset 0 0 0 2px #f59e0b; border-radius: 4px; }
+
+        /* Zebra + deutliche Hover-Zeile, damit man in der breiten Matrix nicht in der
+           Zeile verrutscht. Gilt auch fuer die fixierte Schueler-Spalte – deren
+           Hintergrund muss opak bleiben, sonst scheint beim Querscrollen der Inhalt durch. */
+        #zt-table tbody tr:nth-child(even) td { background: #f6f7fb; }
+        #zt-table tbody tr:nth-child(odd)  td { background: #ffffff; }
+        #zt-table tbody tr:hover td { background: #e0e7ff !important; }
+        #zt-table tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 #4f46e5; }
+        #zt-table tbody tr:hover td:first-child .font-medium { color: #3730a3; }
         .zt-chip { border: 1px solid #d1d5db; border-radius: 9999px; padding: 2px 10px; font-size: 12px; color: #374151; background: #fff; cursor: pointer; }
         .zt-chip:hover { background: #f3f4f6; }
         .zt-chip.zt-off { opacity: .45; text-decoration: line-through; }
@@ -168,8 +177,8 @@
                             $haupt = $abs->firstWhere('typ', 'haupttext');
                             $fachMap = $abs->whereIn('typ', ['fachtext', 'note'])->keyBy('fach_id');
                         @endphp
-                        <tr class="border-b border-gray-100 hover:bg-indigo-50/40">
-                            <td class="border-r border-gray-200 px-4 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10; background: #fff;">
+                        <tr class="border-b border-gray-100">
+                            <td class="border-r border-gray-200 px-4 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10;">
                                 <span class="font-medium text-gray-800">{{ $s->nachname }}, {{ $s->vorname }}</span>
                                 @if ($z && $z->istAbgeschlossen())
                                     <span class="ml-1 rounded-full bg-green-100 px-1.5 text-[10px] font-medium text-green-700">fertig</span>
