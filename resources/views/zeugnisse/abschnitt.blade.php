@@ -64,23 +64,28 @@
                 <p class="text-xs text-gray-400">Autor: {{ $abschnitt->autor_name }}</p>
             @endif
 
-            @if ($klassentext && $berechtigung === 'voll')
-                <div class="rounded-lg bg-indigo-50/60 p-3">
-                    <label class="block text-sm font-medium text-gray-700">Klassenweiter Text
-                        <textarea name="klassentext" rows="3" @disabled($readonly)
-                                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                  placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
-                    </label>
-                    <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> dem individuellen Text.</p>
-                    <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" name="klassentext_neue_zeile" value="1" @checked($abschnitt->klassentext_neue_zeile) @disabled($readonly)
-                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                        Schülertext in neuer Zeile beginnen (statt direkt anschließen)
-                    </label>
-                </div>
-            @endif
+            @php
+                // Zwei Textfelder (Schülertext + Klassentext) in Tabs, damit das aktive
+                // Feld groß dargestellt werden kann – nur wenn es beide gibt und keine Note.
+                $hatTextTabs = $klassentext && $berechtigung === 'voll' && ! $istNote;
+            @endphp
 
             @if ($istNote)
+                @if ($klassentext && $berechtigung === 'voll')
+                    <div class="rounded-lg bg-indigo-50/60 p-3">
+                        <label class="block text-sm font-medium text-gray-700">Klassenweiter Text
+                            <textarea name="klassentext" rows="3" @disabled($readonly)
+                                      class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                      placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> dem individuellen Text.</p>
+                        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" name="klassentext_neue_zeile" value="1" @checked($abschnitt->klassentext_neue_zeile) @disabled($readonly)
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            Schülertext in neuer Zeile beginnen (statt direkt anschließen)
+                        </label>
+                    </div>
+                @endif
                 <label class="block text-sm font-medium text-gray-700">Note
                     <input type="text" name="note" value="{{ old('note', $abschnitt->note) }}" @disabled($readonly)
                            class="mt-1 block w-32 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -89,6 +94,39 @@
                     <input type="text" name="inhalt" value="{{ old('inhalt', $abschnitt->inhalt) }}" @disabled($readonly)
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </label>
+            @elseif ($hatTextTabs)
+                @php $klassentextGefuellt = trim((string) old('klassentext', $klassentext->text)) !== ''; @endphp
+                <div class="zt-txt" id="zt-txt">
+                    <div class="zt-txt-tabs" role="tablist">
+                        <button type="button" class="zt-txt-tab" data-txt="schueler" role="tab">Schülertext</button>
+                        <button type="button" class="zt-txt-tab" data-txt="klasse" role="tab">
+                            Klassenweiter Text
+                            <span class="zt-txt-dot {{ $klassentextGefuellt ? '' : 'leer' }}"
+                                  title="{{ $klassentextGefuellt ? 'enthält Text' : 'noch leer' }}"></span>
+                        </button>
+                    </div>
+
+                    {{-- Tab 1: Schülertext (individuell) --}}
+                    <div class="zt-txt-panel" data-txt="schueler">
+                        <textarea name="inhalt" rows="16" @disabled($readonly)
+                                  class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                  placeholder="Individueller Text für diesen Schüler …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500">Individueller Text für <strong>diesen Schüler</strong>.</p>
+                    </div>
+
+                    {{-- Tab 2: Klassenweiter Text (+ Umbruch-Option) --}}
+                    <div class="zt-txt-panel" data-txt="klasse" hidden>
+                        <textarea name="klassentext" rows="16" @disabled($readonly)
+                                  class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                  placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> dem individuellen Text.</p>
+                        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" name="klassentext_neue_zeile" value="1" @checked($abschnitt->klassentext_neue_zeile) @disabled($readonly)
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            Schülertext in neuer Zeile beginnen (statt direkt anschließen)
+                        </label>
+                    </div>
+                </div>
             @else
                 <label class="block text-sm font-medium text-gray-700">{{ $klassentext ? 'Schülertext' : 'Text' }}
                     <textarea name="inhalt" rows="8" @disabled($readonly)
@@ -322,6 +360,22 @@
             .zt-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
         }
 
+        /* Text-Tabs: Schülertext | Klassenweiter Text – beide Felder bleiben im DOM
+           (werden mitgespeichert), nur die Anzeige wechselt. So kann das aktive Feld
+           groß dargestellt werden. */
+        .zt-txt-tabs { display: flex; gap: .25rem; border-bottom: 1px solid #e5e7eb; margin-bottom: .5rem; }
+        .zt-txt-tab {
+            display: inline-flex; align-items: center; gap: .45rem; margin-bottom: -1px;
+            padding: .5rem .9rem; border: 0; border-bottom: 2px solid transparent;
+            background: transparent; cursor: pointer; font-size: .875rem; font-weight: 600; color: #6b7280;
+        }
+        .zt-txt-tab:hover { color: #374151; }
+        .zt-txt-tab.aktiv { color: #4f46e5; border-bottom-color: #4f46e5; }
+        .zt-txt-dot { width: .5rem; height: .5rem; border-radius: 9999px; background: #4f46e5; }
+        .zt-txt-dot.leer { background: transparent; box-shadow: inset 0 0 0 1px #cbd5e1; }
+        .zt-txt-panel[hidden] { display: none; }
+        .zt-txt-area { min-height: 20rem; resize: vertical; }
+
         /* Änderungsverlauf: klar getrennte Zeilen (Divider + Zebra) */
         .zt-log { margin-top: .75rem; padding: 0; list-style: none; border: 1px solid #e5e7eb; border-radius: .5rem; overflow: hidden; }
         .zt-log-item { padding: .625rem .75rem; border-left: 3px solid #e5e7eb; }
@@ -404,6 +458,21 @@
         @media (max-width: 640px) { .zt-modal-cols { grid-template-columns: 1fr; } }
     </style>
     <script>
+        // Text-Tabs: Schülertext | Klassenweiter Text. Beide Textareas bleiben im
+        // Formular (werden gespeichert) – hier wechselt nur die Sichtbarkeit.
+        (function () {
+            const root = document.getElementById('zt-txt');
+            if (!root) return;
+            const tabs = [...root.querySelectorAll('.zt-txt-tab')];
+            const panels = [...root.querySelectorAll('.zt-txt-panel')];
+            function zeige(name) {
+                tabs.forEach((t) => t.classList.toggle('aktiv', t.dataset.txt === name));
+                panels.forEach((p) => { p.hidden = p.dataset.txt !== name; });
+            }
+            tabs.forEach((t) => t.addEventListener('click', () => zeige(t.dataset.txt)));
+            zeige('schueler');
+        })();
+
         (function () {
             const nav = document.getElementById('zt-nav');
             if (!nav) return;
