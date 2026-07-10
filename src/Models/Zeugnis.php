@@ -16,6 +16,10 @@ class Zeugnis extends Model
     public const STATUS_ENTWURF = 'entwurf';
     public const STATUS_ABGESCHLOSSEN = 'abgeschlossen';
 
+    /** Zeugnistyp: Hauptzeugnis (Fachbereiche) oder Fachzeugnis (Fächer). */
+    public const TYP_HAUPT = 'haupt';
+    public const TYP_FACH = 'fach';
+
     protected $table = 'zeugnisse';
 
     protected $guarded = [];
@@ -43,5 +47,10 @@ class Zeugnis extends Model
     public function istAbgeschlossen(): bool
     {
         return $this->status === self::STATUS_ABGESCHLOSSEN;
+    }
+
+    public function istHaupt(): bool
+    {
+        return $this->typ === self::TYP_HAUPT;
     }
 }

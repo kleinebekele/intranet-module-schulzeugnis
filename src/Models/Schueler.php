@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulzeugnis\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -38,9 +39,22 @@ class Schueler extends Model
         return $this->belongsTo(Format::class, 'format_override_id');
     }
 
-    public function zeugnis(): HasOne
+    /** Alle Zeugnisse des Schülers (Haupt- und/oder Fachzeugnis). */
+    public function zeugnisse(): HasMany
     {
-        return $this->hasOne(Zeugnis::class, 'schueler_id');
+        return $this->hasMany(Zeugnis::class, 'schueler_id');
+    }
+
+    /** Das Fachzeugnis (Fächer) – höchstens eins. */
+    public function fachzeugnis(): HasOne
+    {
+        return $this->hasOne(Zeugnis::class, 'schueler_id')->where('typ', Zeugnis::TYP_FACH);
+    }
+
+    /** Das Hauptzeugnis (Fachbereiche) – höchstens eins. */
+    public function hauptzeugnis(): HasOne
+    {
+        return $this->hasOne(Zeugnis::class, 'schueler_id')->where('typ', Zeugnis::TYP_HAUPT);
     }
 
     public function fullName(): string
@@ -48,10 +62,16 @@ class Schueler extends Model
         return trim($this->vorname . ' ' . $this->nachname);
     }
 
-    /** Effektives Format: eigener Override, sonst Standard der Klasse. */
+    /** Effektives Fachzeugnis-Format: eigener Override, sonst Standard der Klasse. */
     public function effektivesFormatId(): ?int
     {
         return $this->format_override_id ?? $this->klasse?->standard_format_id;
+    }
+
+    /** Format des Hauptzeugnisses (Klassen-Vorlage; kein Schüler-Override). */
+    public function hauptFormatId(): ?int
+    {
+        return $this->klasse?->hauptzeugnis_format_id;
     }
 }
 

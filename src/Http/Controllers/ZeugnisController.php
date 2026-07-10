@@ -14,6 +14,7 @@ use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
+use Intranet\Modules\Schulzeugnis\Support\Ghostscript;
 use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
 
 /**
@@ -42,8 +43,17 @@ class ZeugnisController
             ->orderBy('name')
             ->get();
 
+        // Hauptzeugnis: jeder Schüler bekommt automatisch eins (kein manuelles Anlegen).
+        if ($klasse->hat_hauptzeugnis) {
+            $klasse->loadMissing(['klassenlehrer', 'hauptbereiche']);
+            foreach ($klasse->schueler()->whereDoesntHave('hauptzeugnis')->get() as $ohne) {
+                $ohne->setRelation('klasse', $klasse);
+                $this->erzeugeHauptzeugnis($klasse, $ohne);
+            }
+        }
+
         $schueler = $klasse->schueler()
-            ->with(['zeugnis.abschnitte'])
+            ->with(['fachzeugnis.abschnitte', 'hauptzeugnis.abschnitte'])
             ->orderBy('nachname')
             ->orderBy('vorname')
             ->get();
@@ -60,21 +70,28 @@ class ZeugnisController
             ->groupBy('fach_id')
             ->map(fn ($g) => $g->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->values()->all());
 
-        $klassentexte = Klassentext::where('klasse_id', $klasse->id)->get()
-            ->mapWithKeys(fn ($kt) => [($kt->fach_id === null ? 'haupt' : $kt->fach_id) => (string) $kt->text]);
+        $ktRows = Klassentext::where('klasse_id', $klasse->id)->get()
+            ->keyBy(fn ($kt) => $kt->fach_id === null ? 'haupt' : $kt->fach_id);
+        $klassentexte = $ktRows->map(fn ($kt) => (string) $kt->text);
 
         // Überlauf-/Auto-Verkleinerungs-Analyse je Zeugnis (aus dem Cache; nur beim
         // ersten Mal bzw. nach Inhaltsänderungen wird gerechnet).
         $warnungen = [];
+        $warnAgg   = ['fach' => false, 'haupt' => false];
         foreach ($schueler as $s) {
-            if (! $s->zeugnis) {
-                continue;
+            $warnungen[$s->id] = ['fach' => null, 'haupt' => null];
+            foreach (['fach' => $s->fachzeugnis, 'haupt' => $s->hauptzeugnis] as $k => $z) {
+                if (! $z) {
+                    continue;
+                }
+                if ($z->ueberlauf_status === null) {
+                    $this->ueberlaufNeuBerechnen($z);
+                }
+                $warnungen[$s->id][$k] = ['status' => $z->ueberlauf_status, 'passtBei' => $z->ueberlauf_passt_bei];
+                if (in_array($z->ueberlauf_status, ['verkleinert', 'ueberlauf'], true)) {
+                    $warnAgg[$k] = true;
+                }
             }
-            $z = $s->zeugnis;
-            if ($z->ueberlauf_status === null) {
-                $this->ueberlaufNeuBerechnen($z);
-            }
-            $warnungen[$s->id] = ['status' => $z->ueberlauf_status, 'passtBei' => $z->ueberlauf_passt_bei];
         }
 
         return view('schulzeugnis::zeugnisse.index', [
@@ -85,9 +102,15 @@ class ZeugnisController
             'meineFachIds'     => $meineFachIds,
             'binKlassenlehrer' => $binKlassenlehrer,
             'warnungen'        => $warnungen,
+            'warnAgg'          => $warnAgg,
             'fachlehrer'       => $fachlehrer,
             'klassentexte'     => $klassentexte,
+            'ktRows'           => $ktRows,
+            'hatFach'          => (bool) $klasse->hat_fachzeugnis,
+            'hatHaupt'         => (bool) $klasse->hat_hauptzeugnis,
+            'bereiche'         => $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche : collect(),
             'istAdmin'         => (bool) auth()->user()?->is_admin,
+            'gsVerfuegbar'     => Ghostscript::verfuegbar(),
         ]);
     }
 
@@ -112,45 +135,110 @@ class ZeugnisController
         $r = $renderer->render($zeugnis);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulzeugnis::formate.render', ['seiten' => $r['seiten'], 'daten' => $r['daten']])
-            ->setPaper($groesse, $lage);
+            ->setPaper($groesse, $lage)
+            ->setOption('tempDir', \Intranet\Modules\Schulzeugnis\Support\PdfTemp::dir());
 
         $name = $zeugnis->schueler?->fullName() ?: 'zeugnis';
 
         return $pdf->stream('zeugnis-' . \Illuminate\Support\Str::slug($name) . '.pdf');
     }
 
-    /** Zeugnis für einen Schüler anlegen und die Abschnitte automatisch erzeugen. */
-    public function store(Klasse $klasse, Schueler $schueler)
+    /** Alle Zeugnisse eines Typs (fach|haupt) einer Klasse – in Schüler-Reihenfolge. */
+    private function sammelZeugnisse(Klasse $klasse, string $typ)
     {
-        if ($schueler->zeugnis) {
-            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $schueler->zeugnis);
+        $typWert = $typ === 'haupt' ? Zeugnis::TYP_HAUPT : Zeugnis::TYP_FACH;
+
+        return Zeugnis::where('typ', $typWert)
+            ->whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+            ->with(['schueler', 'format', 'abschnitte'])
+            ->get()
+            ->sortBy(fn ($z) => sprintf('%s|%s', $z->schueler?->nachname ?? '', $z->schueler?->vorname ?? ''))
+            ->values();
+    }
+
+    /** HTML-Vorschau aller Zeugnisse eines Typs einer Klasse hintereinander. */
+    public function sammelVorschau(Klasse $klasse, string $typ, ZeugnisRenderer $renderer)
+    {
+        $seiten = [];
+        foreach ($this->sammelZeugnisse($klasse, $typ) as $z) {
+            $seiten = array_merge($seiten, $renderer->render($z)['seiten']);
         }
 
+        return view('schulzeugnis::formate.render', ['seiten' => $seiten, 'daten' => []]);
+    }
+
+    /** Alle Zeugnisse eines Typs einer Klasse gebündelt als eine PDF. */
+    public function sammelPdf(Klasse $klasse, string $typ, ZeugnisRenderer $renderer)
+    {
+        $seiten = [];
+        $format = null;
+        foreach ($this->sammelZeugnisse($klasse, $typ) as $z) {
+            $seiten = array_merge($seiten, $renderer->render($z)['seiten']);
+            $format ??= $z->format;
+        }
+
+        [$groesse, $lage] = $this->papier($format);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulzeugnis::formate.render', ['seiten' => $seiten, 'daten' => []])
+            ->setPaper($groesse, $lage)
+            ->setOption('tempDir', \Intranet\Modules\Schulzeugnis\Support\PdfTemp::dir());
+
+        $label = $typ === 'haupt' ? 'hauptzeugnisse' : 'fachzeugnisse';
+
+        return $pdf->stream($label . '-' . \Illuminate\Support\Str::slug($klasse->name) . '.pdf');
+    }
+
+    /** Papierformat/-lage aus einem Format ableiten (für dompdf setPaper). */
+    private function papier(?Format $format): array
+    {
+        return $format && $format->broschuere
+            ? ['a3', 'landscape']
+            : [$format && $format->seitenformat === 'a3' ? 'a3' : 'a4', $format && $format->ausrichtung === 'quer' ? 'landscape' : 'portrait'];
+    }
+
+    /**
+     * Fehlende Zeugnisse eines Schülers anlegen – je nach Klassen-Konfiguration ein
+     * Fach- und/oder Hauptzeugnis – und deren Abschnitte automatisch erzeugen.
+     */
+    public function store(Klasse $klasse, Schueler $schueler)
+    {
         $schueler->setRelation('klasse', $klasse);
+        $klasse->loadMissing('klassenlehrer');
+
+        $angelegt = [];
+        if ($klasse->hat_fachzeugnis && ! $schueler->fachzeugnis) {
+            $this->erzeugeFachzeugnis($klasse, $schueler);
+            $angelegt[] = 'Fachzeugnis';
+        }
+        if ($klasse->hat_hauptzeugnis && ! $schueler->hauptzeugnis) {
+            $this->erzeugeHauptzeugnis($klasse, $schueler);
+            $angelegt[] = 'Hauptzeugnis';
+        }
+
+        $meldung = $angelegt
+            ? implode(' + ', $angelegt) . " für {$schueler->fullName()} angelegt."
+            : "Für {$schueler->fullName()} war nichts anzulegen.";
+
+        return redirect()
+            ->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+            ->with('status', $meldung);
+    }
+
+    /** Fachzeugnis + je Fach (mit Lehrauftrag) einen Fach- bzw. Notenabschnitt. */
+    private function erzeugeFachzeugnis(Klasse $klasse, Schueler $schueler): void
+    {
         $formatId = $schueler->effektivesFormatId();
-        $format   = $formatId ? Format::find($formatId) : null;
-        $istNoten = $format && $format->typ === 'noten';
+        $istNoten = $formatId && Format::find($formatId)?->typ === 'noten';
 
         $zeugnis = Zeugnis::create([
             'schueler_id' => $schueler->id,
+            'typ'         => Zeugnis::TYP_FACH,
             'format_id'   => $formatId,
             'status'      => Zeugnis::STATUS_ENTWURF,
         ]);
 
-        // Haupttext (Klassenlehrer)
-        $klasse->loadMissing('klassenlehrer');
-        $zeugnis->abschnitte()->create([
-            'typ'             => Abschnitt::TYP_HAUPTTEXT,
-            'autor_lehrer_id' => $klasse->klassenlehrer_id,
-            'autor_name'      => $klasse->klassenlehrer?->fullName(),
-            'reihenfolge'     => 0,
-            'status'          => Abschnitt::STATUS_STANDARD,
-        ]);
-
-        // Je Fach mit Lehrauftrag ein Fachtext (bzw. Note bei Noten-Formaten).
         // Team-Teaching: alle Lehrer eines Fachs sind gemeinsam ein Autor.
         $proFach = $klasse->lehrauftraege()->with(['fach', 'lehrer'])->get()->groupBy('fach_id');
-
         foreach ($proFach as $gruppe) {
             $fach    = $gruppe->first()->fach;
             $autoren = $gruppe->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->implode(', ');
@@ -160,21 +248,65 @@ class ZeugnisController
                 'fach_id'     => $fach?->id,
                 'autor_name'  => $autoren ?: null,
                 'reihenfolge' => $fach?->reihenfolge ?? 1,
-                'status'      => Abschnitt::STATUS_OFFEN,
+                'status'      => Abschnitt::STATUS_STANDARD,
             ]);
         }
 
         Protokoll::log('zeugnis_angelegt', [
             'schuljahr_id' => $klasse->schuljahr_id,
             'zeugnis_id'   => $zeugnis->id,
-            'beschreibung' => "Zeugnis für {$schueler->fullName()} angelegt",
+            'beschreibung' => "Fachzeugnis für {$schueler->fullName()} angelegt",
         ]);
 
         $this->ueberlaufNeuBerechnen($zeugnis);
+    }
 
-        return redirect()
-            ->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
-            ->with('status', "Zeugnis für {$schueler->fullName()} angelegt.");
+    /** Hauptzeugnis = EIN Abschnitt (Status/Korrektoren/Klassentext), je Fachbereich ein Schülertext. */
+    private function erzeugeHauptzeugnis(Klasse $klasse, Schueler $schueler): void
+    {
+        $zeugnis = Zeugnis::create([
+            'schueler_id' => $schueler->id,
+            'typ'         => Zeugnis::TYP_HAUPT,
+            'format_id'   => $klasse->hauptzeugnis_format_id,
+            'status'      => Zeugnis::STATUS_ENTWURF,
+        ]);
+
+        $abschnitt = $zeugnis->abschnitte()->create([
+            'typ'             => Abschnitt::TYP_HAUPTZEUGNIS,
+            'autor_lehrer_id' => $klasse->klassenlehrer_id,
+            'autor_name'      => $klasse->klassenlehrer?->fullName(),
+            'reihenfolge'     => 0,
+            'status'          => Abschnitt::STATUS_STANDARD,
+        ]);
+
+        $this->syncBereichtexte($abschnitt, $klasse);
+
+        Protokoll::log('zeugnis_angelegt', [
+            'schuljahr_id' => $klasse->schuljahr_id,
+            'zeugnis_id'   => $zeugnis->id,
+            'beschreibung' => "Hauptzeugnis für {$schueler->fullName()} angelegt",
+        ]);
+
+        $this->ueberlaufNeuBerechnen($zeugnis);
+    }
+
+    /**
+     * Legt zu jedem aktuellen Fachbereich der Klasse eine Bereichtext-Zeile am HAU-Abschnitt
+     * an (falls noch nicht vorhanden) – so erscheinen später ergänzte Bereiche automatisch.
+     */
+    private function syncBereichtexte(Abschnitt $abschnitt, Klasse $klasse): void
+    {
+        $vorhanden = $abschnitt->bereichtexte()->pluck('bereich_id')->all();
+
+        foreach ($klasse->hauptbereiche as $bereich) {
+            if (! in_array($bereich->id, $vorhanden, true)) {
+                $abschnitt->bereichtexte()->create([
+                    'bereich_id'   => $bereich->id,
+                    'bereich_name' => $bereich->name,
+                    'reihenfolge'  => $bereich->reihenfolge,
+                ]);
+            }
+        }
     }
 
     public function edit(Zeugnis $zeugnis)
@@ -284,12 +416,18 @@ class ZeugnisController
             ->with('status', 'Zeugnis wieder geöffnet – Bearbeitung möglich.');
     }
 
-    /** Einzelnen Abschnitt (Fachtext/Haupttext/Note) bearbeiten – mit Änderungsverlauf. */
+    /** Einzelnen Abschnitt (Fachtext/Note/Fachbereich) bearbeiten – mit Änderungsverlauf. */
     public function abschnittEdit(Abschnitt $abschnitt)
     {
-        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach', 'korrektoren']);
+        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach', 'bereichtexte.bereich', 'korrektoren']);
         $zeugnis = $abschnitt->zeugnis;
         $klasse  = $zeugnis->schueler?->klasse;
+
+        // Hauptzeugnis: fehlende Fachbereich-Textfelder ergänzen (falls Bereiche dazukamen).
+        if ($abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS && $klasse && ! $zeugnis->istAbgeschlossen()) {
+            $this->syncBereichtexte($abschnitt, $klasse->loadMissing('hauptbereiche'));
+            $abschnitt->load('bereichtexte.bereich');
+        }
 
         $hex = self::STATUS_FARBE_HEX;
         $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
@@ -362,7 +500,8 @@ class ZeugnisController
             'schueler'       => $zeugnis->schueler,
             'stati'          => Abschnitt::STATI,
             'verlauf'        => $verlauf,
-            'klassentext'    => $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null,
+            'klassentext'    => $this->klassentextAnzeige($abschnitt, $klasse),
+            'bereichtexte'   => $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS ? $abschnitt->bereichtexte : collect(),
             'berechtigung'   => $berechtigung,
             'korrekturStati' => self::KORREKTUR_STATI,
             'alleLehrer'     => $klasse ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->orderBy('nachname')->orderBy('vorname')->get() : collect(),
@@ -390,14 +529,18 @@ class ZeugnisController
             return $leer;
         }
 
+        $istHaupt = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS;
         $kette = $klasse->schueler()
-            ->with(['zeugnis.abschnitte'])
+            ->with([$istHaupt ? 'hauptzeugnis.abschnitte' : 'fachzeugnis.abschnitte'])
             ->orderBy('nachname')
             ->orderBy('vorname')
             ->get()
-            ->map(function ($s) use ($abschnitt) {
-                $treffer = $s->zeugnis?->abschnitte->first(
-                    fn ($a) => $a->typ === $abschnitt->typ && $a->fach_id === $abschnitt->fach_id
+            ->map(function ($s) use ($abschnitt, $istHaupt) {
+                $z = $istHaupt ? $s->hauptzeugnis : $s->fachzeugnis;
+                $treffer = $z?->abschnitte->first(
+                    fn ($a) => $istHaupt
+                        ? $a->typ === Abschnitt::TYP_HAUPTZEUGNIS
+                        : ($a->typ === $abschnitt->typ && $a->fach_id === $abschnitt->fach_id)
                 );
 
                 return $treffer ? ['id' => $treffer->id, 'name' => $s->fullName()] : null;
@@ -420,7 +563,7 @@ class ZeugnisController
 
     public function abschnittUpdate(Request $request, Abschnitt $abschnitt)
     {
-        $abschnitt->load('zeugnis.schueler.klasse', 'fach', 'korrektoren');
+        $abschnitt->load('zeugnis.schueler.klasse', 'fach', 'bereich', 'korrektoren');
         $zeugnis = $abschnitt->zeugnis;
         $klasse  = $zeugnis->schueler?->klasse;
         $b       = $this->berechtigung($abschnitt, auth()->user());
@@ -428,7 +571,9 @@ class ZeugnisController
         // Für die Rückmeldung: wessen Text (Name + Fach) tatsächlich gespeichert wurde
         // – wichtig beim Blättern, wo danach schon der nächste Schüler angezeigt wird.
         $gespeichertName = $zeugnis->schueler?->fullName() ?: 'Schüler';
-        $gespeichertWas  = $abschnitt->typ === Abschnitt::TYP_HAUPTTEXT ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext');
+        $gespeichertWas  = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS
+            ? 'Hauptzeugnis'
+            : ($abschnitt->typ === Abschnitt::TYP_HAUPTTEXT ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext'));
 
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
@@ -494,7 +639,10 @@ class ZeugnisController
         $altNotiz  = $abschnitt->notiz;
         $altStatus = $abschnitt->status;
 
-        $abschnitt->inhalt = $data['inhalt'] ?? null;
+        $istHaupt = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS;
+        if (! $istHaupt) {
+            $abschnitt->inhalt = $data['inhalt'] ?? null;
+        }
         if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
             $abschnitt->note = $data['note'] ?? null;
         }
@@ -505,23 +653,30 @@ class ZeugnisController
 
         $abschnitt->korrektoren()->sync($korrektoren);
 
-        $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
-        $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
+        if ($istHaupt) {
+            // Hauptzeugnis: die mehreren Schülertexte (je Fachbereich) speichern.
+            $btEingaben = $request->input('bereichtexte', []);
+            foreach ($abschnitt->bereichtexte as $bt) {
+                if (! array_key_exists($bt->id, $btEingaben)) {
+                    continue;
+                }
+                $altBt = $bt->inhalt;
+                $bt->inhalt = $btEingaben[$bt->id]['inhalt'] ?? null;
+                $bt->save();
+                $this->logFeld($abschnitt, $bt->ueberschrift(), $altBt, $bt->inhalt);
+            }
+        } else {
+            $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
+            $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
+        }
         $this->logFeld($abschnitt, 'Notiz', $altNotiz, $abschnitt->notiz, 'abschnitt_notiz');
         $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
-        // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Haupttext).
-        $klassentextGeaendert = false;
-        if ($klasse) {
-            $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
-            $neu = $data['klassentext'] ?? null;
-            if ((string) $kt->text !== (string) $neu) {
-                $altKt = $kt->text;
-                $kt->text = $neu;
-                $kt->save();
-                $klassentextGeaendert = true;
-                $this->logFeld($abschnitt, 'Klassenweiter Text', $altKt, $neu, 'abschnitt_klassentext');
-            }
+        // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Fachbereich).
+        $neu = $data['klassentext'] ?? null;
+        [$altKt, $klassentextGeaendert] = $this->klassentextSpeichern($abschnitt, $klasse, $neu);
+        if ($klassentextGeaendert) {
+            $this->logFeld($abschnitt, 'Klassenweiter Text', $altKt, $neu, 'abschnitt_klassentext');
         }
 
         $this->ueberlaufNeuBerechnen($zeugnis);
@@ -674,7 +829,8 @@ class ZeugnisController
             ->where('core_user_id', $user->id)
             ->pluck('id');
 
-        if ($abschnitt->typ === Abschnitt::TYP_HAUPTTEXT) {
+        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_HAUPTZEUGNIS], true)) {
+            // Haupttext / Hauptzeugnis: nur der Klassenlehrer ist voll berechtigt.
             if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
                 return 'voll';
             }
@@ -697,6 +853,52 @@ class ZeugnisController
         return 'keine';
     }
 
+    /** Klassentext-Objekt (mit ->text) für die Editor-Anzeige – je Fach oder Fachbereich. */
+    private function klassentextAnzeige(Abschnitt $abschnitt, ?Klasse $klasse): ?object
+    {
+        if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
+            return (object) ['text' => $abschnitt->bereich?->klassentext];
+        }
+
+        return $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null;
+    }
+
+    /**
+     * Klassentext speichern – Fach → zeugnis_fach_klassentexte, Fachbereich → am Bereich.
+     *
+     * @return array{0:?string,1:bool} [alter Wert, wurde geändert]
+     */
+    private function klassentextSpeichern(Abschnitt $abschnitt, ?Klasse $klasse, ?string $neu): array
+    {
+        if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
+            $bereich = $abschnitt->bereich;
+            if (! $bereich) {
+                return [null, false];
+            }
+            $alt = $bereich->klassentext;
+            if ((string) $alt === (string) $neu) {
+                return [$alt, false];
+            }
+            $bereich->klassentext = $neu;
+            $bereich->save();
+
+            return [$alt, true];
+        }
+
+        if (! $klasse) {
+            return [null, false];
+        }
+        $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
+        $alt = $kt->text;
+        if ((string) $alt === (string) $neu) {
+            return [$alt, false];
+        }
+        $kt->text = $neu;
+        $kt->save();
+
+        return [$alt, true];
+    }
+
     /** Klassenweiter Text für (Klasse, Fach) – fach_id null = Haupttext. */
     private function klassentextFuer(int $klasseId, ?int $fachId): Klassentext
     {
@@ -717,6 +919,7 @@ class ZeugnisController
             'fach'        => $fachModel,
             'fachParam'   => $fach,
             'klassentext' => $this->klassentextFuer($klasse->id, $fachId),
+            'stati'       => Abschnitt::STATI,
         ]);
     }
 
@@ -725,11 +928,15 @@ class ZeugnisController
         [$fachId, $fachModel] = $this->fachAusParam($fach);
         $this->autorisiereKlassentext($klasse, $fachId);
 
-        $data = $request->validate(['text' => ['nullable', 'string']]);
+        $data = $request->validate([
+            'text'   => ['nullable', 'string'],
+            'status' => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+        ]);
 
         $kt  = $this->klassentextFuer($klasse->id, $fachId);
         $alt = $kt->text;
         $kt->text = $data['text'] ?? null;
+        $kt->status = $data['status'];
         $kt->save();
 
         if ((string) $alt !== (string) $kt->text) {

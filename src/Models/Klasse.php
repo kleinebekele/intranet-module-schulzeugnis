@@ -16,6 +16,11 @@ class Klasse extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'hat_fachzeugnis'  => 'boolean',
+        'hat_hauptzeugnis' => 'boolean',
+    ];
+
     public function schuljahr(): BelongsTo
     {
         return $this->belongsTo(Schuljahr::class, 'schuljahr_id');
@@ -30,6 +35,18 @@ class Klasse extends Model
     public function standardFormat(): BelongsTo
     {
         return $this->belongsTo(Format::class, 'standard_format_id');
+    }
+
+    /** Vorlage des Hauptzeugnisses (das Fachzeugnis nutzt standardFormat). */
+    public function hauptzeugnisFormat(): BelongsTo
+    {
+        return $this->belongsTo(Format::class, 'hauptzeugnis_format_id');
+    }
+
+    /** Fachbereiche des Hauptzeugnisses – frei je Klasse, in Reihenfolge. */
+    public function hauptbereiche(): HasMany
+    {
+        return $this->hasMany(Hauptbereich::class, 'klasse_id')->orderBy('reihenfolge')->orderBy('id');
     }
 
     /** Klassenlehrer – loser Verweis (kein FK) auf einen Lehrer des Schuljahres. */

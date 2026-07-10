@@ -98,7 +98,7 @@ class ZeugnisRenderer
      */
     public function daten(Zeugnis $zeugnis): array
     {
-        $zeugnis->loadMissing(['schueler.klasse.schuljahr', 'schueler.klasse.klassenlehrer', 'abschnitte.fach']);
+        $zeugnis->loadMissing(['schueler.klasse.schuljahr', 'schueler.klasse.klassenlehrer', 'abschnitte.fach', 'abschnitte.bereichtexte.bereich']);
         $schueler = $zeugnis->schueler;
         $klasse   = $schueler?->klasse;
         $schuljahr = $klasse?->schuljahr;
@@ -110,44 +110,50 @@ class ZeugnisRenderer
 
         $abschnitte = $zeugnis->abschnitte->sortBy([['reihenfolge', 'asc'], ['id', 'asc']]);
 
-        // Haupttext = klassenweiter Haupttext (fach_id = null) + Schüler-Haupttext.
-        $hauptAbschnitt = $abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTTEXT);
-        $hauptSchueler  = (string) ($hauptAbschnitt?->inhalt ?? '');
-        $hauptKlasse    = $klasse
-            ? trim((string) Klassentext::where('klasse_id', $klasse->id)->whereNull('fach_id')->value('text'))
-            : '';
-        if ($hauptKlasse !== '' && $hauptSchueler !== '') {
-            $haupttext = $hauptKlasse . ($hauptAbschnitt?->klassentext_neue_zeile ? "\n" : ' ') . $hauptSchueler;
+        $haupttext = '';
+
+        if ($zeugnis->istHaupt()) {
+            // Hauptzeugnis = EIN Abschnitt: ein gemeinsamer Klassentext (fach_id null) als
+            // Vorspann + je Fachbereich ein Schülertext (Überschrift + Text).
+            $hauptAbschnitt = $abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTZEUGNIS);
+
+            $haupttext = $klasse
+                ? trim((string) Klassentext::where('klasse_id', $klasse->id)->whereNull('fach_id')->value('text'))
+                : '';
+
+            $fachtexte = ($hauptAbschnitt ? $hauptAbschnitt->bereichtexte->sortBy([['reihenfolge', 'asc'], ['id', 'asc']]) : collect())
+                ->map(fn ($bt) => ['fach' => $bt->ueberschrift(), 'text' => (string) ($bt->inhalt ?? '')])
+                ->filter(fn ($b) => trim($b['text']) !== '')
+                ->values()
+                ->all();
         } else {
-            $haupttext = $hauptKlasse !== '' ? $hauptKlasse : $hauptSchueler;
+            // Fachzeugnis: kein Haupttext mehr – je Fach klassenweiter Text + Schülertext.
+            $klassentexte = $klasse
+                ? Klassentext::where('klasse_id', $klasse->id)->pluck('text', 'fach_id')
+                : collect();
+
+            $fachtexte = $abschnitte
+                ->whereIn('typ', [Abschnitt::TYP_FACHTEXT, Abschnitt::TYP_NOTE])
+                ->map(function ($a) use ($klassentexte) {
+                    $schuelerText = $a->typ === Abschnitt::TYP_NOTE
+                        ? trim(($a->note ? 'Note: ' . $a->note . '  ' : '') . ($a->inhalt ?? ''))
+                        : (string) ($a->inhalt ?? '');
+                    $klassenText = trim((string) ($klassentexte[$a->fach_id] ?? ''));
+
+                    if ($klassenText !== '' && $schuelerText !== '') {
+                        $text = $klassenText . ($a->klassentext_neue_zeile ? "\n" : ' ') . $schuelerText;
+                    } else {
+                        $text = $klassenText !== '' ? $klassenText : $schuelerText;
+                    }
+
+                    return ['fach' => $a->fach?->name ?? '', 'text' => $text];
+                })
+                ->filter(fn ($f) => trim($f['text']) !== '')
+                ->values()
+                ->all();
         }
 
-        $klassentexte = $klasse
-            ? Klassentext::where('klasse_id', $klasse->id)->pluck('text', 'fach_id')
-            : collect();
-
-        // Fachtext = klassenweiter Text + (neue Zeile / Leerzeichen) + Schülertext.
-        $fachtexte = $abschnitte
-            ->whereIn('typ', [Abschnitt::TYP_FACHTEXT, Abschnitt::TYP_NOTE])
-            ->map(function ($a) use ($klassentexte) {
-                $schuelerText = $a->typ === Abschnitt::TYP_NOTE
-                    ? trim(($a->note ? 'Note: ' . $a->note . '  ' : '') . ($a->inhalt ?? ''))
-                    : (string) ($a->inhalt ?? '');
-                $klassenText = trim((string) ($klassentexte[$a->fach_id] ?? ''));
-
-                if ($klassenText !== '' && $schuelerText !== '') {
-                    $text = $klassenText . ($a->klassentext_neue_zeile ? "\n" : ' ') . $schuelerText;
-                } else {
-                    $text = $klassenText !== '' ? $klassenText : $schuelerText;
-                }
-
-                return ['fach' => $a->fach?->name ?? '', 'text' => $text];
-            })
-            ->filter(fn ($f) => trim($f['text']) !== '')
-            ->values()
-            ->all();
-
-        // {Zeugnistext} = Haupttext + je Fach „Fach\nText", der Reihe nach.
+        // {Zeugnistext} = (Klassentext-Vorspann beim Hauptzeugnis) + je Eintrag „Überschrift\nText".
         $teile = [];
         if (trim($haupttext) !== '') {
             $teile[] = $haupttext;
@@ -379,7 +385,63 @@ class ZeugnisRenderer
             return null;
         }
 
-        return 'data:' . ($disk->mimeType($path) ?: 'image/png') . ';base64,' . base64_encode($disk->get($path));
+        $raw = $disk->get($path);
+
+        // PNG mit Alpha-Kanal auf weiß flatten – dompdf rendert PNG-Transparenz sonst als
+        // kaputtes/leeres Bild (Broken-Image-Kreuz). Auf dem weißen Zeugnispapier ist das
+        // visuell identisch. Fehlschlag ist unkritisch: dann wird das Original eingebettet.
+        $flach = $this->flattePngAlpha($raw);
+        if ($flach !== null) {
+            return 'data:image/png;base64,' . base64_encode($flach);
+        }
+
+        return 'data:' . ($disk->mimeType($path) ?: 'image/png') . ';base64,' . base64_encode($raw);
+    }
+
+    /**
+     * RGBA-/Graustufen+Alpha-PNG auf weißen Hintergrund flatten (RGB-PNG ohne Alpha).
+     * Gibt null zurück, wenn nichts zu tun ist oder GD nicht verfügbar/fehlerhaft.
+     */
+    private function flattePngAlpha(string $raw): ?string
+    {
+        // PNG-Signatur + Color-Type-Byte (Offset 25): 4 = Gray+Alpha, 6 = RGBA.
+        if (strlen($raw) < 26 || substr($raw, 1, 3) !== 'PNG') {
+            return null;
+        }
+        $colortype = ord($raw[25]);
+        if ($colortype !== 4 && $colortype !== 6) {
+            return null;
+        }
+        if (! function_exists('imagecreatefromstring')) {
+            return null;
+        }
+
+        try {
+            $src = @imagecreatefromstring($raw);
+            if (! $src) {
+                return null;
+            }
+            $w = imagesx($src);
+            $h = imagesy($src);
+
+            $flat = imagecreatetruecolor($w, $h);
+            $white = imagecolorallocate($flat, 255, 255, 255);
+            imagefilledrectangle($flat, 0, 0, $w, $h, $white);
+            imagealphablending($flat, true);
+            imagesavealpha($flat, false);
+            imagecopy($flat, $src, 0, 0, 0, 0, $w, $h);
+
+            ob_start();
+            imagepng($flat);
+            $out = ob_get_clean();
+
+            imagedestroy($src);
+            imagedestroy($flat);
+
+            return $out ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /** @return array<int,array<string,mixed>> */

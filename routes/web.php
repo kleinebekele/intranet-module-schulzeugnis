@@ -45,6 +45,10 @@ Route::middleware(['web', 'auth'])
         Route::put('klassenraeume/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextUpdate'])->name('klassenraeume.klassentexte.update');
         Route::post('klassenraeume/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('klassenraeume.zeugnisse.store');
 
+        // Sammel-Ausgabe: alle Zeugnisse eines Typs (fach|haupt) einer Klasse in einer Datei.
+        Route::get('klassenraeume/{klasse}/sammel/{typ}/vorschau', [ZeugnisController::class, 'sammelVorschau'])->name('klassenraeume.sammel.vorschau');
+        Route::get('klassenraeume/{klasse}/sammel/{typ}/pdf', [ZeugnisController::class, 'sammelPdf'])->name('klassenraeume.sammel.pdf');
+
         // Einzelnes Zeugnis eines Schülers.
         Route::get('klassenraeume/zeugnis/{zeugnis}/bearbeiten', [ZeugnisController::class, 'edit'])->name('klassenraeume.zeugnisse.edit');
         Route::get('klassenraeume/zeugnis/{zeugnis}/vorschau', [ZeugnisController::class, 'vorschau'])->name('klassenraeume.zeugnisse.vorschau');

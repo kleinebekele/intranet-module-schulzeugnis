@@ -130,7 +130,8 @@ class FormatController
             : [$format->seitenformat === 'a3' ? 'a3' : 'a4', $format->ausrichtung === 'quer' ? 'landscape' : 'portrait'];
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulzeugnis::formate.render', $this->renderDaten($format, $this->probe($request)))
-            ->setPaper($groesse, $lage);
+            ->setPaper($groesse, $lage)
+            ->setOption('tempDir', \Intranet\Modules\Schulzeugnis\Support\PdfTemp::dir());
 
         return $pdf->stream("zeugnis-vorschau-{$format->id}.pdf");
     }

@@ -24,4 +24,10 @@ class Klassentext extends Model
     {
         return $this->belongsTo(Fach::class, 'fach_id');
     }
+
+    /** Anzeige-Metadaten (label/icon/farbe) zum Klassentext-Status – gleiche Skala wie Abschnitte. */
+    public function statusMeta(): array
+    {
+        return Abschnitt::STATI[$this->status] ?? Abschnitt::STATI['unbearbeitet'];
+    }
 }

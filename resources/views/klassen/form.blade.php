@@ -11,12 +11,21 @@
         </div>
     </x-slot>
 
-    <div class="max-w-xl">
+    @php
+        // "Allgemein" ist Pflicht: bei neuer Klasse als fixe erste Zeile vorbelegen.
+        $bereicheListe = $bereiche->isNotEmpty()
+            ? $bereiche
+            : collect([(object) ['id' => null, 'name' => 'Allgemein']]);
+        $hatFach  = (bool) old('hat_fachzeugnis', $klasse->exists ? $klasse->hat_fachzeugnis : true);
+        $hatHaupt = (bool) old('hat_hauptzeugnis', $klasse->exists ? $klasse->hat_hauptzeugnis : false);
+    @endphp
+
+    <div class="max-w-2xl">
         <form method="POST"
               action="{{ $klasse->exists
                     ? route('module.schulzeugnis.klassen.update', $klasse)
                     : route('module.schulzeugnis.klassen.store', $schuljahr) }}"
-              class="space-y-5 rounded-xl border border-gray-200 bg-white p-6">
+              class="space-y-6 rounded-xl border border-gray-200 bg-white p-6">
             @csrf
             @if ($klasse->exists)
                 @method('PUT')
@@ -51,21 +60,6 @@
             </div>
 
             <div>
-                <label for="standard_format_id" class="block text-sm font-medium text-gray-700">Standard-Zeugnisformat</label>
-                <select name="standard_format_id" id="standard_format_id"
-                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">— kein Standard —</option>
-                    @foreach ($formate as $format)
-                        <option value="{{ $format->id }}" @selected(old('standard_format_id', $klasse->standard_format_id) == $format->id)>
-                            {{ $format->name }} ({{ $format->typLabel() }}){{ $format->aktiv ? '' : ' · archiviert' }}
-                        </option>
-                    @endforeach
-                </select>
-                <p class="mt-1 text-xs text-gray-400">Vorgabe für alle Schüler der Klasse; je Schüler überschreibbar.</p>
-                @error('standard_format_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-            </div>
-
-            <div>
                 <label for="klassenlehrer_id" class="block text-sm font-medium text-gray-700">Klassenlehrer</label>
                 <select name="klassenlehrer_id" id="klassenlehrer_id"
                         class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -82,6 +76,86 @@
                 @error('klassenlehrer_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
+            {{-- ============ Fachzeugnis (Fächer) ============ --}}
+            <div class="rounded-lg border border-gray-200 p-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="hat_fachzeugnis" id="hat_fachzeugnis" value="1" @checked($hatFach)
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-semibold text-gray-800">Fachzeugnis (Fächer)</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">Das bisherige Zeugnis mit einer Spalte je Fach.</p>
+
+                <div id="fach-details" class="mt-3 {{ $hatFach ? '' : 'hidden' }}">
+                    <label for="standard_format_id" class="block text-sm font-medium text-gray-700">Fachzeugnis-Format</label>
+                    <select name="standard_format_id" id="standard_format_id"
+                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">— kein Standard —</option>
+                        @foreach ($formate as $format)
+                            <option value="{{ $format->id }}" @selected(old('standard_format_id', $klasse->standard_format_id) == $format->id)>
+                                {{ $format->name }} ({{ $format->typLabel() }}){{ $format->aktiv ? '' : ' · archiviert' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-400">Vorgabe für alle Schüler der Klasse; je Schüler überschreibbar.</p>
+                    @error('standard_format_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
+            {{-- ============ Hauptzeugnis (Fachbereiche) ============ --}}
+            <div class="rounded-lg border border-gray-200 p-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="hat_hauptzeugnis" id="hat_hauptzeugnis" value="1" @checked($hatHaupt)
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-semibold text-gray-800">Hauptzeugnis (Fachbereiche)</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">Eigenständiges Zeugnis aus benannten Fachbereichen (z. B. Allgemein, Rechnen …), die zu einem Text zusammenfließen.</p>
+
+                <div id="haupt-details" class="mt-3 space-y-4 {{ $hatHaupt ? '' : 'hidden' }}">
+                    <div>
+                        <label for="hauptzeugnis_format_id" class="block text-sm font-medium text-gray-700">Hauptzeugnis-Format</label>
+                        <select name="hauptzeugnis_format_id" id="hauptzeugnis_format_id"
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">— kein Format —</option>
+                            @foreach ($formate as $format)
+                                <option value="{{ $format->id }}" @selected(old('hauptzeugnis_format_id', $klasse->hauptzeugnis_format_id) == $format->id)>
+                                    {{ $format->name }} ({{ $format->typLabel() }}){{ $format->aktiv ? '' : ' · archiviert' }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('hauptzeugnis_format_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <span class="block text-sm font-medium text-gray-700">Fachbereiche</span>
+                        <p class="mt-0.5 text-xs text-gray-400">Reihenfolge = Abfolge im Zeugnis. „Allgemein" ist Pflicht.</p>
+                        <div id="bereich-liste" class="mt-2 space-y-2">
+                            @foreach ($bereicheListe as $i => $b)
+                                @php $istAllgemein = $b->name === 'Allgemein'; @endphp
+                                <div class="kb-bereich flex items-center gap-2">
+                                    @if ($b->id)
+                                        <input type="hidden" name="bereiche[{{ $i }}][id]" value="{{ $b->id }}">
+                                    @endif
+                                    <input type="text" name="bereiche[{{ $i }}][name]" value="{{ $b->name }}"
+                                           {{ $istAllgemein ? 'readonly' : '' }} placeholder="Bereich (z. B. Rechnen)"
+                                           class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 {{ $istAllgemein ? 'bg-gray-50 text-gray-500' : '' }}">
+                                    @if ($istAllgemein)
+                                        <span class="shrink-0 text-xs text-gray-400">Pflicht</span>
+                                    @else
+                                        <button type="button" class="kb-remove shrink-0 rounded-lg border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600" title="Bereich entfernen">
+                                            <i class="bx bx-x text-lg"></i>
+                                        </button>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                        <button type="button" id="bereich-add"
+                                class="mt-2 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+                            <i class="bx bx-plus"></i> Fachbereich hinzufügen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
@@ -92,4 +166,44 @@
             </div>
         </form>
     </div>
+
+    <script>
+        (function () {
+            // Detail-Bereiche je Schalter ein-/ausblenden.
+            function bind(cbId, boxId) {
+                var cb = document.getElementById(cbId), box = document.getElementById(boxId);
+                if (!cb || !box) { return; }
+                cb.addEventListener('change', function () { box.classList.toggle('hidden', !cb.checked); });
+            }
+            bind('hat_fachzeugnis', 'fach-details');
+            bind('hat_hauptzeugnis', 'haupt-details');
+
+            // Fachbereiche dynamisch hinzufügen/entfernen. Index läuft fortlaufend weiter.
+            var liste = document.getElementById('bereich-liste');
+            var addBtn = document.getElementById('bereich-add');
+            var next = liste ? liste.querySelectorAll('.kb-bereich').length : 0;
+
+            if (addBtn && liste) {
+                addBtn.addEventListener('click', function () {
+                    var row = document.createElement('div');
+                    row.className = 'kb-bereich flex items-center gap-2';
+                    row.innerHTML =
+                        '<input type="text" name="bereiche[' + next + '][name]" placeholder="Bereich (z. B. Rechnen)" ' +
+                        'class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">' +
+                        '<button type="button" class="kb-remove shrink-0 rounded-lg border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600" title="Bereich entfernen"><i class="bx bx-x text-lg"></i></button>';
+                    liste.appendChild(row);
+                    var inp = row.querySelector('input');
+                    if (inp) { inp.focus(); }
+                    next++;
+                });
+            }
+
+            if (liste) {
+                liste.addEventListener('click', function (e) {
+                    var btn = e.target.closest('.kb-remove');
+                    if (btn) { btn.closest('.kb-bereich').remove(); }
+                });
+            }
+        })();
+    </script>
 </x-app-layout>

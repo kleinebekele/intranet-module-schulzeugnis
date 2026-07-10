@@ -123,6 +123,24 @@
             &larr; Zurück zu den Klassenräumen
         </a>
 
+        @if ($istAdmin && ! $gsVerfuegbar)
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div class="flex items-start gap-2">
+                    <i class="bx bx-error mt-0.5 text-lg text-amber-600"></i>
+                    <div>
+                        <p class="font-semibold">Ghostscript nicht installiert – keine PDF/A-Langzeitarchivierung möglich</p>
+                        <p class="mt-1">Zeugnis-PDFs werden als <strong>normale PDFs</strong> (PDF 1.7) erzeugt, nicht im revisionssicheren Archivformat <strong>PDF/A-2b</strong> (eingebettete Fonts, definierter Farbraum, in sich geschlossen). Für die dauerhafte Archivierung fehlt damit die Konvertierung – Vorschau, Druck und normaler Download funktionieren uneingeschränkt.</p>
+                        <p class="mt-2 text-xs">
+                            Installation auf dem Server:
+                            <code class="rounded bg-amber-100 px-1 py-0.5">sudo apt install ghostscript</code>
+                            &middot; danach prüfen mit
+                            <code class="rounded bg-amber-100 px-1 py-0.5">gs --version</code>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @if (session('error'))
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
@@ -134,7 +152,6 @@
                 <button type="button" id="zt-mine" class="zt-chip">Meine Fächer</button>
                 <button type="button" id="zt-all" class="zt-chip">Alle</button>
                 <span class="mx-1 text-gray-300">|</span>
-                <button type="button" class="zt-chip" data-col="haupt">HAU</button>
                 @foreach ($faecher as $fach)
                     <button type="button" class="zt-chip" data-col="{{ $fach->id }}" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</button>
                 @endforeach
@@ -156,12 +173,17 @@
                 <thead>
                     <tr class="text-gray-600">
                         <th class="border-b border-r border-gray-200 px-4 text-left font-semibold" style="position: sticky; left: 0; top: 0; z-index: 30; background: #f9fafb;">Schüler</th>
-                        <th class="zt-col zt-col-haupt zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
-                            style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
-                            data-fach="Haupttext" data-rolle="Klassenlehrer"
-                            data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
-                            data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
-                            @if ($istAdmin || $binKlassenlehrer) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif>HAU</th>
+                        @if ($hatHaupt)
+                            <th class="zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
+                                style="position: sticky; top: 0; z-index: 20; background: #eef2ff;"
+                                data-fach="Hauptzeugnis" data-rolle="Klassenlehrer"
+                                data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
+                                data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
+                                title="Hauptzeugnis">HAU</th>
+                            <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #eef2ff;" title="Warnhinweis Hauptzeugnis">⚠</th>
+                            <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #eef2ff;" title="Vorschau Hauptzeugnis"><i class="bx bx-show"></i></th>
+                            <th class="zt-mini border-b border-r border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #eef2ff;" title="PDF Hauptzeugnis">PDF</th>
+                        @endif
                         @foreach ($faecher as $fach)
                             <th class="zt-col zt-col-{{ $fach->id }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
@@ -176,19 +198,77 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {{-- Klassenweit-Zeile: gemeinsame (Klassen-)Texte je Spalte, mit eigenem Status. --}}
+                    <tr class="zt-klassenweit border-b border-gray-200">
+                        <td class="border-r border-gray-200 px-4 whitespace-nowrap font-semibold text-indigo-800"
+                            style="position: sticky; left: 0; z-index: 10; background: #eef2ff;">Klassenweit</td>
+                        @if ($hatHaupt)
+                            @php $ktH = $ktRows['haupt'] ?? null; $kmH = $ktH?->statusMeta() ?? $stati['unbearbeitet']; @endphp
+                            <td class="px-2 text-center" style="background: #eef2ff;">
+                                @if ($istAdmin || $binKlassenlehrer)
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}"
+                                       title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                        <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}"></i>
+                                    </a>
+                                @else
+                                    <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}" title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}"></i>
+                                @endif
+                            </td>
+                            <td class="zt-mini text-center" style="background: #eef2ff;">
+                                @if ($warnAgg['haupt'])
+                                    <i class="bx bxs-error text-amber-600" title="Bei mindestens einem Schüler ist der Hauptzeugnis-Text zu lang"></i>
+                                @else
+                                    <span class="text-gray-300">–</span>
+                                @endif
+                            </td>
+                            <td class="zt-mini text-center" style="background: #eef2ff;">
+                                <a href="{{ route('module.schulzeugnis.klassenraeume.sammel.vorschau', ['klasse' => $klasse, 'typ' => 'haupt']) }}" target="_blank" title="Vorschau ALLER Hauptzeugnisse" class="inline-flex text-indigo-600 hover:text-indigo-800"><i class="bx bx-show text-lg"></i></a>
+                            </td>
+                            <td class="zt-mini border-r border-gray-200 text-center" style="background: #eef2ff;">
+                                <a href="{{ route('module.schulzeugnis.klassenraeume.sammel.pdf', ['klasse' => $klasse, 'typ' => 'haupt']) }}" target="_blank" title="Alle Hauptzeugnisse als EINE PDF" class="inline-flex text-red-600 hover:text-red-800"><i class="bx bxs-file-pdf text-lg"></i></a>
+                            </td>
+                        @endif
+                        @foreach ($faecher as $fach)
+                            @php $ktF = $ktRows[$fach->id] ?? null; $kmF = $ktF?->statusMeta() ?? $stati['unbearbeitet']; @endphp
+                            <td class="zt-col zt-col-{{ $fach->id }} px-2 text-center" style="background: #eef2ff;">
+                                @if ($istAdmin || in_array($fach->id, $meineFachIds))
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}"
+                                       title="Klassentext {{ $fach->name }} – {{ $kmF['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                        <i class="bx {{ $kmF['icon'] }} text-lg {{ $farbeKlasse[$kmF['farbe']] ?? 'text-gray-300' }}"></i>
+                                    </a>
+                                @else
+                                    <i class="bx {{ $kmF['icon'] }} text-lg {{ $farbeKlasse[$kmF['farbe']] ?? 'text-gray-300' }}" title="Klassentext {{ $fach->name }} – {{ $kmF['label'] }}"></i>
+                                @endif
+                            </td>
+                        @endforeach
+                        <td class="zt-mini border-l border-gray-200 text-center" style="background: #eef2ff;">
+                            @if ($warnAgg['fach'])
+                                <i class="bx bxs-error text-amber-600" title="Bei mindestens einem Schüler ist der Fachzeugnis-Text zu lang"></i>
+                            @else
+                                <span class="text-gray-300">–</span>
+                            @endif
+                        </td>
+                        <td class="zt-mini text-center" style="background: #eef2ff;">
+                            <a href="{{ route('module.schulzeugnis.klassenraeume.sammel.vorschau', ['klasse' => $klasse, 'typ' => 'fach']) }}" target="_blank" title="Vorschau ALLER Fachzeugnisse" class="inline-flex text-indigo-600 hover:text-indigo-800"><i class="bx bx-show text-lg"></i></a>
+                        </td>
+                        <td class="zt-mini text-center" style="background: #eef2ff;">
+                            <a href="{{ route('module.schulzeugnis.klassenraeume.sammel.pdf', ['klasse' => $klasse, 'typ' => 'fach']) }}" target="_blank" title="Alle Fachzeugnisse als EINE PDF" class="inline-flex text-red-600 hover:text-red-800"><i class="bx bxs-file-pdf text-lg"></i></a>
+                        </td>
+                    </tr>
+
                     @forelse ($schueler as $s)
                         @php
-                            $z = $s->zeugnis;
+                            $z = $s->fachzeugnis;
+                            $hz = $s->hauptzeugnis;
                             $abs = $z ? $z->abschnitte : collect();
-                            $haupt = $abs->firstWhere('typ', 'haupttext');
                             $fachMap = $abs->whereIn('typ', ['fachtext', 'note'])->keyBy('fach_id');
+                            $haz = $hz ? $hz->abschnitte->firstWhere('typ', 'hauptzeugnis') : null;
+                            $fehlt = $hatFach && ! $z;
                         @endphp
                         <tr class="border-b border-gray-100">
                             <td class="border-r border-gray-200 px-4 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10;">
                                 <span class="font-medium text-gray-800">{{ $s->nachname }}, {{ $s->vorname }}</span>
-                                @if ($z && $z->istAbgeschlossen())
-                                    <span class="ml-1 rounded-full bg-green-100 px-1.5 text-[10px] font-medium text-green-700">fertig</span>
-                                @elseif (! $z)
+                                @if ($fehlt)
                                     <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.store', [$klasse, $s]) }}" class="inline">
                                         @csrf
                                         <button type="submit" class="ml-1 text-xs text-indigo-600 hover:underline">+ anlegen</button>
@@ -196,19 +276,47 @@
                                 @endif
                             </td>
 
-                            {{-- Haupttext --}}
-                            <td class="zt-col zt-col-haupt px-2 text-center" data-status="{{ $haupt?->status ?? '' }}">
-                                @if ($haupt)
-                                    @php $m = $haupt->statusMeta(); @endphp
-                                    <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $haupt) }}" title="Haupttext – {{ $m['label'] }}"
-                                       data-ab="{{ $haupt->id }}"
-                                       class="inline-flex rounded p-0.5 hover:bg-indigo-100">
-                                        <i class="bx {{ $m['icon'] }} text-lg {{ $farbeKlasse[$m['farbe']] ?? 'text-gray-300' }}"></i>
-                                    </a>
-                                @else
-                                    <span class="text-gray-200">–</span>
-                                @endif
-                            </td>
+                            @if ($hatHaupt)
+                                @php $wh = $warnungen[$s->id]['haupt'] ?? null; @endphp
+                                {{-- Hauptzeugnis (HAU) + Warnung/Vorschau/PDF --}}
+                                <td class="px-2 text-center" data-status="{{ $haz?->status ?? '' }}">
+                                    @if ($haz)
+                                        @php $hm = $haz->statusMeta(); @endphp
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $haz) }}" title="Hauptzeugnis – {{ $hm['label'] }}"
+                                           data-ab="{{ $haz->id }}"
+                                           class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                            <i class="bx {{ $hm['icon'] }} text-lg {{ $farbeKlasse[$hm['farbe']] ?? 'text-gray-300' }}"></i>
+                                        </a>
+                                    @else
+                                        <span class="text-gray-200">–</span>
+                                    @endif
+                                </td>
+                                <td class="zt-mini text-center">
+                                    @if ($wh && $wh['status'] === 'verkleinert')
+                                        <i class="bx bx-error-circle text-amber-600" title="Text zu lang – passt verkleinert bei {{ $wh['passtBei'] }} pt"></i>
+                                    @elseif ($wh && $wh['status'] === 'ueberlauf')
+                                        <i class="bx bxs-error text-red-600" title="Text passt auch bei kleinster Schrift nicht vollständig"></i>
+                                    @elseif ($wh && $wh['status'] === 'ok')
+                                        <i class="bx bx-check text-green-500" title="passt"></i>
+                                    @else
+                                        <span class="text-gray-200">–</span>
+                                    @endif
+                                </td>
+                                <td class="zt-mini text-center">
+                                    @if ($hz)
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.vorschau', $hz) }}" target="_blank" title="Vorschau Hauptzeugnis" class="inline-flex text-indigo-600 hover:text-indigo-800"><i class="bx bx-show text-lg"></i></a>
+                                    @else
+                                        <span class="text-gray-200">–</span>
+                                    @endif
+                                </td>
+                                <td class="zt-mini border-r border-gray-200 text-center">
+                                    @if ($hz)
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.pdf', $hz) }}" target="_blank" title="Hauptzeugnis als PDF" class="inline-flex text-red-600 hover:text-red-800"><i class="bx bxs-file-pdf text-lg"></i></a>
+                                    @else
+                                        <span class="text-gray-200">–</span>
+                                    @endif
+                                </td>
+                            @endif
 
                             {{-- Fächer --}}
                             @foreach ($faecher as $fach)
@@ -227,8 +335,8 @@
                                 </td>
                             @endforeach
 
-                            {{-- Warnhinweis Textlänge --}}
-                            @php $w = $warnungen[$s->id] ?? null; @endphp
+                            {{-- Warnhinweis Textlänge (Fachzeugnis) --}}
+                            @php $w = $warnungen[$s->id]['fach'] ?? null; @endphp
                             <td class="zt-mini border-l border-gray-200 text-center">
                                 @if ($w && $w['status'] === 'verkleinert')
                                     <i class="bx bx-error-circle text-amber-600" title="Text zu lang – passt automatisch verkleinert bei {{ $w['passtBei'] }} pt"></i>
@@ -263,7 +371,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $faecher->count() + 5 }}" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="{{ $faecher->count() + ($hatHaupt ? 4 : 0) + 4 }}" class="px-4 py-8 text-center text-gray-500">
                                 Noch keine Schüler in dieser Klasse.
                                 <a href="{{ route('module.schulzeugnis.schueler.jahr', $klasse->schuljahr_id) }}" class="text-indigo-600 hover:text-indigo-700">Schüler anlegen</a>.
                             </td>
@@ -280,7 +388,6 @@
             const statusSel = document.getElementById('zt-status');
             const countEl = document.getElementById('zt-count');
             const mineIds = @json(array_map('strval', $meineFachIds));
-            const mineHaupt = @json($binKlassenlehrer);
 
             function setCol(key, show) {
                 document.querySelectorAll('.zt-col-' + key).forEach((el) => el.classList.toggle('zt-hidden-col', !show));
@@ -291,7 +398,7 @@
             function applyRows() {
                 const st = statusSel.value;
                 let sichtbar = 0;
-                table.querySelectorAll('tbody tr').forEach((tr) => {
+                table.querySelectorAll('tbody tr:not(.zt-klassenweit)').forEach((tr) => {
                     let show = true;
                     if (st) {
                         show = [...tr.querySelectorAll('td[data-status]')].some((td) =>
@@ -312,7 +419,7 @@
                     return c ? !c.classList.contains('zt-off') : false;
                 };
                 const alleAn = chips.every((c) => !c.classList.contains('zt-off'));
-                let meineAn = sichtbar('haupt') === !!mineHaupt;
+                let meineAn = true;
                 if (meineAn) {
                     for (const c of chips) {
                         const key = c.dataset.col;
@@ -328,14 +435,12 @@
                 chip.addEventListener('click', () => { setCol(chip.dataset.col, chip.classList.contains('zt-off')); applyRows(); updatePresets(); });
             });
             document.getElementById('zt-mine').addEventListener('click', () => {
-                setCol('haupt', mineHaupt);
                 @foreach ($faecher as $fach)
                     setCol('{{ $fach->id }}', mineIds.includes('{{ $fach->id }}'));
                 @endforeach
                 applyRows(); updatePresets();
             });
             document.getElementById('zt-all').addEventListener('click', () => {
-                setCol('haupt', true);
                 @foreach ($faecher as $fach)
                     setCol('{{ $fach->id }}', true);
                 @endforeach
@@ -344,7 +449,7 @@
             statusSel.addEventListener('change', applyRows);
 
             // Für Lehrer: standardmäßig auf die eigenen Fächer filtern; Admins sehen alles.
-            if (mineIds.length || mineHaupt) {
+            if (mineIds.length) {
                 document.getElementById('zt-mine').click();
             }
             updatePresets();

@@ -1,5 +1,7 @@
 @php
-    $titel = $abschnitt->typ === 'haupttext' ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext');
+    $titel = $abschnitt->typ === 'hauptzeugnis'
+        ? 'Hauptzeugnis'
+        : ($abschnitt->typ === 'haupttext' ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext'));
     $istNote = $abschnitt->typ === 'note';
 @endphp
 <x-app-layout>
@@ -94,6 +96,45 @@
                     <input type="text" name="inhalt" value="{{ old('inhalt', $abschnitt->inhalt) }}" @disabled($readonly)
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </label>
+            @elseif ($abschnitt->typ === 'hauptzeugnis')
+                {{-- Hauptzeugnis: je Fachbereich ein Schülertext-Tab + ein Klassentext-Tab. --}}
+                @php $ktGefuellt = $klassentext && trim((string) old('klassentext', $klassentext->text ?? '')) !== ''; @endphp
+                <div class="zt-txt" id="zt-txt">
+                    <div class="zt-txt-tabs" role="tablist">
+                        @foreach ($bereichtexte as $bt)
+                            <button type="button" class="zt-txt-tab" data-txt="b{{ $bt->id }}" role="tab">{{ $bt->ueberschrift() }}</button>
+                        @endforeach
+                        @if ($klassentext && $berechtigung === 'voll')
+                            <button type="button" class="zt-txt-tab" data-txt="klasse" role="tab">
+                                Klassenweiter Text
+                                <span class="zt-txt-dot {{ $ktGefuellt ? '' : 'leer' }}" title="{{ $ktGefuellt ? 'enthält Text' : 'noch leer' }}"></span>
+                            </button>
+                        @endif
+                    </div>
+
+                    @foreach ($bereichtexte as $bt)
+                        <div class="zt-txt-panel" data-txt="b{{ $bt->id }}" @unless ($loop->first) hidden @endunless>
+                            <textarea name="bereichtexte[{{ $bt->id }}][inhalt]" rows="16" @disabled($readonly)
+                                      class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                      placeholder="Text für „{{ $bt->ueberschrift() }}" …">{{ old('bereichtexte.' . $bt->id . '.inhalt', $bt->inhalt) }}</textarea>
+                            <p class="mt-1 text-xs text-gray-500">Text für <strong>diesen Schüler</strong> im Bereich „{{ $bt->ueberschrift() }}".</p>
+                        </div>
+                    @endforeach
+
+                    @if ($klassentext && $berechtigung === 'voll')
+                        <div class="zt-txt-panel" data-txt="klasse" hidden>
+                            <textarea name="klassentext" rows="16" @disabled($readonly)
+                                      class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                      placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
+                            <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> den individuellen Texten.</p>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input type="checkbox" name="klassentext_neue_zeile" value="1" @checked($abschnitt->klassentext_neue_zeile) @disabled($readonly)
+                                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                Schülertext in neuer Zeile beginnen (statt direkt anschließen)
+                            </label>
+                        </div>
+                    @endif
+                </div>
             @elseif ($hatTextTabs)
                 @php $klassentextGefuellt = trim((string) old('klassentext', $klassentext->text)) !== ''; @endphp
                 <div class="zt-txt" id="zt-txt">
@@ -470,7 +511,7 @@
                 panels.forEach((p) => { p.hidden = p.dataset.txt !== name; });
             }
             tabs.forEach((t) => t.addEventListener('click', () => zeige(t.dataset.txt)));
-            zeige('schueler');
+            if (tabs.length) { zeige(tabs[0].dataset.txt); }
         })();
 
         (function () {

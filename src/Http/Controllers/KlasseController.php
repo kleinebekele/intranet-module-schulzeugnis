@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Format;
+use Intranet\Modules\Schulzeugnis\Models\Hauptbereich;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
@@ -36,6 +37,7 @@ class KlasseController
             'formate'   => $this->formatOptions(),
             'lehrer'    => $this->lehrerOptions($schuljahr),
             'stufen'    => $this->stufenOptions(),
+            'bereiche'  => collect(),
         ]);
     }
 
@@ -44,6 +46,7 @@ class KlasseController
         $data = $this->validated($request, $schuljahr->id);
 
         $klasse = $schuljahr->klassen()->create($data);
+        $this->syncHauptzeugnis($request, $klasse);
 
         Protokoll::log('klasse_angelegt', [
             'schuljahr_id' => $schuljahr->id,
@@ -60,9 +63,10 @@ class KlasseController
         return view('schulzeugnis::klassen.form', [
             'schuljahr' => $klasse->schuljahr,
             'klasse'    => $klasse,
-            'formate'   => $this->formatOptions($klasse->standard_format_id),
+            'formate'   => $this->formatOptions($klasse->standard_format_id, $klasse->hauptzeugnis_format_id),
             'lehrer'    => $this->lehrerOptions($klasse->schuljahr),
             'stufen'    => $this->stufenOptions(),
+            'bereiche'  => $klasse->hauptbereiche,
         ]);
     }
 
@@ -72,6 +76,7 @@ class KlasseController
         $alt  = $klasse->name;
 
         $klasse->update($data);
+        $this->syncHauptzeugnis($request, $klasse);
 
         Protokoll::log('klasse_geaendert', [
             'schuljahr_id' => $klasse->schuljahr_id,
@@ -132,12 +137,60 @@ class KlasseController
     /** @return array<string,mixed> */
     private function validated(Request $request, int $schuljahrId): array
     {
-        return $request->validate([
-            'name'               => ['required', 'string', 'max:255'],
-            'stufe_id'           => ['nullable', 'integer', Rule::exists('zeugnis_stufen', 'id')],
-            'standard_format_id' => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
-            'klassenlehrer_id'   => ['nullable', 'integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')->where('schuljahr_id', $schuljahrId)],
+        $data = $request->validate([
+            'name'                   => ['required', 'string', 'max:255'],
+            'stufe_id'               => ['nullable', 'integer', Rule::exists('zeugnis_stufen', 'id')],
+            'standard_format_id'     => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
+            'hauptzeugnis_format_id' => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
+            'klassenlehrer_id'       => ['nullable', 'integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')->where('schuljahr_id', $schuljahrId)],
         ]);
+
+        // Checkboxen kommen nur beim Anhaken mit – daher explizit als bool lesen.
+        $data['hat_fachzeugnis']  = $request->boolean('hat_fachzeugnis');
+        $data['hat_hauptzeugnis'] = $request->boolean('hat_hauptzeugnis');
+        if (! $data['hat_hauptzeugnis']) {
+            $data['hauptzeugnis_format_id'] = null;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Fachbereiche des Hauptzeugnisses aus dem Formular übernehmen (nur wenn aktiv).
+     * ID-basiert, damit bestehende Bereiche – und die daran hängenden Schülertexte –
+     * erhalten bleiben; "Allgemein" ist Pflicht.
+     */
+    private function syncHauptzeugnis(Request $request, Klasse $klasse): void
+    {
+        if (! $klasse->hat_hauptzeugnis) {
+            return; // Bereiche bleiben erhalten, falls das Hauptzeugnis später wieder aktiviert wird
+        }
+
+        $eingaben = collect($request->input('bereiche', []))
+            ->map(fn ($b) => ['id' => $b['id'] ?? null, 'name' => trim((string) ($b['name'] ?? ''))])
+            ->filter(fn ($b) => $b['name'] !== '')
+            ->values();
+
+        $behalten = [];
+        $pos = 0;
+        foreach ($eingaben as $b) {
+            $row = $b['id'] ? $klasse->hauptbereiche()->find($b['id']) : null;
+            if ($row) {
+                $row->update(['name' => $b['name'], 'reihenfolge' => $pos]);
+            } else {
+                $row = $klasse->hauptbereiche()->create(['name' => $b['name'], 'reihenfolge' => $pos]);
+            }
+            $behalten[] = $row->id;
+            $pos++;
+        }
+
+        // Entfernte Bereiche löschen – anhängende Schülertexte behalten via nullOnDelete ihren bereich_name.
+        $klasse->hauptbereiche()->whereNotIn('id', $behalten ?: [0])->delete();
+
+        // "Allgemein" ist Pflicht – notfalls vorne ergänzen.
+        if (! $klasse->hauptbereiche()->where('name', Hauptbereich::STANDARD)->exists()) {
+            $klasse->hauptbereiche()->create(['name' => Hauptbereich::STANDARD, 'reihenfolge' => -1]);
+        }
     }
 
     /** Lehrer des Schuljahres für die Klassenlehrer-Auswahl. */
@@ -149,11 +202,13 @@ class KlasseController
             ->get();
     }
 
-    /** Auswählbare Formate: aktive plus das aktuell gesetzte (auch wenn archiviert). */
-    private function formatOptions(?int $currentId = null)
+    /** Auswählbare Formate: aktive plus die aktuell gesetzten (auch wenn archiviert). */
+    private function formatOptions(?int ...$currentIds)
     {
+        $ids = array_filter($currentIds);
+
         return Format::where('aktiv', true)
-            ->when($currentId, fn ($q) => $q->orWhere('id', $currentId))
+            ->when($ids, fn ($q) => $q->orWhereIn('id', $ids))
             ->orderBy('name')
             ->get();
     }

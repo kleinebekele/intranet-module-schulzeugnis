@@ -42,6 +42,17 @@
                 @enderror
             </div>
 
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700">Bearbeitungsstatus</label>
+                <select name="status" id="status"
+                        class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    @foreach ($stati as $key => $meta)
+                        <option value="{{ $key }}" @selected(old('status', $klassentext->status ?? 'unbearbeitet') === $key)>{{ $meta['label'] }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-gray-400">Erscheint in der „Klassenweit"-Zeile der Zeugnis-Tabelle.</p>
+            </div>
+
             <div class="flex items-center gap-2">
                 <button type="submit"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
