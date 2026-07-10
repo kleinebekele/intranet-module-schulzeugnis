@@ -342,7 +342,8 @@
                 if (link.closest('tr') && link.closest('tr').style.display === 'none') { statusSel.value = ''; applyRows(); }
 
                 // Markierung in der ersten Sekunde wiederholt setzen (überlebt ein
-                // einmaliges Neu-Rendern der Zeilen beim Laden), dann wieder entfernen.
+                // einmaliges Neu-Rendern der Zeilen beim Laden). Sie bleibt danach
+                // bestehen, bis man die Seite verlässt – nicht mehr automatisch entfernen.
                 let gescrollt = false;
                 const iv = setInterval(function () {
                     const l = table.querySelector(linkSel);
@@ -353,11 +354,7 @@
                         if (!gescrollt && tr) { gescrollt = true; tr.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
                     }
                 }, 120);
-                setTimeout(function () {
-                    clearInterval(iv);
-                    const l = table.querySelector(linkSel);
-                    if (l) { const tr = l.closest('tr'), td = l.closest('td'); if (tr) tr.classList.remove('zt-focus'); if (td) td.classList.remove('zt-focus-cell'); }
-                }, 4500);
+                setTimeout(function () { clearInterval(iv); }, 1500);
             })();
         })();
 
