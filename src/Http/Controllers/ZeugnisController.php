@@ -125,7 +125,7 @@ class ZeugnisController
     /** Befülltes Zeugnis als PDF (dompdf), echtes Papierformat. */
     public function pdf(Zeugnis $zeugnis, ZeugnisRenderer $renderer)
     {
-        $zeugnis->loadMissing('format');
+        $zeugnis->loadMissing(['format', 'schueler.klasse.schuljahr']);
         $format = $zeugnis->format;
 
         [$groesse, $lage] = $format && $format->broschuere
@@ -138,9 +138,19 @@ class ZeugnisController
             ->setPaper($groesse, $lage)
             ->setOption('tempDir', \Intranet\Modules\Schulzeugnis\Support\PdfTemp::dir());
 
-        $name = $zeugnis->schueler?->fullName() ?: 'zeugnis';
+        $typLabel  = $zeugnis->istHaupt() ? 'Hauptzeugnis' : 'Fachzeugnis';
+        $schuljahr = $zeugnis->schueler?->klasse?->schuljahr?->name ?? '';
+        $name      = $zeugnis->schueler?->fullName() ?: 'Schueler';
 
-        return $pdf->stream('zeugnis-' . \Illuminate\Support\Str::slug($name) . '.pdf');
+        return $pdf->stream($this->pdfDateiname($typLabel, $schuljahr, $name));
+    }
+
+    /** Dateisystem-sicherer PDF-Dateiname: Typ_Schuljahr_Name (Sonderzeichen bereinigt). */
+    private function pdfDateiname(string $typLabel, string $schuljahr, string $name): string
+    {
+        $sauber = fn ($s) => trim(str_replace(' ', '_', preg_replace('#[/\\\\:*?"<>|]+#', '-', (string) $s)), '_-');
+
+        return "{$typLabel}_" . $sauber($schuljahr) . '_' . $sauber($name) . '.pdf';
     }
 
     /** Alle Zeugnisse eines Typs (fach|haupt) einer Klasse – in Schüler-Reihenfolge. */
@@ -183,9 +193,10 @@ class ZeugnisController
             ->setPaper($groesse, $lage)
             ->setOption('tempDir', \Intranet\Modules\Schulzeugnis\Support\PdfTemp::dir());
 
-        $label = $typ === 'haupt' ? 'hauptzeugnisse' : 'fachzeugnisse';
+        $typLabel  = $typ === 'haupt' ? 'Hauptzeugnisse' : 'Fachzeugnisse';
+        $schuljahr = $klasse->loadMissing('schuljahr')->schuljahr?->name ?? '';
 
-        return $pdf->stream($label . '-' . \Illuminate\Support\Str::slug($klasse->name) . '.pdf');
+        return $pdf->stream($this->pdfDateiname($typLabel, $schuljahr, 'Klasse-' . $klasse->name));
     }
 
     /** Papierformat/-lage aus einem Format ableiten (für dompdf setPaper). */
