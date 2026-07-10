@@ -76,6 +76,11 @@
         #zt-table i.bx { line-height: 1; vertical-align: middle; }
         #zt-table tbody a { padding: 0; }
         .zt-hidden-col { display: none !important; }
+        /* Fach-Spalten + die drei Aktionsspalten (Warnung/Vorschau/PDF) schmal halten –
+           sie zeigen nur ein Icon bzw. ein kurzes Kuerzel. */
+        #zt-table .zt-col, #zt-table .zt-mini { width: 35px; max-width: 35px; }
+        #zt-table th.zt-col, #zt-table th.zt-mini { padding-left: 3px; padding-right: 3px; }
+        #zt-table td.zt-col, #zt-table td.zt-mini { padding-left: 2px; padding-right: 2px; }
         #zt-table tr.zt-focus td { background: #fffbeb !important; transition: background .3s ease; }
         #zt-table td.zt-focus-cell { box-shadow: inset 0 0 0 2px #f59e0b; border-radius: 4px; }
 
@@ -90,6 +95,7 @@
         .zt-chip { border: 1px solid #d1d5db; border-radius: 9999px; padding: 2px 10px; font-size: 12px; color: #374151; background: #fff; cursor: pointer; }
         .zt-chip:hover { background: #f3f4f6; }
         .zt-chip.zt-off { opacity: .45; text-decoration: line-through; }
+        .zt-chip.zt-preset { border-color: #6366f1; color: #4f46e5; background: #eef2ff; font-weight: 600; }
         #zt-table th.zt-kopf { cursor: help; }
         #zt-tip {
             position: fixed; z-index: 60; max-width: 300px;
@@ -125,10 +131,10 @@
         <div class="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
             <div class="flex flex-wrap items-center gap-2">
                 <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Spalten</span>
-                <button type="button" id="zt-mine" class="zt-chip" style="border-color:#a5b4fc;color:#4f46e5;">Meine Fächer</button>
+                <button type="button" id="zt-mine" class="zt-chip">Meine Fächer</button>
                 <button type="button" id="zt-all" class="zt-chip">Alle</button>
                 <span class="mx-1 text-gray-300">|</span>
-                <button type="button" class="zt-chip" data-col="haupt">Haupt</button>
+                <button type="button" class="zt-chip" data-col="haupt">HAU</button>
                 @foreach ($faecher as $fach)
                     <button type="button" class="zt-chip" data-col="{{ $fach->id }}" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</button>
                 @endforeach
@@ -145,8 +151,8 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white" style="max-height: 74vh; overflow: auto;">
-            <table id="zt-table" class="min-w-full border-collapse text-sm">
+        <div class="rounded-xl border border-gray-200 bg-white" style="max-height: 74vh; overflow: auto; width: fit-content; max-width: 100%;">
+            <table id="zt-table" class="border-collapse text-sm">
                 <thead>
                     <tr class="text-gray-600">
                         <th class="border-b border-r border-gray-200 px-4 text-left font-semibold" style="position: sticky; left: 0; top: 0; z-index: 30; background: #f9fafb;">Schüler</th>
@@ -155,7 +161,7 @@
                             data-fach="Haupttext" data-rolle="Klassenlehrer"
                             data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
                             data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
-                            @if ($istAdmin || $binKlassenlehrer) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif>Haupt</th>
+                            @if ($istAdmin || $binKlassenlehrer) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif>HAU</th>
                         @foreach ($faecher as $fach)
                             <th class="zt-col zt-col-{{ $fach->id }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
@@ -164,9 +170,9 @@
                                 data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}"
                                 @if ($istAdmin || in_array($fach->id, $meineFachIds)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
-                        <th class="border-b border-l border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
-                        <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">Vorschau</th>
-                        <th class="border-b border-gray-200 px-3 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">PDF</th>
+                        <th class="zt-mini border-b border-l border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
+                        <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Vorschau (HTML)"><i class="bx bx-show"></i></th>
+                        <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">PDF</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -223,15 +229,11 @@
 
                             {{-- Warnhinweis Textlänge --}}
                             @php $w = $warnungen[$s->id] ?? null; @endphp
-                            <td class="border-l border-gray-200 px-3 text-center whitespace-nowrap">
+                            <td class="zt-mini border-l border-gray-200 text-center">
                                 @if ($w && $w['status'] === 'verkleinert')
-                                    <span class="text-amber-600" title="Text zu lang – passt automatisch verkleinert bei {{ $w['passtBei'] }} pt">
-                                        <i class="bx bx-error-circle"></i> {{ $w['passtBei'] }} pt
-                                    </span>
+                                    <i class="bx bx-error-circle text-amber-600" title="Text zu lang – passt automatisch verkleinert bei {{ $w['passtBei'] }} pt"></i>
                                 @elseif ($w && $w['status'] === 'ueberlauf')
-                                    <span class="text-red-600" title="Text passt auch bei kleinster Schrift nicht vollständig">
-                                        <i class="bx bxs-error"></i> zu lang
-                                    </span>
+                                    <i class="bx bxs-error text-red-600" title="Text passt auch bei kleinster Schrift nicht vollständig"></i>
                                 @elseif ($w && $w['status'] === 'ok')
                                     <i class="bx bx-check text-green-500" title="passt"></i>
                                 @else
@@ -240,7 +242,7 @@
                             </td>
 
                             {{-- Vorschau / PDF --}}
-                            <td class="px-3 text-center">
+                            <td class="zt-mini text-center">
                                 @if ($z)
                                     <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.vorschau', $z) }}" target="_blank" title="Vorschau (HTML)" class="inline-flex text-indigo-600 hover:text-indigo-800">
                                         <i class="bx bx-show text-lg"></i>
@@ -249,7 +251,7 @@
                                     <span class="text-gray-200">–</span>
                                 @endif
                             </td>
-                            <td class="px-3 text-center">
+                            <td class="zt-mini text-center">
                                 @if ($z)
                                     <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.pdf', $z) }}" target="_blank" title="Als PDF herunterladen" class="inline-flex text-red-600 hover:text-red-800">
                                         <i class="bx bxs-file-pdf text-lg"></i>
@@ -301,22 +303,43 @@
                 countEl.textContent = st ? (sichtbar + ' Schüler mit diesem Status') : '';
             }
 
+            // "Alle" / "Meine Fächer" nur hervorheben, wenn die sichtbaren Spalten GENAU
+            // dieser Auswahl entsprechen – sonst ist keiner der beiden markiert.
+            function updatePresets() {
+                const chips = [...document.querySelectorAll('.zt-chip[data-col]')];
+                const sichtbar = (key) => {
+                    const c = document.querySelector('.zt-chip[data-col="' + key + '"]');
+                    return c ? !c.classList.contains('zt-off') : false;
+                };
+                const alleAn = chips.every((c) => !c.classList.contains('zt-off'));
+                let meineAn = sichtbar('haupt') === !!mineHaupt;
+                if (meineAn) {
+                    for (const c of chips) {
+                        const key = c.dataset.col;
+                        if (key === 'haupt') { continue; }
+                        if (mineIds.includes(key) !== sichtbar(key)) { meineAn = false; break; }
+                    }
+                }
+                document.getElementById('zt-all').classList.toggle('zt-preset', alleAn);
+                document.getElementById('zt-mine').classList.toggle('zt-preset', meineAn && !alleAn);
+            }
+
             document.querySelectorAll('.zt-chip[data-col]').forEach((chip) => {
-                chip.addEventListener('click', () => { setCol(chip.dataset.col, chip.classList.contains('zt-off')); applyRows(); });
+                chip.addEventListener('click', () => { setCol(chip.dataset.col, chip.classList.contains('zt-off')); applyRows(); updatePresets(); });
             });
             document.getElementById('zt-mine').addEventListener('click', () => {
                 setCol('haupt', mineHaupt);
                 @foreach ($faecher as $fach)
                     setCol('{{ $fach->id }}', mineIds.includes('{{ $fach->id }}'));
                 @endforeach
-                applyRows();
+                applyRows(); updatePresets();
             });
             document.getElementById('zt-all').addEventListener('click', () => {
                 setCol('haupt', true);
                 @foreach ($faecher as $fach)
                     setCol('{{ $fach->id }}', true);
                 @endforeach
-                applyRows();
+                applyRows(); updatePresets();
             });
             statusSel.addEventListener('change', applyRows);
 
@@ -324,6 +347,7 @@
             if (mineIds.length || mineHaupt) {
                 document.getElementById('zt-mine').click();
             }
+            updatePresets();
 
             // Fokus: zuletzt bearbeiteten Abschnitt (?focus=ID) sichtbar machen –
             // ggf. Spalte einblenden, Status-Filter lösen, hinscrollen, hervorheben.
