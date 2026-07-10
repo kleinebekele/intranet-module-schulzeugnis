@@ -30,6 +30,36 @@
            farbe, Schrift IMMER weiß) und die neutrale Ebene das Fach. */
         .todo-node { border: 1px solid #e5e7eb; border-radius: .75rem; overflow: hidden; }
 
+        /* Kacheln der obersten Ebene in ein responsives Raster (1→2→3→4 Spalten je Breite).
+           align-items: start, damit eine aufgeklappte Kachel die Nachbarn nicht mitstreckt. */
+        .todo-grid { display: grid; gap: .85rem; align-items: start; grid-template-columns: 1fr; }
+        @media (min-width: 720px)  { .todo-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1100px) { .todo-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1700px) { .todo-grid { grid-template-columns: repeat(4, 1fr); } }
+        /* Aufgeklappte Kachel dezent hervorheben. */
+        .todo-node-aktiv { box-shadow: 0 8px 24px -8px rgba(79,70,229,.45); }
+
+        /* Aufgeklappt: aktive Kachel als eigene Spalte links, restliche Kacheln rechts in
+           einem Sub-Raster (Spaltenzahl = Basis − 1). So rutscht kein Element unter die
+           lange, offene Kachel. Aufbau/Abbau + Gleiten passiert per JS (FLIP). */
+        .todo-grid.hat-offen { display: flex; flex-wrap: wrap; gap: .85rem; align-items: flex-start; }
+        .todo-grid.hat-offen > .todo-node-aktiv { flex: 1 1 100%; }
+        .todo-grid.hat-offen > .todo-rest {
+            flex: 1 1 100%; display: grid; gap: .85rem; grid-template-columns: 1fr; align-content: start;
+        }
+        @media (min-width: 720px) {
+            .todo-grid.hat-offen > .todo-node-aktiv { flex: 0 0 calc(50% - .425rem); }
+            .todo-grid.hat-offen > .todo-rest { flex: 1 1 0; }
+        }
+        @media (min-width: 1100px) {
+            .todo-grid.hat-offen > .todo-node-aktiv { flex-basis: calc(33.333% - .567rem); }
+            .todo-grid.hat-offen > .todo-rest { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (min-width: 1700px) {
+            .todo-grid.hat-offen > .todo-node-aktiv { flex-basis: calc(25% - .64rem); }
+            .todo-grid.hat-offen > .todo-rest { grid-template-columns: repeat(3, 1fr); }
+        }
+
         /* Farbige Elemente (Klasse) – Stufenfarbe, weiße Schrift, dunkler Badge. */
         .todo-farbe {
             color: #fff;
@@ -81,20 +111,51 @@
         .todo-toggle a { padding: .3rem .75rem; border-radius: .45rem; font-size: .8rem; font-weight: 500; color: #6b7280; text-decoration: none; }
         .todo-toggle a.aktiv { background: #4f46e5; color: #fff; }
 
-        /* Tabs. */
-        .todo-tabs { display: flex; gap: .25rem; border-bottom: 1px solid #e5e7eb; }
+        /* Tabs als abgesetzte Karten (Rahmen + Schatten), damit sie klar voneinander
+           und vom Inhalt getrennt sind; der aktive Tab ist indigo hervorgehoben. */
+        .todo-tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
         .todo-tab-btn {
-            display: inline-flex; align-items: center; gap: .45rem; margin-bottom: -1px;
-            padding: .5rem .9rem; border: 0; border-bottom: 2px solid transparent;
-            background: transparent; cursor: pointer; font-size: .875rem; font-weight: 500; color: #6b7280;
+            display: inline-flex; align-items: center; gap: .45rem;
+            padding: .5rem .95rem; border: 1px solid #e5e7eb; border-radius: .6rem;
+            background: #fff; cursor: pointer; font-size: .875rem; font-weight: 500; color: #6b7280;
+            box-shadow: 0 1px 2px rgba(0,0,0,.05);
+            transition: color .15s, border-color .15s, box-shadow .15s, background .15s;
         }
-        .todo-tab-btn:hover { color: #374151; }
-        .todo-tab-btn.aktiv { color: #4f46e5; border-bottom-color: #4f46e5; }
+        .todo-tab-btn:hover { color: #374151; border-color: #c7d2fe; }
+        .todo-tab-btn.aktiv {
+            color: #4f46e5; background: #eef2ff; border-color: #4f46e5;
+            box-shadow: 0 3px 10px -2px rgba(79,70,229,.35);
+        }
         .todo-tab-anzahl { border-radius: 9999px; background: #f3f4f6; color: #6b7280; padding: 0 .5rem; font-size: .7rem; font-weight: 600; }
         .todo-tab-btn.aktiv .todo-tab-anzahl { background: #e0e7ff; color: #4f46e5; }
         .todo-tab-gruen, .todo-tab-btn.aktiv .todo-tab-gruen { background: #dcfce7; color: #16a34a; }
         .todo-panel[hidden] { display: none; }
         .todo-erledigt-liste[hidden] { display: none; }
+
+        /* Tab-Wechsel: kurzer Lade-Hinweis + Einblenden des neuen Panels, damit auch
+           bei sehr aehnlichem Inhalt sichtbar ist, dass umgeschaltet wurde. Die Panels
+           liegen bereits im DOM – der Spinner ist ein bewusster, kurzer visueller Effekt,
+           kein echter Request. */
+        .todo-panels { position: relative; }
+        .todo-loader {
+            position: absolute; inset: 0; z-index: 10;
+            display: none; align-items: flex-start; justify-content: center;
+            padding-top: 3.5rem;
+            background: rgba(255,255,255,.65);
+        }
+        .todo-panels.laedt .todo-loader { display: flex; }
+        .todo-spinner {
+            width: 34px; height: 34px; border-radius: 9999px;
+            border: 3px solid #e0e7ff; border-top-color: #4f46e5;
+            animation: todo-spin .6s linear infinite;
+        }
+        @keyframes todo-spin { to { transform: rotate(360deg); } }
+        .todo-panel.todo-einblenden { animation: todo-fade .25s ease; }
+        @keyframes todo-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) {
+            .todo-spinner { animation-duration: 1.2s; }
+            .todo-panel.todo-einblenden { animation: none; }
+        }
     </style>
 
     <div class="space-y-6">
@@ -157,17 +218,20 @@
                     'zu'          => ['gruppen' => $zuKorrigierenGruppen, 'leer' => 'Aktuell nichts zu korrigieren.'],
                 ];
             @endphp
-            @foreach ($panels as $key => $panel)
-                <div class="todo-panel" data-panel="{{ $key }}" hidden>
-                    @if (empty($panel['gruppen']))
-                        <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
-                            {{ $panel['leer'] }}
-                        </div>
-                    @else
-                        @include('schulzeugnis::todo._gruppen', ['gruppen' => $panel['gruppen'], 'farbeKlasse' => $farbeKlasse, 'letzteAenderung' => $letzteAenderung])
-                    @endif
-                </div>
-            @endforeach
+            <div class="todo-panels">
+                <div class="todo-loader" aria-hidden="true"><div class="todo-spinner"></div></div>
+                @foreach ($panels as $key => $panel)
+                    <div class="todo-panel" data-panel="{{ $key }}" hidden>
+                        @if (empty($panel['gruppen']))
+                            <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+                                {{ $panel['leer'] }}
+                            </div>
+                        @else
+                            @include('schulzeugnis::todo._gruppen', ['gruppen' => $panel['gruppen'], 'farbeKlasse' => $farbeKlasse])
+                        @endif
+                    </div>
+                @endforeach
+            </div>
         @endif
     </div>
 
@@ -178,9 +242,16 @@
             var panels = document.querySelectorAll('.todo-panel');
             if (!tabs.length) { return; }
 
+            var wrap = document.querySelector('.todo-panels');
+
             function aktiviere(name) {
                 tabs.forEach(function (t) { t.classList.toggle('aktiv', t.dataset.tab === name); });
-                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+                panels.forEach(function (p) {
+                    var sichtbar = p.dataset.panel === name;
+                    p.hidden = !sichtbar;
+                    p.classList.remove('todo-einblenden');
+                    if (sichtbar) { void p.offsetWidth; p.classList.add('todo-einblenden'); }
+                });
                 // Gruppierungs-Links den aktuellen Tab mitgeben, damit er nach dem Reload bleibt.
                 document.querySelectorAll('.todo-toggle a').forEach(function (a) {
                     var url = new URL(a.href, window.location.origin);
@@ -193,8 +264,20 @@
             var start = Array.prototype.some.call(tabs, function (t) { return t.dataset.tab === gewuenscht; }) ? gewuenscht : 'meine';
             aktiviere(start);
 
+            // Beim Wechsel kurz einen Spinner zeigen, dann umschalten – deutliches Signal,
+            // dass sich der Inhalt geaendert hat (auch wenn zwei Panels aehnlich aussehen).
+            var ladeTimer = null;
             tabs.forEach(function (t) {
-                t.addEventListener('click', function () { aktiviere(t.dataset.tab); });
+                t.addEventListener('click', function () {
+                    if (t.classList.contains('aktiv')) { return; }   // schon aktiv → nichts tun
+                    if (!wrap) { aktiviere(t.dataset.tab); return; }
+                    clearTimeout(ladeTimer);
+                    wrap.classList.add('laedt');
+                    ladeTimer = setTimeout(function () {
+                        wrap.classList.remove('laedt');
+                        aktiviere(t.dataset.tab);
+                    }, 300);
+                });
             });
         })();
 
@@ -207,22 +290,79 @@
             });
         });
 
-        // Akkordeon der zweiten Ebene: pro Kopfzeile ist immer nur ein Eintrag offen.
-        document.querySelectorAll('.todo-akk').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var scope  = btn.closest('.todo-kinder');
-                var inhalt = btn.parentElement.querySelector('.todo-inhalt');
-                var offen  = btn.getAttribute('aria-expanded') === 'true';
+        // Akkordeon der zweiten Ebene: GLOBAL exklusiv. Beim Öffnen eines Fachs schließen
+        // alle anderen (auch in fremden Kacheln); die betroffene Kachel wird zur eigenen
+        // Spalte links, alle übrigen wandern in ein Sub-Raster rechts daneben (kein Element
+        // rutscht unter die lange, offene Kachel). Umbau + FLIP-Gleiten.
+        document.querySelectorAll('.todo-panel').forEach(function (panel) {
+            var grid = panel.querySelector('.todo-grid');
+            if (!grid) { return; }
+            var akks = panel.querySelectorAll('.todo-akk');
+            if (!akks.length) { return; }
+            var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-                if (!offen && scope) {
-                    scope.querySelectorAll('.todo-akk[aria-expanded="true"]').forEach(function (other) {
-                        other.setAttribute('aria-expanded', 'false');
-                        other.parentElement.querySelector('.todo-inhalt').hidden = true;
-                    });
-                }
+            // Originalreihenfolge der Kacheln – für sauberes Zurückbauen und FLIP.
+            var original = [].slice.call(grid.querySelectorAll(':scope > .todo-node'));
 
-                btn.setAttribute('aria-expanded', String(!offen));
-                if (inhalt) { inhalt.hidden = offen; }
+            function messe() { return original.map(function (n) { return n.getBoundingClientRect(); }); }
+
+            function flip(vorher) {
+                if (reduce || !vorher) { return; }
+                original.forEach(function (n, i) {
+                    var f = vorher[i]; if (!f) { return; }
+                    var l = n.getBoundingClientRect();
+                    var dx = f.left - l.left, dy = f.top - l.top;
+                    if (dx || dy) { n.style.transition = 'none'; n.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }
+                });
+                requestAnimationFrame(function () {
+                    original.forEach(function (n) { n.style.transition = 'transform .28s ease'; n.style.transform = ''; });
+                });
+                setTimeout(function () {
+                    original.forEach(function (n) { n.style.transition = ''; n.style.transform = ''; });
+                }, 340);
+            }
+
+            // Split auflösen: alle Akkordeons zu, Kacheln in Originalreihenfolge zurück ins Raster.
+            function zuruecksetzen() {
+                panel.querySelectorAll('.todo-akk[aria-expanded="true"]').forEach(function (o) {
+                    o.setAttribute('aria-expanded', 'false');
+                    var oi = o.parentElement.querySelector('.todo-inhalt'); if (oi) { oi.hidden = true; }
+                });
+                grid.classList.remove('hat-offen');
+                original.forEach(function (n) { n.classList.remove('todo-node-aktiv'); grid.appendChild(n); });
+                var rest = grid.querySelector('.todo-rest'); if (rest) { rest.remove(); }
+            }
+
+            // Split aufbauen: aktive Kachel links, alle übrigen ins Sub-Raster rechts.
+            function aufbauen(node, btn, inhalt) {
+                btn.setAttribute('aria-expanded', 'true');
+                if (inhalt) { inhalt.hidden = false; }
+                node.classList.add('todo-node-aktiv');
+                grid.classList.add('hat-offen');
+                grid.insertBefore(node, grid.firstChild);
+                var rest = document.createElement('div');
+                rest.className = 'todo-rest';
+                original.forEach(function (n) { if (n !== node) { rest.appendChild(n); } });
+                grid.appendChild(rest);
+            }
+
+            akks.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var offen  = btn.getAttribute('aria-expanded') === 'true';
+                    var node   = btn.closest('.todo-node');
+                    var inhalt = btn.parentElement.querySelector('.todo-inhalt');
+
+                    var vorher = reduce ? null : messe();
+                    zuruecksetzen();
+                    if (!offen && node) { aufbauen(node, btn, inhalt); }
+                    flip(vorher);
+
+                    if (!offen && node) {
+                        setTimeout(function () {
+                            node.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+                        }, reduce ? 0 : 350);
+                    }
+                });
             });
         });
 

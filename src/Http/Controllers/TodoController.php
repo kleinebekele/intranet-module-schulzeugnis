@@ -7,7 +7,6 @@ use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
 use Intranet\Modules\Schulzeugnis\Models\Lehrer;
-use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 
@@ -48,7 +47,6 @@ class TodoController
             'erledigtAnzahl'        => 0,
             'korrigierteAnzahl'     => 0,
             'zuKorrigierenAnzahl'   => 0,
-            'letzteAenderung'       => collect(),
             'stati'                 => Abschnitt::STATI,
         ];
 
@@ -119,19 +117,6 @@ class TodoController
         $offenAnzahl    = $meineTexte->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig')->count();
         $erledigtAnzahl = $meineTexte->count() - $offenAnzahl;
 
-        // Letzte protokollierte Änderung je Abschnitt (was zuletzt, wann, von wem) –
-        // als Referenz auf den Änderungsverlauf direkt in der Aufgabenliste.
-        $alleIds = $eigene->pluck('id')->merge($korrektur->pluck('id'))->unique();
-        $letzteAenderung = Protokoll::whereIn('abschnitt_id', $alleIds)
-            ->whereIn('aktion', [
-                'abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz',
-                'abschnitt_klassentext', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt',
-            ])
-            ->orderByDesc('id')
-            ->get(['id', 'abschnitt_id', 'akteur_name', 'beschreibung', 'created_at'])
-            ->groupBy('abschnitt_id')
-            ->map(fn (Collection $g) => $g->first());
-
         return view('schulzeugnis::todo.index', [
             'schuljahr'            => $schuljahr,
             'istAdmin'             => false,
@@ -143,7 +128,6 @@ class TodoController
             'erledigtAnzahl'       => $erledigtAnzahl,
             'korrigierteAnzahl'    => $korrigierte->count(),
             'zuKorrigierenAnzahl'  => $korrektur->count(),
-            'letzteAenderung'      => $letzteAenderung,
             'stati'                => Abschnitt::STATI,
         ]);
     }

@@ -1,8 +1,8 @@
 {{-- Zweistufige Aufgaben-Liste. Die oberste Ebene ist eine sichtbare Kopfzeile,
      die zweite Ebene ein Akkordeon. Je nach Gruppierung ist die farbige Ebene die
      Klasse (Stufenfarbe, weiße Schrift) und die neutrale Ebene das Fach.
-     Erwartet: $gruppen (Baum aus TodoController::gruppiere), $farbeKlasse, $letzteAenderung. --}}
-<div class="space-y-3">
+     Erwartet: $gruppen (Baum aus TodoController::gruppiere), $farbeKlasse. --}}
+<div class="todo-grid">
     @foreach ($gruppen as $node)
         <div class="todo-node">
             {{-- Oberste Ebene: Kopfzeile (immer sichtbar) --}}
