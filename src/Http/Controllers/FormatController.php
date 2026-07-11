@@ -152,6 +152,7 @@ class FormatController
             'seitenLabels' => $format->broschuere
                 ? ['Titelseite', 'innen links', 'innen rechts', 'Rückseite']
                 : ['Seite'],
+            'seitenRollen' => $format->broschuere ? [] : $format->seitenRollen(),
             'elemente'     => $format->layout ?: $this->standardLayout(),
             'bindungen'    => $this->bindungen(),
             'variablen'    => $this->variablen(),
@@ -213,7 +214,27 @@ class FormatController
             ->values()
             ->all();
 
-        $format->update(['layout' => $elemente]);
+        $daten = ['layout' => $elemente];
+
+        // Seiten-Rollen (nur Nicht-Broschüre): 'start' erscheint einmal,
+        // 'folge' wiederholt sich beliebig oft, bis der Zeugnistext durch ist.
+        if (! $format->broschuere && is_array($payload['seiten'] ?? null)) {
+            $rollen = array_values(array_map(
+                fn ($r) => $r === 'folge' ? 'folge' : 'start',
+                array_slice($payload['seiten'], 0, 20)
+            ));
+            $daten['seiten'] = $rollen ?: ['start'];
+        }
+
+        // Element-Seiten auf den gültigen Bereich klammern.
+        $anzahl = $format->broschuere ? 4 : count($daten['seiten'] ?? $format->seitenRollen());
+        $daten['layout'] = array_map(function ($e) use ($anzahl) {
+            $e['seite'] = min($anzahl, max(1, (int) ($e['seite'] ?? 1)));
+
+            return $e;
+        }, $elemente);
+
+        $format->update($daten);
 
         Protokoll::log('format_layout_gespeichert', [
             'beschreibung' => "Layout von {$format->name} gespeichert ({$format->name})",
@@ -319,6 +340,23 @@ class FormatController
         $key    = isset($proben[$probe]) ? $probe : (string) array_key_first($proben);
         $daten  = $this->beispielDaten($proben[$key]['text'] ?? '');
         $elemente = $this->ersetzeVariablen($this->resolveBilder($format->layout ?: $this->standardLayout()), $daten);
+
+        // Mit Folgeseiten wächst das Zeugnis, bis der Text durch ist – die
+        // Verteilung übernimmt die geteilte Textverteilung (wie beim echten Zeugnis).
+        if ($format->hatFolgeseiten()) {
+            $res = \Intranet\Modules\Schulzeugnis\Support\Textverteilung::verteilen(
+                $elemente,
+                (string) ($daten['zeugnistext'] ?? ''),
+                $format->seitenRollen(),
+                $this->fontMetrics()
+            );
+
+            return [
+                'seiten' => $this->seitenZuBlaettern($format, $res['seiten']),
+                'daten'  => $daten,
+            ];
+        }
+
         $elemente = $this->fuelleTextbereiche($elemente, (string) ($daten['zeugnistext'] ?? ''));
 
         return [
@@ -547,13 +585,34 @@ class FormatController
             ];
         }
 
+        // Nicht-Broschüre: ein Blatt je Design-Seite (Element-Seite geklammert).
+        $anzahl = $format->seitenAnzahl();
+        $liste  = [];
+        for ($n = 1; $n <= $anzahl; $n++) {
+            $liste[] = array_values(array_filter(
+                $elemente,
+                fn ($e) => min($anzahl, max(1, (int) ($e['seite'] ?? 1))) === $n
+            ));
+        }
+
+        return $this->seitenZuBlaettern($format, $liste);
+    }
+
+    /**
+     * Fertige Seiten-Listen (je Seite die Elemente) in Blätter der Formatgröße gießen.
+     *
+     * @param  array<int,array<int,array<string,mixed>>>  $seiten
+     * @return array<int,array<string,mixed>>
+     */
+    private function seitenZuBlaettern(Format $format, array $seiten): array
+    {
         $s = $format->seiteMm();
 
-        return [
-            ['b' => $s['b'], 'h' => $s['h'], 'panels' => [
-                ['x' => 0, 'y' => 0, 'w' => $s['b'], 'h' => $s['h'], 'elemente' => $elemente],
-            ]],
-        ];
+        return array_map(fn ($els) => [
+            'b' => $s['b'], 'h' => $s['h'], 'panels' => [
+                ['x' => 0, 'y' => 0, 'w' => $s['b'], 'h' => $s['h'], 'elemente' => $els],
+            ],
+        ], $seiten);
     }
 
     /** Wörter zählen (für die Label-Angabe der Beispieltexte). */
@@ -736,14 +795,19 @@ class FormatController
             'name'         => ['required', 'string', 'max:255'],
             'typ'          => ['required', Rule::in(['text', 'noten'])],
             'seitenformat' => ['required', Rule::in(['a4', 'a3'])],
-            'ausrichtung'  => ['required', Rule::in(['hoch', 'quer'])],
-            'broschuere'   => ['nullable', 'boolean'],
+            'ausrichtung'  => ['required', Rule::in(['hoch', 'quer', 'broschuere'])],
             'beschreibung' => ['nullable', 'string', 'max:2000'],
             'aktiv'        => ['nullable', 'boolean'],
         ]);
 
-        $data['aktiv']      = $request->boolean('aktiv');
-        $data['broschuere'] = $request->boolean('broschuere');
+        $data['aktiv'] = $request->boolean('aktiv');
+
+        // Broschüre ist eine Ausrichtungs-Option im Formular; in der DB bleibt sie
+        // das bewährte Flag (Falzbogen A3 quer = 4 A4-Seiten, fix).
+        $data['broschuere'] = $data['ausrichtung'] === 'broschuere';
+        if ($data['broschuere']) {
+            $data['ausrichtung'] = 'quer';
+        }
 
         return $data;
     }

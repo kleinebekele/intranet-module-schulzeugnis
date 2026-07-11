@@ -37,6 +37,21 @@ class ZeugnisRenderer
         $elemente = $this->ersetzeVariablen($this->resolveBilder($layout), $daten);
         $basis    = $this->basisGroesse($elemente);
 
+        // Formate mit Folgeseiten wachsen statt zu schrumpfen: die Schrift bleibt
+        // wie designt, überlaufender Text erzeugt Kopien der Folgeseite(n).
+        if ($format && $format->hatFolgeseiten()) {
+            $res = Textverteilung::verteilen($elemente, (string) ($daten['zeugnistext'] ?? ''), $format->seitenRollen(), $this->fontMetrics());
+
+            return [
+                'seiten'    => $this->seitenZuBlaettern($format, $res['seiten']),
+                'daten'     => $daten,
+                'groesse'   => $basis,
+                'ueberlauf' => $res['rest'] > 0,
+                'passtBei'  => $res['rest'] > 0 ? null : $basis,
+                'basis'     => $basis,
+            ];
+        }
+
         $ergebnis = $this->verteileMitShrink($elemente, (string) ($daten['zeugnistext'] ?? ''), $basis);
 
         return [
@@ -67,6 +82,16 @@ class ZeugnisRenderer
         }
 
         $basis = $this->basisGroesse($layout);
+
+        // Mit Folgeseiten wächst das Zeugnis – Überlauf nur, wenn selbst die
+        // Sicherheitsgrenze nicht reicht (oder keine Folgeseite einen Textbereich hat).
+        if ($format && $format->hatFolgeseiten()) {
+            $res = Textverteilung::verteilen($layout, $text, $format->seitenRollen(), $this->fontMetrics());
+
+            return $res['rest'] > 0
+                ? ['status' => 'ueberlauf', 'passtBei' => null, 'basis' => $basis]
+                : ['status' => 'ok', 'passtBei' => $basis, 'basis' => $basis];
+        }
 
         if ($this->fuelle($layout, $text, $basis)['rest'] <= 0) {
             return ['status' => 'ok', 'passtBei' => $basis, 'basis' => $basis];
@@ -462,12 +487,33 @@ class ZeugnisRenderer
             ];
         }
 
+        // Nicht-Broschüre: ein Blatt je Design-Seite (Element-Seite geklammert).
+        $anzahl = $format ? $format->seitenAnzahl() : 1;
+        $liste  = [];
+        for ($n = 1; $n <= $anzahl; $n++) {
+            $liste[] = array_values(array_filter(
+                $elemente,
+                fn ($e) => min($anzahl, max(1, (int) ($e['seite'] ?? 1))) === $n
+            ));
+        }
+
+        return $this->seitenZuBlaettern($format, $liste);
+    }
+
+    /**
+     * Fertige Seiten-Listen (je Seite die Elemente) in Blätter der Formatgröße gießen.
+     *
+     * @param  array<int,array<int,array<string,mixed>>>  $seiten
+     * @return array<int,array<string,mixed>>
+     */
+    private function seitenZuBlaettern(?Format $format, array $seiten): array
+    {
         $s = $format ? $format->seiteMm() : ['b' => 210, 'h' => 297];
 
-        return [
-            ['b' => $s['b'], 'h' => $s['h'], 'panels' => [
-                ['x' => 0, 'y' => 0, 'w' => $s['b'], 'h' => $s['h'], 'elemente' => $elemente],
-            ]],
-        ];
+        return array_map(fn ($els) => [
+            'b' => $s['b'], 'h' => $s['h'], 'panels' => [
+                ['x' => 0, 'y' => 0, 'w' => $s['b'], 'h' => $s['h'], 'elemente' => $els],
+            ],
+        ], $seiten);
     }
 }

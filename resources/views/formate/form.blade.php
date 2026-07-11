@@ -38,8 +38,11 @@
                 @error('typ') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
+            @php
+                $ausrichtungWert = old('ausrichtung', ($format->exists && $format->broschuere) ? 'broschuere' : ($format->ausrichtung ?? 'hoch'));
+            @endphp
             <div class="grid grid-cols-2 gap-4">
-                <div>
+                <div id="feld-seitenformat">
                     <label for="seitenformat" class="block text-sm font-medium text-gray-700">Papierformat</label>
                     <select name="seitenformat" id="seitenformat"
                             class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -51,21 +54,34 @@
                     <label for="ausrichtung" class="block text-sm font-medium text-gray-700">Ausrichtung</label>
                     <select name="ausrichtung" id="ausrichtung"
                             class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="hoch" @selected(old('ausrichtung', $format->ausrichtung ?? 'hoch') === 'hoch')>Hochformat</option>
-                        <option value="quer" @selected(old('ausrichtung', $format->ausrichtung) === 'quer')>Querformat</option>
+                        <option value="hoch" @selected($ausrichtungWert === 'hoch')>Hochformat</option>
+                        <option value="quer" @selected($ausrichtungWert === 'quer')>Querformat</option>
+                        <option value="broschuere" @selected($ausrichtungWert === 'broschuere')>Gefaltete DIN-A3-Broschüre</option>
                     </select>
+                    @error('ausrichtung') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
             </div>
 
-            <div class="rounded-lg bg-gray-50 px-3 py-3">
-                <label class="flex items-center gap-2">
-                    <input type="checkbox" name="broschuere" value="1"
-                           @checked(old('broschuere', $format->exists ? $format->broschuere : false))
-                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    <span class="text-sm text-gray-700">Als gefaltete DIN-A3-Broschüre ausgeben (4 A4-Seiten)</span>
-                </label>
-                <p class="mt-1 text-xs text-gray-400">Im Broschüren-Modus sind die Seiten A4; Papierformat und Ausrichtung oben werden dann ignoriert.</p>
+            <div id="hinweis-broschuere" class="rounded-lg bg-amber-50 px-3 py-3" style="display:none;">
+                <p class="text-sm text-amber-800">Als Broschüre wird das Zeugnis im <strong>DIN-A3-Querformat</strong> ausgegeben und einmal gefaltet – es besteht aus <strong>genau 4 A4-Seiten</strong> und kann nicht länger werden. Das Papierformat oben wird ignoriert.</p>
             </div>
+            <div id="hinweis-seiten" class="rounded-lg bg-gray-50 px-3 py-3" style="display:none;">
+                <p class="text-xs text-gray-500">Ohne Broschüren-Modus kannst du im Designer weitere Seiten hinzufügen. Jede Seite ist Start- oder Folgeseite; Folgeseiten wiederholen sich beliebig oft, bis der ganze Zeugnistext ausgegeben ist.</p>
+            </div>
+
+            <script>
+                (function () {
+                    const sel = document.getElementById('ausrichtung');
+                    const zeige = () => {
+                        const b = sel.value === 'broschuere';
+                        document.getElementById('hinweis-broschuere').style.display = b ? '' : 'none';
+                        document.getElementById('hinweis-seiten').style.display = b ? 'none' : '';
+                        document.getElementById('feld-seitenformat').style.opacity = b ? '.4' : '';
+                    };
+                    sel.addEventListener('change', zeige);
+                    zeige();
+                })();
+            </script>
 
             <div>
                 <label for="beschreibung" class="block text-sm font-medium text-gray-700">Beschreibung <span class="text-gray-400">(optional)</span></label>

@@ -38,6 +38,11 @@
         .dz-swap { font-size: 12px; border: 1px solid #d1d5db; border-radius: 6px; padding: 2px 6px; color: #4f46e5; background: #fff; cursor: pointer; }
         .dz-page { position: relative; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.15); }
         .dz-page.dz-active { outline: 2px solid #a5b4fc; }
+        .dz-page.dz-page-folge { outline: 2px dashed #c7d2fe; }
+        .dz-page.dz-page-folge.dz-active { outline: 2px solid #a5b4fc; }
+        .dz-folgetag { position: absolute; right: 6px; top: 6px; z-index: 7; background: #eef2ff; color: #4f46e5; font: 600 10px/1.2 sans-serif; padding: 2px 7px; border-radius: 999px; pointer-events: none; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+        .dz-pagedel { font-size: 12px; border: 1px solid #fecaca; border-radius: 6px; padding: 2px 7px; color: #dc2626; background: #fff; cursor: pointer; }
+        .dz-pagedel:hover { background: #fef2f2; }
         .dz-el { position: absolute; overflow: hidden; box-sizing: border-box; cursor: move; border: 1px dashed transparent; line-height: 1.3; padding: 0 1px; }
         .dz-el:hover { border-color: #c7d2fe; }
         .dz-el.dz-sel { border: 1px solid #6366f1; z-index: 5; }
@@ -127,6 +132,15 @@
                 <p class="dz-hint" id="dz-pagehint" style="margin-top:12px;"></p>
                 <p class="dz-hint" style="margin-top:8px;">Element anklicken zum Auswählen, ziehen zum Verschieben, an den blauen Griffen die Größe ändern. Danach <strong>Speichern</strong>.</p>
             </div>
+
+            @unless ($format->broschuere)
+                <div class="dz-card" style="margin-top:12px;">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Seiten</p>
+                    <button class="dz-add" id="dz-addstart" type="button">+ Startseite</button>
+                    <button class="dz-add" id="dz-addfolge" type="button">+ Folgeseite</button>
+                    <p class="dz-hint" style="margin-top:8px;">Startseiten erscheinen genau einmal. <strong>Folgeseiten wiederholen sich</strong> im fertigen Zeugnis so oft, bis der ganze Zeugnistext ausgegeben ist – bei kurzem Text entfallen sie ganz. Die Schrift wird dabei nie verkleinert.</p>
+                </div>
+            @endunless
         </div>
 
         <div class="dz-canvas">
@@ -175,7 +189,9 @@
         const DATEN = @json($daten);
         const TEXTPROBEN = @json($textproben);
         const PAGE = @json($designSeite);
-        const PAGES = @json($seitenAnzahl);
+        const BROSCHUERE = @json((bool) $format->broschuere);
+        let ROLLEN = @json($seitenRollen); // je Seite 'start'|'folge' (leer bei Broschüre)
+        let PAGES = @json($seitenAnzahl);
         const LABELS = @json($seitenLabels);
         const SCALE = 2.5;
         const SAVE_URL = @json(route('module.schulzeugnis.formate.layout', $format));
@@ -231,8 +247,10 @@
             });
             return zeilen;
         }
+        let FOLGE_INFO = { instanzen: 0 };
         function computeSplit() {
             const map = {};
+            FOLGE_INFO = { instanzen: 0 };
             const alle = [];
             STATE.elements.forEach((e, i) => { if (e.typ === 'textbereich') alle.push(i); });
             const text = String(DATEN['zeugnistext'] || '');
@@ -242,6 +260,45 @@
                 const ea = STATE.elements[a], eb = STATE.elements[b];
                 return (ea.seite || 1) - (eb.seite || 1) || (ea.y || 0) - (eb.y || 0) || (ea.x || 0) - (eb.x || 0);
             };
+
+            // Mit Folgeseiten: Startseiten zuerst, der Rest fließt in Kopien der
+            // Folgeseite(n) – im Designer wird die erste Kopie gezeigt, weitere
+            // werden nur hochgerechnet (Spiegel von Support\Textverteilung).
+            const folgeIdx = alle.filter((i) => rolleVon(STATE.elements[i].seite || 1) === 'folge');
+            if (folgeIdx.length) {
+                const startIdx = alle.filter((i) => rolleVon(STATE.elements[i].seite || 1) === 'start');
+                const first = STATE.elements[alle.slice().sort(byPos)[0]];
+                const minBreite = Math.min.apply(null, alle.map((i) => (+STATE.elements[i].w || 40) * MM_TO_PT - 4));
+                const zeilen = wrapText(text, Math.max(10, minBreite), +first.size || 11, first.font || 'DejaVu Sans');
+                const maxZ = (el) => Math.max(1, Math.floor(((+el.h || 10) * MM_TO_PT) / ((+el.size || 11) * 1.35)));
+                const fill = (order, pos) => {
+                    order.forEach((i) => {
+                        const part = zeilen.slice(pos, pos + maxZ(STATE.elements[i]));
+                        map[i] = { lines: part };
+                        pos += part.length;
+                    });
+                    return pos;
+                };
+
+                const festS = startIdx.filter((i) => !STATE.elements[i].nurUeberhang).sort(byPos);
+                const bedingtS = startIdx.filter((i) => STATE.elements[i].nurUeberhang);
+                startIdx.forEach((i) => { map[i] = { lines: [] }; });
+                let pos = fill(festS, 0);
+                if (pos < zeilen.length && bedingtS.length) pos = fill(startIdx.slice().sort(byPos), 0);
+
+                const folgeSort = folgeIdx.slice().sort(byPos);
+                folgeSort.forEach((i) => { map[i] = { lines: [] }; });
+                if (pos < zeilen.length) {
+                    const kapazitaet = folgeSort.reduce((s, i) => s + maxZ(STATE.elements[i]), 0);
+                    pos = fill(folgeSort, pos);
+                    FOLGE_INFO.instanzen = 1;
+                    if (pos < zeilen.length && kapazitaet > 0) {
+                        FOLGE_INFO.instanzen += Math.ceil((zeilen.length - pos) / kapazitaet);
+                    }
+                }
+                return map;
+            }
+
             const fest = alle.filter((i) => !STATE.elements[i].nurUeberhang).sort(byPos);
             const bedingt = alle.filter((i) => STATE.elements[i].nurUeberhang);
 
@@ -282,7 +339,9 @@
         }
         const r1 = (n) => Math.round(n * 10) / 10;
         const substVars = (t) => String(t).replace(/\{(\w+)\}/g, (m, k) => (k in VARIABLEN && VARIABLEN[k] in DATEN) ? DATEN[VARIABLEN[k]] : m);
-        const pageLabel = (n) => (PAGES > 1 ? ('Seite ' + n + ' · ' + (LABELS[n - 1] || '')) : 'Seite');
+        const rolleVon = (n) => BROSCHUERE ? 'start' : (ROLLEN[n - 1] || 'start');
+        const kurzLabel = (n) => BROSCHUERE ? (LABELS[n - 1] || '') : (rolleVon(n) === 'folge' ? 'Folgeseite' : 'Startseite');
+        const pageLabel = (n) => (PAGES > 1 ? ('Seite ' + n + ' · ' + kurzLabel(n)) : 'Seite');
 
         function buildPages() {
             pagesWrap.innerHTML = '';
@@ -293,15 +352,37 @@
                     bar.className = 'dz-pagebar';
                     const lab = document.createElement('span');
                     lab.className = 'dz-pagelabel';
-                    lab.textContent = pageLabel(n);
+                    lab.textContent = BROSCHUERE ? pageLabel(n) : ('Seite ' + n);
                     bar.appendChild(lab);
+                    if (!BROSCHUERE) {
+                        const rsel = document.createElement('select');
+                        rsel.className = 'dz-swap';
+                        rsel.title = 'Rolle dieser Seite';
+                        rsel.innerHTML = '<option value="start"' + (rolleVon(n) === 'start' ? ' selected' : '') + '>Startseite</option>'
+                            + '<option value="folge"' + (rolleVon(n) === 'folge' ? ' selected' : '') + '>Folgeseite</option>';
+                        rsel.addEventListener('change', () => {
+                            ROLLEN[n - 1] = rsel.value;
+                            buildPages(); renderProps(); render();
+                            statusEl.textContent = 'Seite ' + n + ' ist jetzt ' + kurzLabel(n) + ' (noch nicht gespeichert)';
+                        });
+                        bar.appendChild(rsel);
+                    }
                     const sel = document.createElement('select');
                     sel.className = 'dz-swap';
                     let opts = '<option value="">Seite tauschen mit …</option>';
-                    for (let m = 1; m <= PAGES; m++) if (m !== n) opts += '<option value="' + m + '">Seite ' + m + ' (' + (LABELS[m - 1] || '') + ')</option>';
+                    for (let m = 1; m <= PAGES; m++) if (m !== n) opts += '<option value="' + m + '">Seite ' + m + ' (' + esc(kurzLabel(m)) + ')</option>';
                     sel.innerHTML = opts;
                     sel.addEventListener('change', () => { if (sel.value) { swapPages(n, +sel.value); sel.value = ''; } });
                     bar.appendChild(sel);
+                    if (!BROSCHUERE) {
+                        const del = document.createElement('button');
+                        del.type = 'button';
+                        del.className = 'dz-pagedel';
+                        del.title = 'Seite löschen';
+                        del.textContent = '×';
+                        del.addEventListener('click', () => deletePage(n));
+                        bar.appendChild(del);
+                    }
                     block.appendChild(bar);
                 }
                 const pg = document.createElement('div');
@@ -329,6 +410,7 @@
                 if (!part) return '<span style="color:#9ca3af;">(Zeugnistext)</span>';
                 const inhalt = part.lines.map(esc).join('<br>');
                 if (inhalt) return inhalt;
+                if (rolleVon(el.seite || 1) === 'folge') return '<span style="color:#cbd5e1;">(Fortsetzung des Zeugnistexts – füllt sich bei Überhang)</span>';
                 return '<span style="color:#cbd5e1;">' + (el.nurUeberhang ? '(nur bei Überhang)' : '(leer)') + '</span>';
             }
             if (el.typ === 'block') {
@@ -345,6 +427,15 @@
             for (let n = 1; n <= PAGES; n++) {
                 pageDivs[n].innerHTML = '';
                 pageDivs[n].classList.toggle('dz-active', PAGES > 1 && n === STATE.activePage);
+                pageDivs[n].classList.toggle('dz-page-folge', rolleVon(n) === 'folge');
+                if (rolleVon(n) === 'folge') {
+                    const tag = document.createElement('div');
+                    tag.className = 'dz-folgetag';
+                    tag.textContent = FOLGE_INFO.instanzen > 1
+                        ? ('Folgeseite · im PDF ≈ ' + FOLGE_INFO.instanzen + '× wiederholt')
+                        : (FOLGE_INFO.instanzen === 1 ? 'Folgeseite · wird 1× gebraucht' : 'Folgeseite · entfällt bei diesem Text');
+                    pageDivs[n].appendChild(tag);
+                }
             }
             STATE.elements.forEach((el, i) => {
                 const pg = pageDivs[el.seite || 1];
@@ -450,10 +541,40 @@
                 if (s === a) el.seite = b;
                 else if (s === b) el.seite = a;
             });
+            if (!BROSCHUERE) {
+                // Die Rolle wandert mit dem Seiteninhalt.
+                const t = ROLLEN[a - 1];
+                ROLLEN[a - 1] = ROLLEN[b - 1];
+                ROLLEN[b - 1] = t;
+            }
             STATE.sel = -1;
             STATE.activePage = b;
-            renderProps(); render();
+            buildPages(); renderProps(); render();
             statusEl.textContent = 'Seiten ' + a + ' und ' + b + ' getauscht (noch nicht gespeichert)';
+        }
+
+        function addPage(rolle) {
+            if (BROSCHUERE) return;
+            ROLLEN.push(rolle);
+            PAGES = ROLLEN.length;
+            STATE.sel = -1;
+            STATE.activePage = PAGES;
+            buildPages(); renderProps(); render();
+            statusEl.textContent = (rolle === 'folge' ? 'Folgeseite' : 'Startseite') + ' hinzugefügt (noch nicht gespeichert)';
+        }
+
+        function deletePage(n) {
+            if (BROSCHUERE || PAGES <= 1) return;
+            const anzahl = STATE.elements.filter((e) => (e.seite || 1) === n).length;
+            if (anzahl > 0 && !confirm('Seite ' + n + ' enthält ' + anzahl + ' Element(e). Seite samt Elementen löschen?')) return;
+            STATE.elements = STATE.elements.filter((e) => (e.seite || 1) !== n);
+            STATE.elements.forEach((e) => { if ((e.seite || 1) > n) e.seite = (e.seite || 1) - 1; });
+            ROLLEN.splice(n - 1, 1);
+            PAGES = ROLLEN.length;
+            STATE.sel = -1;
+            STATE.activePage = Math.min(STATE.activePage, PAGES);
+            buildPages(); renderProps(); render();
+            statusEl.textContent = 'Seite ' + n + ' gelöscht (noch nicht gespeichert)';
         }
 
         function renderProps() {
@@ -472,7 +593,7 @@
                 for (let n = 1; n <= PAGES; n++) opts += '<option value="' + n + '"' + ((el.seite || 1) === n ? ' selected' : '') + '>' + esc(pageLabel(n)) + '</option>';
                 html += '<label>Seite<select id="dzp-seite">' + opts + '</select></label>';
                 let copts = '<option value="">— auf Seite kopieren —</option>';
-                for (let n = 1; n <= PAGES; n++) copts += '<option value="' + n + '">Seite ' + n + ' (' + esc(LABELS[n - 1] || '') + ')</option>';
+                for (let n = 1; n <= PAGES; n++) copts += '<option value="' + n + '">Seite ' + n + ' (' + esc(kurzLabel(n)) + ')</option>';
                 html += '<label>Kopie auf Seite<select id="dzp-copyseite">' + copts + '</select></label>';
             }
             if (el.typ === 'textbereich') {
@@ -624,16 +745,20 @@
                 const r = await fetch(SAVE_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
-                    body: JSON.stringify({ elemente: STATE.elements }),
+                    body: JSON.stringify({ elemente: STATE.elements, seiten: BROSCHUERE ? undefined : ROLLEN }),
                 });
                 if (r.ok) { const j = await r.json(); statusEl.textContent = 'gespeichert (' + j.anzahl + ' Elemente)'; }
                 else { statusEl.textContent = 'Fehler beim Speichern (' + r.status + ')'; }
             } catch (err) { statusEl.textContent = 'Netzwerkfehler'; }
         }
 
-        document.querySelectorAll('.dz-add').forEach((b) => b.addEventListener('click', () => add(b.dataset.typ)));
+        document.querySelectorAll('.dz-add[data-typ]').forEach((b) => b.addEventListener('click', () => add(b.dataset.typ)));
         document.getElementById('dz-save').addEventListener('click', save);
         fileInput.addEventListener('change', onFile);
+        const addStartBtn = document.getElementById('dz-addstart');
+        if (addStartBtn) addStartBtn.addEventListener('click', () => addPage('start'));
+        const addFolgeBtn = document.getElementById('dz-addfolge');
+        if (addFolgeBtn) addFolgeBtn.addEventListener('click', () => addPage('folge'));
 
         document.getElementById('dz-varhelp').addEventListener('click', () => {
             document.getElementById('dz-vartable').innerHTML = Object.keys(VARIABLEN).map((k) => '<tr><td><code>{' + k + '}</code></td><td>' + esc(DATEN[VARIABLEN[k]] || '') + '</td></tr>').join('');
