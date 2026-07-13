@@ -532,8 +532,8 @@ class ZeugnisController
             'bereichtexte'   => $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS ? $abschnitt->bereichtexte : collect(),
             'berechtigung'   => $berechtigung,
             'korrekturStati' => self::KORREKTUR_STATI,
-            'alleLehrer'     => $klasse ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->orderBy('nachname')->orderBy('vorname')->get() : collect(),
-            'korrektorIds'   => $abschnitt->korrektoren->pluck('id')->all(),
+            'alleLehrer'     => $klasse ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->whereNotIn('id', $this->meineLehrerIds($klasse))->orderBy('nachname')->orderBy('vorname')->get() : collect(),
+            'korrektorIds'   => $abschnitt->korrektoren->pluck('id')->diff($this->meineLehrerIds($klasse))->values()->all(),
             'readonly'       => $zeugnis->istAbgeschlossen() || $berechtigung === 'keine',
             'navPrev'        => $nachbarn['prev'],
             'navNext'        => $nachbarn['next'],
@@ -655,7 +655,7 @@ class ZeugnisController
         // Korrektor-Pflicht nur beim normalen Speichern erzwingen. Beim Blättern
         // („Speichern & vorheriger/nächster") nicht blockieren – dann wird gespeichert
         // und einfach zum Nachbarn gewechselt, Korrektoren können später folgen.
-        $korrektoren = $data['korrektoren'] ?? [];
+        $korrektoren = $this->ohneEigeneLehrer($data['korrektoren'] ?? [], $klasse);
         $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index'], true);
         if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
@@ -936,6 +936,26 @@ class ZeugnisController
         return 'keine';
     }
 
+    /** Lehrer-IDs, die zum eingeloggten Nutzer im Schuljahr der Klasse gehören. */
+    private function meineLehrerIds(?Klasse $klasse): \Illuminate\Support\Collection
+    {
+        if (! $klasse) {
+            return collect();
+        }
+
+        return Lehrer::where('schuljahr_id', $klasse->schuljahr_id)
+            ->where('core_user_id', auth()->id())
+            ->pluck('id');
+    }
+
+    /** Eigene Lehrer-IDs aus einer Korrektoren-Auswahl entfernen (man korrigiert sich nicht selbst). */
+    private function ohneEigeneLehrer(array $ids, ?Klasse $klasse): array
+    {
+        $meine = $this->meineLehrerIds($klasse)->map(fn ($i) => (int) $i)->all();
+
+        return array_values(array_diff(array_map('intval', $ids), $meine));
+    }
+
     /**
      * Klassentext-Route-Parameter (fach-id | 'haupt') für die „Vorherige Zeile"-Navigation
      * eines Abschnitts. null bei Hauptzeugnis/Fachbereich (dort kein einzelner Fach-Klassentext).
@@ -1034,8 +1054,8 @@ class ZeugnisController
             'korrekturStati' => self::KORREKTUR_STATI,
             'verlauf'        => $this->klassentextVerlauf($kt),
             'berechtigung'   => $berechtigung,
-            'alleLehrer'     => Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->orderBy('nachname')->orderBy('vorname')->get(),
-            'korrektorIds'   => $kt->exists ? $kt->korrektoren->pluck('id')->all() : [],
+            'alleLehrer'     => Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->whereNotIn('id', $this->meineLehrerIds($klasse))->orderBy('nachname')->orderBy('vorname')->get(),
+            'korrektorIds'   => $kt->exists ? $kt->korrektoren->pluck('id')->diff($this->meineLehrerIds($klasse))->values()->all() : [],
             'readonly'       => false,
             'navPrev'        => $nachbarn['prev'],
             'navNext'        => $nachbarn['next'],
@@ -1092,7 +1112,7 @@ class ZeugnisController
         ]);
 
         // Korrektor-Pflicht nur beim reinen Speichern erzwingen (beim Blättern nicht blockieren).
-        $korrektoren = $data['korrektoren'] ?? [];
+        $korrektoren = $this->ohneEigeneLehrer($data['korrektoren'] ?? [], $klasse);
         $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index'], true);
         if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
             return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
