@@ -248,13 +248,30 @@
                             <i class="bx bx-right-arrow-alt text-lg text-indigo-500"></i>
                             <span>{{ $labelNext }}</span>
                         </label>
-                        <label class="flex items-center gap-2 {{ $navPrev ? 'text-gray-700' : 'text-gray-400' }}">
-                            <input type="radio" name="weiter" value="prev" data-url="{{ $urlPrev }}"
-                                   @checked($vorauswahl === 'prev') @disabled(! $navPrev)
-                                   class="text-indigo-600 focus:ring-indigo-500">
-                            <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
-                            <span>{{ $labelPrev }}</span>
-                        </label>
+                        @if ($navPrev)
+                            <label class="flex items-center gap-2 text-gray-700">
+                                <input type="radio" name="weiter" value="prev" data-url="{{ $urlPrev }}"
+                                       @checked($vorauswahl === 'prev')
+                                       class="text-indigo-600 focus:ring-indigo-500">
+                                <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
+                                <span>{{ $labelPrev }}</span>
+                            </label>
+                        @elseif (! empty($klassentextZeileUrl))
+                            {{-- Erster Schüler: eine Zeile hoch = Klassenweit-Zeile desselben Fachs. --}}
+                            <label class="flex items-center gap-2 text-gray-700">
+                                <input type="radio" name="weiter" value="klassentext" data-url="{{ $klassentextZeileUrl }}"
+                                       class="text-indigo-600 focus:ring-indigo-500">
+                                <i class="bx bx-up-arrow-alt text-lg text-indigo-500"></i>
+                                <span>Vorherige Zeile: Klassentext</span>
+                            </label>
+                        @else
+                            <label class="flex items-center gap-2 text-gray-400">
+                                <input type="radio" name="weiter" value="prev" disabled
+                                       class="text-indigo-600 focus:ring-indigo-500">
+                                <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
+                                <span>{{ $labelPrev }}</span>
+                            </label>
+                        @endif
                         <label class="flex items-center gap-2 text-gray-700">
                             <input type="radio" name="weiter" value="index" data-url="{{ $urlIndex }}"
                                    @checked($vorauswahl === 'index')

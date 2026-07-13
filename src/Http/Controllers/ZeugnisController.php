@@ -503,6 +503,13 @@ class ZeugnisController
                     : route('module.schulzeugnis.klassenraeume.index'),
                'label' => 'Zeugnis-Tabelle', 'icon' => 'bx-table'];
 
+        // „Vorherige Zeile": oberhalb des ersten Schülers steht in der Tabelle die
+        // Klassenweit-Zeile – dorthin (Klassentext desselben Fachs) kann man hoch springen.
+        $ktParam = $this->klassentextParamFuerAbschnitt($abschnitt);
+        $klassentextZeileUrl = ($ktParam !== null && $klasse)
+            ? route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $ktParam])
+            : null;
+
         return view('schulzeugnis::zeugnisse.abschnitt', [
             'quelle'         => $quelle,
             'zurueck'        => $zurueck,
@@ -512,6 +519,7 @@ class ZeugnisController
             'stati'          => Abschnitt::STATI,
             'verlauf'        => $verlauf,
             'klassentext'    => $this->klassentextAnzeige($abschnitt, $klasse),
+            'klassentextZeileUrl' => $klassentextZeileUrl,
             'bereichtexte'   => $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS ? $abschnitt->bereichtexte : collect(),
             'berechtigung'   => $berechtigung,
             'korrekturStati' => self::KORREKTUR_STATI,
@@ -601,7 +609,7 @@ class ZeugnisController
                 'inhalt' => ['nullable', 'string'],
                 'note'   => ['nullable', 'string', 'max:20'],
                 'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
-                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index'])],
+                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altInhalt = $abschnitt->inhalt;
@@ -632,7 +640,7 @@ class ZeugnisController
             'klassentext'   => ['nullable', 'string'],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
-            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index'])],
+            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
         ]);
 
         // Korrektor-Pflicht nur beim normalen Speichern erzwingen. Beim Blättern
@@ -730,6 +738,13 @@ class ZeugnisController
             return $klasse
                 ? redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', ['klasse' => $klasse, 'focus' => $abschnitt->id])
                 : redirect()->route('module.schulzeugnis.klassenraeume.index');
+        }
+        if ($weiter === 'klassentext') {
+            // Eine Zeile hoch: in die Klassenweit-Zeile desselben Fachs.
+            $ktParam = $this->klassentextParamFuerAbschnitt($abschnitt);
+            if ($ktParam !== null && $klasse) {
+                return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $ktParam]);
+            }
         }
 
         return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $abschnitt, 'quelle' => $quelle]);
@@ -864,6 +879,19 @@ class ZeugnisController
         return 'keine';
     }
 
+    /**
+     * Klassentext-Route-Parameter (fach-id | 'haupt') für die „Vorherige Zeile"-Navigation
+     * eines Abschnitts. null bei Hauptzeugnis/Fachbereich (dort kein einzelner Fach-Klassentext).
+     */
+    private function klassentextParamFuerAbschnitt(Abschnitt $abschnitt): ?string
+    {
+        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH], true)) {
+            return null;
+        }
+
+        return $abschnitt->fach_id === null ? 'haupt' : (string) $abschnitt->fach_id;
+    }
+
     /** Klassentext-Objekt (mit ->text) für die Editor-Anzeige – je Fach oder Fachbereich. */
     private function klassentextAnzeige(Abschnitt $abschnitt, ?Klasse $klasse): ?object
     {
@@ -980,7 +1008,7 @@ class ZeugnisController
             $data = $request->validate([
                 'text'   => ['nullable', 'string'],
                 'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
-                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index'])],
+                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altText   = $kt->text;
@@ -1003,7 +1031,7 @@ class ZeugnisController
             'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
-            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index'])],
+            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
         ]);
 
         // Korrektor-Pflicht nur beim reinen Speichern erzwingen (beim Blättern nicht blockieren).
