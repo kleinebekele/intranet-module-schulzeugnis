@@ -190,7 +190,7 @@
                                 data-fach="{{ $fach->name }}" data-rolle="Fachlehrer"
                                 data-lehrer="{{ implode(', ', $fachlehrer[$fach->id] ?? []) }}"
                                 data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}"
-                                @if ($istAdmin || in_array($fach->id, $meineFachIds)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
+                                @if ($istAdmin || in_array($fach->id, $meineFachIds) || in_array($fach->id, $ktKorrektorKeys)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
                         <th class="zt-mini border-b border-l border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
                         <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Vorschau (HTML)"><i class="bx bx-show"></i></th>
@@ -205,7 +205,7 @@
                         @if ($hatHaupt)
                             @php $ktH = $ktRows['haupt'] ?? null; $kmH = $ktH?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="px-2 text-center" style="background: #eef2ff;">
-                                @if ($istAdmin || $binKlassenlehrer)
+                                @if ($istAdmin || $binKlassenlehrer || in_array('haupt', $ktKorrektorKeys))
                                     <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}"
                                        title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                         <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}"></i>
@@ -231,7 +231,7 @@
                         @foreach ($faecher as $fach)
                             @php $ktF = $ktRows[$fach->id] ?? null; $kmF = $ktF?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="zt-col zt-col-{{ $fach->id }} px-2 text-center" style="background: #eef2ff;">
-                                @if ($istAdmin || in_array($fach->id, $meineFachIds))
+                                @if ($istAdmin || in_array($fach->id, $meineFachIds) || in_array($fach->id, $ktKorrektorKeys))
                                     <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}"
                                        title="Klassentext {{ $fach->name }} – {{ $kmF['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                         <i class="bx {{ $kmF['icon'] }} text-lg {{ $farbeKlasse[$kmF['farbe']] ?? 'text-gray-300' }}"></i>

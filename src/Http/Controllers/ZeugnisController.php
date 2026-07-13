@@ -70,9 +70,13 @@ class ZeugnisController
             ->groupBy('fach_id')
             ->map(fn ($g) => $g->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->values()->all());
 
-        $ktRows = Klassentext::where('klasse_id', $klasse->id)->get()
+        $ktRows = Klassentext::where('klasse_id', $klasse->id)->with('korrektoren')->get()
             ->keyBy(fn ($kt) => $kt->fach_id === null ? 'haupt' : $kt->fach_id);
         $klassentexte = $ktRows->map(fn ($kt) => (string) $kt->text);
+
+        // Klassenweit-Status auch für zugewiesene Korrektoren anklickbar machen (öffnet den Editor).
+        $meineLehrerIds  = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->where('core_user_id', $userId)->pluck('id');
+        $ktKorrektorKeys = $ktRows->filter(fn ($kt) => $kt->korrektoren->pluck('id')->intersect($meineLehrerIds)->isNotEmpty())->keys()->all();
 
         // Überlauf-/Auto-Verkleinerungs-Analyse je Zeugnis (aus dem Cache; nur beim
         // ersten Mal bzw. nach Inhaltsänderungen wird gerechnet).
@@ -106,6 +110,7 @@ class ZeugnisController
             'fachlehrer'       => $fachlehrer,
             'klassentexte'     => $klassentexte,
             'ktRows'           => $ktRows,
+            'ktKorrektorKeys'  => $ktKorrektorKeys,
             'hatFach'          => (bool) $klasse->hat_fachzeugnis,
             'hatHaupt'         => (bool) $klasse->hat_hauptzeugnis,
             'bereiche'         => $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche : collect(),
@@ -442,18 +447,21 @@ class ZeugnisController
 
         $hex = self::STATUS_FARBE_HEX;
         $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
-            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt'])
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt', 'abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt'])
             ->orderByDesc('id')
             ->get()
             ->map(function (Protokoll $e) use ($hex) {
                 $istStatus  = $e->aktion === 'abschnitt_status';
                 $istRestore = in_array($e->aktion, ['abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt'], true);
+                $istMeta    = in_array($e->aktion, ['abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt'], true);
                 $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
 
                 $status  = null;
                 $summary = '';
 
-                if ($istStatus) {
+                if ($istMeta) {
+                    // Korrektor-Änderung: die Beschreibung sagt alles, kein Text-Diff.
+                } elseif ($istStatus) {
                     $meta = fn ($k) => Abschnitt::STATI[$k] ?? ['label' => $k, 'icon' => 'bx-circle', 'farbe' => 'gray'];
                     $ma = $meta($e->alt_wert);
                     $mn = $meta($e->neu_wert);
@@ -481,6 +489,7 @@ class ZeugnisController
                     'akteur'            => $e->akteur_name,
                     'feld'              => $e->beschreibung,
                     'istStatus'         => $istStatus,
+                    'istMeta'           => $istMeta,
                     'wiederhergestellt' => $istRestore,
                     'status'            => $status,
                     'summary'           => $summary,
@@ -670,7 +679,13 @@ class ZeugnisController
         $abschnitt->klassentext_neue_zeile = $request->boolean('klassentext_neue_zeile');
         $abschnitt->save();
 
+        $altKorrektoren = $abschnitt->korrektoren->pluck('id')->all();
         $abschnitt->korrektoren()->sync($korrektoren);
+        $this->protokolliereKorrektoren([
+            'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
+            'zeugnis_id'   => $zeugnis->id,
+            'abschnitt_id' => $abschnitt->id,
+        ], 'abschnitt_korrektor', $altKorrektoren, $korrektoren);
 
         if ($istHaupt) {
             // Hauptzeugnis: die mehreren Schülertexte (je Fachbereich) speichern.
@@ -1051,7 +1066,12 @@ class ZeugnisController
         $kt->status = $data['status'];
         $kt->save();
 
+        $altKorrektoren = ($kt->relationLoaded('korrektoren')) ? $kt->korrektoren->pluck('id')->all() : [];
         $kt->korrektoren()->sync($korrektoren);
+        $this->protokolliereKorrektoren([
+            'schuljahr_id'   => $klasse->schuljahr_id,
+            'klassentext_id' => $kt->id,
+        ], 'klassentext_korrektor', $altKorrektoren, $korrektoren);
 
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Notiz', $altNotiz, $kt->notiz, 'klassentext_notiz');
@@ -1202,6 +1222,43 @@ class ZeugnisController
             ->with('status', 'Klassentext (' . $label . ') gespeichert.');
     }
 
+    /**
+     * Korrektor-Zuweisungen protokollieren: je hinzugefügtem/entferntem Lehrer eine
+     * append-only Zeile mit Name des Betroffenen (Akteur = eingeloggter Nutzer, Zeit
+     * automatisch). $aktionPrefix z. B. 'abschnitt_korrektor' oder 'klassentext_korrektor'.
+     *
+     * @param  array<string,mixed>  $baseAttrs  Bezug (schuljahr_id/zeugnis_id/abschnitt_id/klassentext_id)
+     * @param  array<int,int|string>  $alt
+     * @param  array<int,int|string>  $neu
+     */
+    private function protokolliereKorrektoren(array $baseAttrs, string $aktionPrefix, array $alt, array $neu): void
+    {
+        $alt = array_map('intval', $alt);
+        $neu = array_map('intval', $neu);
+        $hinzu = array_values(array_diff($neu, $alt));
+        $weg   = array_values(array_diff($alt, $neu));
+
+        if (! $hinzu && ! $weg) {
+            return;
+        }
+
+        $namen = Lehrer::whereIn('id', array_merge($hinzu, $weg))->get()
+            ->mapWithKeys(fn ($l) => [$l->id => $l->fullName()]);
+
+        foreach ($hinzu as $id) {
+            Protokoll::log($aktionPrefix . '_hinzugefuegt', array_merge($baseAttrs, [
+                'beschreibung' => 'Korrektor hinzugefügt: ' . ($namen[$id] ?? ('#' . $id)),
+                'neu_wert'     => $namen[$id] ?? ('#' . $id),
+            ]));
+        }
+        foreach ($weg as $id) {
+            Protokoll::log($aktionPrefix . '_entfernt', array_merge($baseAttrs, [
+                'beschreibung' => 'Korrektor entfernt: ' . ($namen[$id] ?? ('#' . $id)),
+                'alt_wert'     => $namen[$id] ?? ('#' . $id),
+            ]));
+        }
+    }
+
     /** Eine Feld-Änderung am Klassentext protokollieren – nur wenn sie sich unterscheidet. */
     private function logKlassentext(Klassentext $kt, ?int $schuljahrId, string $feld, ?string $alt, ?string $neu, string $aktion = 'klassentext_geaendert'): void
     {
@@ -1238,18 +1295,21 @@ class ZeugnisController
         $hex = self::STATUS_FARBE_HEX;
 
         return Protokoll::where('klassentext_id', $kt->id)
-            ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_notiz', 'klassentext_status', 'klassentext_wiederhergestellt'])
+            ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_notiz', 'klassentext_status', 'klassentext_wiederhergestellt', 'klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt'])
             ->orderByDesc('id')
             ->get()
             ->map(function (Protokoll $e) use ($hex) {
                 $istStatus  = $e->aktion === 'klassentext_status';
                 $istRestore = $e->aktion === 'klassentext_wiederhergestellt';
+                $istMeta    = in_array($e->aktion, ['klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt'], true);
                 $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
 
                 $status  = null;
                 $summary = '';
 
-                if ($istStatus) {
+                if ($istMeta) {
+                    // Korrektor-Änderung: die Beschreibung sagt alles, kein Text-Diff.
+                } elseif ($istStatus) {
                     $meta = fn ($k) => Abschnitt::STATI[$k] ?? ['label' => $k, 'icon' => 'bx-circle', 'farbe' => 'gray'];
                     $ma = $meta($e->alt_wert);
                     $mn = $meta($e->neu_wert);
@@ -1277,6 +1337,7 @@ class ZeugnisController
                     'akteur'            => $e->akteur_name,
                     'feld'              => $e->beschreibung,
                     'istStatus'         => $istStatus,
+                    'istMeta'           => $istMeta,
                     'wiederhergestellt' => $istRestore,
                     'status'            => $status,
                     'summary'           => $summary,

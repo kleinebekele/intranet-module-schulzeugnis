@@ -356,11 +356,13 @@
                                     <span class="inline-flex items-center gap-1 text-gray-700">
                                         <i class="bx {{ $e['status']['neuIcon'] }}" style="color: {{ $e['status']['neuColor'] }}"></i>{{ $e['status']['neuLabel'] }}
                                     </span>
+                                @elseif (! empty($e['istMeta']))
+                                    {{-- Korrektor-Änderung: der Feld-Text oben genügt --}}
                                 @else
                                     <span class="{{ $e['wiederhergestellt'] ? 'text-amber-700' : 'text-gray-500' }}">— {{ $e['summary'] }}</span>
                                 @endif
                             </div>
-                            @unless ($e['istStatus'])
+                            @unless ($e['istStatus'] || ! empty($e['istMeta']))
                                 <div class="mt-1 text-xs">
                                     <button type="button" class="zt-vergleich inline-flex items-center gap-1 text-indigo-600 hover:underline"
                                             data-feld="{{ $e['feld'] }}" data-zeit="{{ $e['zeit']?->format('d.m.Y H:i') }}"
