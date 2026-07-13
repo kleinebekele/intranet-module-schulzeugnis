@@ -944,4 +944,5 @@
         render();
         renderProps();
     </script>
+    @include('schulzeugnis::zeugnisse._textarea-schrift')
 </x-app-layout>

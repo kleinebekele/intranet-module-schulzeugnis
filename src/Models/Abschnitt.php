@@ -39,6 +39,7 @@ class Abschnitt extends Model
         'in_korrektur'            => ['label' => 'In Korrektur',            'icon' => 'bxs-edit',          'farbe' => 'red'],
         'korrektur_noetig'        => ['label' => 'Korrektur nötig',         'icon' => 'bx-error-circle',   'farbe' => 'red'],
         'korrektur_durchgefuehrt' => ['label' => 'Korrektur durchgeführt',  'icon' => 'bxs-edit',          'farbe' => 'green'],
+        'korrektur_abgelehnt'     => ['label' => 'Korrektur abgelehnt',     'icon' => 'bxs-x-circle',      'farbe' => 'red'],
         'in_ueberarbeitung'       => ['label' => 'In Überarbeitung',        'icon' => 'bx-revision',       'farbe' => 'amber'],
         'vollstaendig'            => ['label' => 'Vollständig',             'icon' => 'bxs-check-circle',  'farbe' => 'green'],
     ];

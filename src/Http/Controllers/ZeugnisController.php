@@ -23,8 +23,8 @@ use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
  */
 class ZeugnisController
 {
-    /** Status, die ein zugewiesener Korrektor setzen darf. */
-    private const KORREKTUR_STATI = ['in_korrektur', 'korrektur_durchgefuehrt'];
+    /** Status, die ein zugewiesener Korrektor setzen darf (inkl. Ablehnen). */
+    private const KORREKTUR_STATI = ['in_korrektur', 'korrektur_durchgefuehrt', 'korrektur_abgelehnt'];
 
     /** Status, für die beim Speichern Korrektoren ausgewählt sein müssen. */
     private const BRAUCHT_KORREKTOREN = ['frei_zur_korrektur', 'korrektur_noetig'];

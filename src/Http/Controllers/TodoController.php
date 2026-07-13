@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 use Illuminate\Support\Collection;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
+use Intranet\Modules\Schulzeugnis\Models\Klassentext;
 use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
 use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
@@ -43,6 +44,7 @@ class TodoController
             'meineTexteGruppen'     => [],
             'korrigierteGruppen'    => [],
             'zuKorrigierenGruppen'  => [],
+            'zuKorrigierenKlassentexte' => [],
             'meineTexteAnzahl'      => 0,
             'erledigtAnzahl'        => 0,
             'korrigierteAnzahl'     => 0,
@@ -107,6 +109,42 @@ class TodoController
             ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
             ->get();
 
+        // 2b) Offene Korrektur-Anfragen an mich bei KLASSENWEITEN Texten (klassen-, nicht
+        //     schülerbezogen) – separat, da sie keine Schüler-Zeile haben.
+        $ktKorrektur = Klassentext::whereIn('status', self::KORREKTUR_OFFEN)
+            ->whereHas('korrektoren', fn ($q) => $q->whereIn('zeugnis_schuljahr_lehrer.id', $meineLehrerIds))
+            ->whereHas('klasse', fn ($k) => $k->where('schuljahr_id', $schuljahr->id))
+            ->with(['klasse.stufe', 'fach'])
+            ->get();
+
+        $ktGruppen = $ktKorrektur
+            ->groupBy(fn (Klassentext $kt) => $kt->klasse_id)
+            ->map(function (Collection $g) {
+                $klasse = $g->first()->klasse;
+
+                return [
+                    'label' => 'Klasse ' . ($klasse->name ?? '—'),
+                    'sort'  => $klasse->name ?? '',
+                    'farbe' => $klasse->stufe?->farbe ?: '#64748b',
+                    'sub'   => $klasse->stufe?->name,
+                    'items' => $g
+                        ->sortBy(fn (Klassentext $kt) => $kt->fach_id === null ? -1 : ($kt->fach?->reihenfolge ?? 999))
+                        ->map(fn (Klassentext $kt) => [
+                            'url'    => route('module.schulzeugnis.klassenraeume.klassentexte.edit', [
+                                'klasse' => $kt->klasse_id,
+                                'fach'   => $kt->fach_id === null ? 'haupt' : $kt->fach_id,
+                            ]),
+                            'fach'   => $kt->fach?->name ?? 'Hauptzeugnis',
+                            'status' => $kt->statusMeta(),
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->sortBy('sort', SORT_NATURAL)
+            ->values()
+            ->all();
+
         // Eigene Texte aufteilen:
         //  - „Korrigierte" = Status „Korrektur durchgeführt" (eigener Tab)
         //  - „Meine Zeugnistexte" = der Rest (offen + erledigt); die Erledigten sind
@@ -124,10 +162,11 @@ class TodoController
             'meineTexteGruppen'    => $this->gruppiere($meineTexte, $modus),
             'korrigierteGruppen'   => $this->gruppiere($korrigierte, $modus),
             'zuKorrigierenGruppen' => $this->gruppiere($korrektur, $modus),
+            'zuKorrigierenKlassentexte' => $ktGruppen,
             'meineTexteAnzahl'     => $offenAnzahl,
             'erledigtAnzahl'       => $erledigtAnzahl,
             'korrigierteAnzahl'    => $korrigierte->count(),
-            'zuKorrigierenAnzahl'  => $korrektur->count(),
+            'zuKorrigierenAnzahl'  => $korrektur->count() + $ktKorrektur->count(),
             'stati'                => Abschnitt::STATI,
         ]);
     }

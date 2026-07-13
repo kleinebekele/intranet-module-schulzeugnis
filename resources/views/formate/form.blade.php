@@ -107,4 +107,5 @@
             </div>
         </form>
     </div>
+    @include('schulzeugnis::zeugnisse._textarea-schrift')
 </x-app-layout>

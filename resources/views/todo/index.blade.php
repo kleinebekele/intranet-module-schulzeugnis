@@ -221,13 +221,17 @@
             <div class="todo-panels">
                 <div class="todo-loader" aria-hidden="true"><div class="todo-spinner"></div></div>
                 @foreach ($panels as $key => $panel)
+                    @php $ktBlock = $key === 'zu' ? $zuKorrigierenKlassentexte : []; @endphp
                     <div class="todo-panel" data-panel="{{ $key }}" hidden>
-                        @if (empty($panel['gruppen']))
+                        @if (! empty($ktBlock))
+                            @include('schulzeugnis::todo._klassentexte', ['ktGruppen' => $ktBlock, 'farbeKlasse' => $farbeKlasse])
+                        @endif
+                        @if (! empty($panel['gruppen']))
+                            @include('schulzeugnis::todo._gruppen', ['gruppen' => $panel['gruppen'], 'farbeKlasse' => $farbeKlasse])
+                        @elseif (empty($ktBlock))
                             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
                                 {{ $panel['leer'] }}
                             </div>
-                        @else
-                            @include('schulzeugnis::todo._gruppen', ['gruppen' => $panel['gruppen'], 'farbeKlasse' => $farbeKlasse])
                         @endif
                     </div>
                 @endforeach

@@ -1,5 +1,8 @@
 {{-- Gemeinsame Editor-Optik für Abschnitt- UND Klassentext-Editor. --}}
 <style>
+    /* Zeugnistexte kompakter setzen (viele Textareas liefen auf Default-16px). */
+    textarea { font-size: .8125rem; line-height: 1.5; }
+
     .zt-page { max-width: 92rem; }
     .zt-cols { display: grid; gap: 1rem; }
     @media (min-width: 1024px) {
