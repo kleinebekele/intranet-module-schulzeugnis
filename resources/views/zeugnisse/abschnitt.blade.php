@@ -432,6 +432,9 @@
     </div>
 
     <style>
+        /* Zeugnistexte kompakter setzen (viele Textareas liefen auf Default-16px). */
+        textarea { font-size: .8125rem; line-height: 1.5; }
+
         .zt-page { max-width: 92rem; }
         .zt-cols { display: grid; gap: 1rem; }
         @media (min-width: 1024px) {
@@ -713,6 +716,81 @@
             });
             modal.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', close));
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        })();
+
+        // Hinweis beim Speichern: Korrektor ausgewählt, aber der Status würde ihn
+        // nicht sehen lassen (nur „Frei zur Korrektur"/„In Korrektur"/„Korrektur
+        // nötig" tauchen bei Korrektoren auf). Nutzer kann Status mitsetzen ODER
+        // bewusst nur vormerken. (Gleiches Verhalten wie im Klassentext-Editor.)
+        (function () {
+            const korr = document.getElementById('zt-korr');
+            if (!korr) return;
+            const form = korr.closest('form');
+            const statusHidden = document.querySelector('#zt-status input[type=hidden]');
+            if (!form || !statusHidden) return;
+
+            const SICHTBAR_FUER_KORREKTOR = ['frei_zur_korrektur', 'in_korrektur', 'korrektur_noetig'];
+            let bestaetigt = false;
+
+            function setzeStatusFrei() {
+                statusHidden.value = 'frei_zur_korrektur';
+                const li  = document.querySelector('#zt-status .zt-status-list li[data-value="frei_zur_korrektur"]');
+                const btn = document.querySelector('#zt-status .zt-status-btn');
+                if (li && btn) {
+                    const label = btn.querySelector('.zt-status-label');
+                    const icon  = btn.querySelector('.bx');
+                    if (label) label.textContent = li.dataset.label;
+                    if (icon)  { icon.className = 'bx ' + li.dataset.icon; icon.style.color = li.dataset.color; }
+                }
+            }
+
+            function absenden() { bestaetigt = true; form.submit(); }
+
+            function zeigeHinweis() {
+                const back = document.createElement('div');
+                back.style.cssText = 'position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(17,24,39,.5)';
+                const box = document.createElement('div');
+                box.style.cssText = 'background:#fff;border-radius:.75rem;max-width:34rem;width:100%;box-shadow:0 20px 50px -12px rgba(0,0,0,.5);padding:1.25rem';
+                box.innerHTML =
+                    '<div style="display:flex;gap:.6rem;align-items:flex-start">'
+                  + '<i class="bx bxs-error" style="font-size:1.7rem;color:#f59e0b;line-height:1"></i>'
+                  + '<div><p style="font-weight:600;color:#1f2937">Korrektor ausgewählt – aber der Status passt (noch) nicht</p>'
+                  + '<p style="margin-top:.35rem;font-size:.875rem;color:#4b5563;line-height:1.5">Ein zugewiesener Korrektor sieht den Text erst unter „zu&nbsp;Korrigieren", wenn der Status auf <strong>„Frei zur Korrektur"</strong> steht. Beim aktuellen Status wird der Korrektor nur schon einmal vorgemerkt.</p></div></div>';
+                const row = document.createElement('div');
+                row.style.cssText = 'margin-top:1.1rem;display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end';
+
+                const bSet = document.createElement('button');
+                bSet.type = 'button';
+                bSet.textContent = 'Status „Frei zur Korrektur" setzen & speichern';
+                bSet.style.cssText = 'border:0;border-radius:.5rem;background:#4f46e5;color:#fff;padding:.5rem .9rem;font-size:.875rem;font-weight:500;cursor:pointer';
+                bSet.addEventListener('click', () => { setzeStatusFrei(); back.remove(); absenden(); });
+
+                const bOk = document.createElement('button');
+                bOk.type = 'button';
+                bOk.textContent = 'Verstanden – nur vormerken';
+                bOk.style.cssText = 'border:1px solid #d1d5db;border-radius:.5rem;background:#fff;color:#374151;padding:.5rem .9rem;font-size:.875rem;font-weight:500;cursor:pointer';
+                bOk.addEventListener('click', () => { back.remove(); absenden(); });
+
+                const bCancel = document.createElement('button');
+                bCancel.type = 'button';
+                bCancel.textContent = 'Abbrechen';
+                bCancel.style.cssText = 'border:0;border-radius:.5rem;background:transparent;color:#6b7280;padding:.5rem .7rem;font-size:.875rem;cursor:pointer';
+                bCancel.addEventListener('click', () => back.remove());
+
+                row.appendChild(bCancel); row.appendChild(bOk); row.appendChild(bSet);
+                box.appendChild(row); back.appendChild(box); document.body.appendChild(back);
+                back.addEventListener('click', (e) => { if (e.target === back) back.remove(); });
+                bSet.focus();
+            }
+
+            form.addEventListener('submit', function (e) {
+                if (bestaetigt) return;
+                const anzahl = form.querySelectorAll('input[name="korrektoren[]"]').length;
+                if (anzahl > 0 && SICHTBAR_FUER_KORREKTOR.indexOf(statusHidden.value) === -1) {
+                    e.preventDefault();
+                    zeigeHinweis();
+                }
+            });
         })();
     </script>
 </x-app-layout>
