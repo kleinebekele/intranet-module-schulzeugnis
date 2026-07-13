@@ -150,13 +150,15 @@ class TodoController
         // Eigene Texte in die ToDo-Kategorien aufteilen:
         //  - „In Korrektur"   = meine Texte, die ich zur Korrektur freigegeben habe und
         //                       die gerade bearbeitet werden (in_korrektur / korrektur_noetig)
-        //  - „Korrigierte"    = Status „Korrektur durchgeführt"
+        //  - „Korrigierte"    = Status „Korrektur durchgeführt" (NUR hier, nicht in „Meine Aufgaben")
         //  - „Meine Aufgaben" = alle übrigen eigenen Texte; „Vollständig" ist je Gruppe
         //                       per Toggle einblendbar (Aufteilung in gruppiere()).
         $imKorrekturLauf = ['in_korrektur', 'korrektur_noetig'];
         $inKorrektur     = $eigene->filter(fn (Abschnitt $a) => in_array($a->status, $imKorrekturLauf, true))->values();
         $korrigierte     = $eigene->filter(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
-        $meineAufgaben   = $eigene->reject(fn (Abschnitt $a) => in_array($a->status, $imKorrekturLauf, true))->values();
+
+        $nichtMeineAufgaben = array_merge($imKorrekturLauf, ['korrektur_durchgefuehrt']);
+        $meineAufgaben      = $eigene->reject(fn (Abschnitt $a) => in_array($a->status, $nichtMeineAufgaben, true))->values();
 
         $offenAnzahl    = $meineAufgaben->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig')->count();
         $erledigtAnzahl = $meineAufgaben->count() - $offenAnzahl;
