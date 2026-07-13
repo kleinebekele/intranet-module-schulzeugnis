@@ -15,6 +15,7 @@
         .fach { margin-bottom: 2.5mm; }
         .fach b { display: block; }
         .falz { position: absolute; top: 0; bottom: 0; border-left: 0.2mm dashed #cbd5e1; }
+        .falz-h { position: absolute; left: 0; right: 0; border-top: 0.2mm dashed #cbd5e1; }
     </style>
 </head>
 <body>
@@ -66,6 +67,7 @@
 
         @if (count($sheet['panels']) > 1)
             <div class="falz" style="left: {{ $sheet['b'] / 2 }}mm;"></div>
+            <div class="falz-h" style="top: {{ $sheet['h'] / 2 }}mm;"></div>
         @endif
     </div>
 @endforeach
