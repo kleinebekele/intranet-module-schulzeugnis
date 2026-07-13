@@ -718,11 +718,72 @@
             select(STATE.elements.length - 1);
         }
 
+        // Zielwerte fürs Verkleinern vor dem Upload: unter nginx-Default (1 MB) bleiben
+        // und riesige Fotos auf eine sinnvolle Kantenlänge bringen (spart auch PDF-Größe,
+        // da das Bild beim Rendern als base64 eingebettet wird).
+        const BILD_MAX_KANTE = 1600;            // px, längste Seite
+        const BILD_ZIEL_BYTES = 900 * 1024;     // ~0,9 MB
+
+        function ladeBild(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild nicht lesbar')); };
+                img.src = url;
+            });
+        }
+
+        function canvasBlob(canvas, typ, q) {
+            return new Promise((resolve) => canvas.toBlob((b) => resolve(b), typ, q));
+        }
+
+        // Gibt eine (ggf. verkleinerte) Datei zurück; im Zweifel das Original.
+        async function verkleinereBild(file) {
+            if (file.size <= BILD_ZIEL_BYTES) return file;
+            let img;
+            try { img = await ladeBild(file); } catch (e) { return file; }
+            let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            if (!w || !h) return file;
+
+            const scale = Math.min(1, BILD_MAX_KANTE / Math.max(w, h));
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+
+            // PNG zuerst versuchen (erhält Transparenz), wenn es klein genug wird.
+            if (/png$/i.test(file.type)) {
+                ctx.clearRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                const png = await canvasBlob(canvas, 'image/png');
+                if (png && png.size <= BILD_ZIEL_BYTES) return new File([png], 'logo.png', { type: 'image/png' });
+            }
+
+            // Sonst JPEG auf weißem Grund (wie die PDF-Ausgabe PNG-Alpha weiß füllt).
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            let q = 0.85, blob = await canvasBlob(canvas, 'image/jpeg', q);
+            while (blob && blob.size > BILD_ZIEL_BYTES && q > 0.5) {
+                q -= 0.1;
+                blob = await canvasBlob(canvas, 'image/jpeg', q);
+            }
+            return blob ? new File([blob], 'logo.jpg', { type: 'image/jpeg' }) : file;
+        }
+
         async function onFile() {
             const f = fileInput.files[0];
             if (!f) return;
+            statusEl.textContent = 'verarbeite Bild …';
+            let datei = f;
+            try { datei = await verkleinereBild(f); } catch (e) { datei = f; }
+            if (datei !== f) {
+                statusEl.textContent = 'Bild verkleinert (' + Math.round(f.size / 1024) + ' → ' + Math.round(datei.size / 1024) + ' KB)';
+            }
             const fd = new FormData();
-            fd.append('bild', f);
+            fd.append('bild', datei);
             statusEl.textContent = 'lade Bild hoch …';
             try {
                 const r = await fetch(UPLOAD_URL, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' }, body: fd });
@@ -736,7 +797,7 @@
                     select(STATE.elements.length - 1); statusEl.textContent = 'Bild hinzugefügt';
                 }
             } catch (e) { statusEl.textContent = 'Netzwerkfehler beim Upload'; }
-            finally { fileMode = 'add'; fileTarget = -1; }
+            finally { fileMode = 'add'; fileTarget = -1; fileInput.value = ''; }
         }
 
         async function save() {
