@@ -919,51 +919,149 @@ class ZeugnisController
         return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId]);
     }
 
-    /** Klassenweiten Text (je Fach bzw. Haupttext) direkt bearbeiten. */
+    /**
+     * Klassenweiten Text (je Fach bzw. Haupttext) direkt bearbeiten – verhält sich
+     * wie der Abschnitt-Editor (Notiz, Korrektoren, Status, Verlauf, Navigation),
+     * nur mit EINEM Textfeld statt Schüler-/Klassentext-Tabs.
+     */
     public function klassentextEdit(Klasse $klasse, string $fach)
     {
         [$fachId, $fachModel] = $this->fachAusParam($fach);
-        $this->autorisiereKlassentext($klasse, $fachId);
+        $klasse->loadMissing('schuljahr');
+        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        if ($kt->exists) {
+            $kt->load('korrektoren');
+        }
+
+        $berechtigung = $this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user());
+        if ($berechtigung === 'keine') {
+            abort(403, 'Keine Berechtigung, diesen Klassentext zu bearbeiten.');
+        }
+
+        $nachbarn = $this->klassentextNachbarn($klasse, $fachId);
 
         return view('schulzeugnis::klassen.klassentext', [
-            'klasse'      => $klasse->load('schuljahr'),
-            'fach'        => $fachModel,
-            'fachParam'   => $fach,
-            'klassentext' => $this->klassentextFuer($klasse->id, $fachId),
-            'stati'       => Abschnitt::STATI,
+            'klasse'         => $klasse,
+            'fach'           => $fachModel,
+            'fachParam'      => $fach,
+            'klassentext'    => $kt,
+            'stati'          => Abschnitt::STATI,
+            'korrekturStati' => self::KORREKTUR_STATI,
+            'verlauf'        => $this->klassentextVerlauf($kt),
+            'berechtigung'   => $berechtigung,
+            'alleLehrer'     => Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->orderBy('nachname')->orderBy('vorname')->get(),
+            'korrektorIds'   => $kt->exists ? $kt->korrektoren->pluck('id')->all() : [],
+            'readonly'       => false,
+            'navPrev'        => $nachbarn['prev'],
+            'navNext'        => $nachbarn['next'],
+            'navPosition'    => $nachbarn['position'],
+            'navGesamt'      => $nachbarn['gesamt'],
         ]);
     }
 
     public function klassentextUpdate(Request $request, Klasse $klasse, string $fach)
     {
         [$fachId, $fachModel] = $this->fachAusParam($fach);
-        $this->autorisiereKlassentext($klasse, $fachId);
+        $klasse->loadMissing('schuljahr');
+        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        if ($kt->exists) {
+            $kt->load('korrektoren');
+        }
+        $b     = $this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user());
+        $label = $fachModel?->name ?? 'Haupttext';
 
+        if ($b === 'keine') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->with('error', 'Du bist für diesen Klassentext nicht berechtigt.');
+        }
+
+        // Korrektor: nur Text korrigieren + Korrektur-Status.
+        if ($b === 'korrektor') {
+            $data = $request->validate([
+                'text'   => ['nullable', 'string'],
+                'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
+                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index'])],
+            ]);
+
+            $altText   = $kt->text;
+            $altStatus = $kt->status;
+            $kt->text = $data['text'] ?? null;
+            $kt->status = $data['status'];
+            $kt->save();
+
+            $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
+            $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
+            $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
+
+            return $this->klassentextZiel($request, $klasse, $fachId, $label);
+        }
+
+        // Voll berechtigt: Text, Notiz, Status, Korrektoren.
         $data = $request->validate([
-            'text'   => ['nullable', 'string'],
-            'status' => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+            'text'          => ['nullable', 'string'],
+            'notiz'         => ['nullable', 'string'],
+            'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
+            'korrektoren'   => ['array'],
+            'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
+            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index'])],
         ]);
 
-        $kt  = $this->klassentextFuer($klasse->id, $fachId);
-        $alt = $kt->text;
+        // Korrektor-Pflicht nur beim reinen Speichern erzwingen (beim Blättern nicht blockieren).
+        $korrektoren = $data['korrektoren'] ?? [];
+        $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index'], true);
+        if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->withInput()
+                ->with('error', 'Bitte mindestens einen Korrektor auswählen, wenn der Text zur Korrektur freigegeben wird.');
+        }
+
+        $altText   = $kt->text;
+        $altNotiz  = $kt->notiz;
+        $altStatus = $kt->status;
         $kt->text = $data['text'] ?? null;
+        $kt->notiz = $data['notiz'] ?? null;
         $kt->status = $data['status'];
         $kt->save();
 
-        if ((string) $alt !== (string) $kt->text) {
-            Protokoll::log('klassentext_geaendert', [
-                'schuljahr_id' => $klasse->schuljahr_id,
-                'beschreibung' => 'Klassenweiter Text (' . ($fachModel?->name ?? 'Haupttext') . ') in ' . ($klasse->name ?? '') . ' geändert',
-                'neu_wert'     => $kt->text,
-            ]);
+        $kt->korrektoren()->sync($korrektoren);
 
-            // Überlauf-Analyse aller Zeugnisse der Klasse verwerfen – sie ist jetzt veraltet.
-            Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
-                ->update(['ueberlauf_status' => null]);
+        $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
+        $this->logKlassentext($kt, $klasse->schuljahr_id, 'Notiz', $altNotiz, $kt->notiz, 'klassentext_notiz');
+        $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
+        $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
+
+        return $this->klassentextZiel($request, $klasse, $fachId, $label);
+    }
+
+    /** Einen früheren Textstand eines Klassentextes aus dem Verlauf wiederherstellen. */
+    public function klassentextWiederherstellen(Request $request, Klasse $klasse, string $fach)
+    {
+        [$fachId] = $this->fachAusParam($fach);
+        $klasse->loadMissing('schuljahr');
+        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        if ($kt->exists) {
+            $kt->load('korrektoren');
         }
 
-        return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
-            ->with('status', 'Klassentext (' . ($fachModel?->name ?? 'Haupttext') . ') gespeichert.');
+        if ($this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user()) !== 'voll') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->with('error', 'Nur die verantwortliche Lehrkraft kann frühere Stände wiederherstellen.');
+        }
+
+        $eintrag = Protokoll::where('klassentext_id', $kt->id)
+            ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_wiederhergestellt'])
+            ->findOrFail((int) $request->input('protokoll_id'));
+
+        $ziel = $eintrag->alt_wert;
+        $alt  = $kt->text;
+        $kt->text = $ziel;
+        $kt->save();
+
+        $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $alt, $ziel, 'klassentext_wiederhergestellt');
+        $this->klassentextUeberlaufVerwerfen($klasse, $alt, $ziel);
+
+        return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+            ->with('status', 'Früherer Klassentext-Stand wiederhergestellt.');
     }
 
     /** Route-Parameter → [fachId|null, Fach|null]. "haupt" = Haupttext. */
@@ -977,32 +1075,188 @@ class ZeugnisController
         return [$model->id, $model];
     }
 
-    /** Klassentext darf ändern: Admin, Fachlehrer des Fachs bzw. Klassenlehrer (Haupttext). */
-    private function autorisiereKlassentext(Klasse $klasse, ?int $fachId): void
+    /**
+     * Berechtigung für einen Klassentext: 'voll' | 'korrektor' | 'keine' – analog
+     * zu {@see berechtigung()} für Abschnitte.
+     */
+    private function klassentextBerechtigung(Klassentext $kt, ?int $fachId, Klasse $klasse, $user): string
     {
-        $user = auth()->user();
-        if ($user?->is_admin) {
-            return;
+        if (! $user) {
+            return 'keine';
+        }
+        if ($user->is_admin) {
+            return 'voll';
         }
 
         $meineLehrerIds = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)
-            ->where('core_user_id', $user?->id)
+            ->where('core_user_id', $user->id)
             ->pluck('id');
 
         if ($fachId === null) {
             if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
-                return;
+                return 'voll';
             }
         } else {
             $fachLehrer = Lehrauftrag::where('klasse_id', $klasse->id)
                 ->where('fach_id', $fachId)
                 ->pluck('lehrer_id');
             if ($meineLehrerIds->intersect($fachLehrer)->isNotEmpty()) {
-                return;
+                return 'voll';
             }
         }
 
-        abort(403, 'Keine Berechtigung, diesen Klassentext zu bearbeiten.');
+        $korrektorIds = $kt->exists
+            ? ($kt->relationLoaded('korrektoren') ? $kt->korrektoren->pluck('id') : $kt->korrektoren()->pluck('zeugnis_schuljahr_lehrer.id'))
+            : collect();
+        if ($meineLehrerIds->intersect($korrektorIds)->isNotEmpty()) {
+            return 'korrektor';
+        }
+
+        return 'keine';
+    }
+
+    /**
+     * Vor-/nächstes Fach der Klasse für die „Danach weiter"-Navigation (gleiche
+     * Reihenfolge wie die Spalten der Zeugnis-Tabelle). Haupttext hat keine Nachbarn.
+     *
+     * @return array{prev:?array{param:string,name:string},next:?array{param:string,name:string},position:?int,gesamt:?int}
+     */
+    private function klassentextNachbarn(Klasse $klasse, ?int $fachId): array
+    {
+        $leer = ['prev' => null, 'next' => null, 'position' => null, 'gesamt' => null];
+        if ($fachId === null) {
+            return $leer;
+        }
+
+        $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
+        $kette   = Fach::whereIn('id', $fachIds)->orderBy('reihenfolge')->orderBy('name')->get()
+            ->map(fn ($f) => ['param' => (string) $f->id, 'name' => $f->name])
+            ->values();
+
+        $idx = $kette->search(fn ($e) => $e['param'] === (string) $fachId);
+        if ($idx === false) {
+            return $leer;
+        }
+
+        return [
+            'prev'     => $idx > 0 ? $kette[$idx - 1] : null,
+            'next'     => $idx < $kette->count() - 1 ? $kette[$idx + 1] : null,
+            'position' => $idx + 1,
+            'gesamt'   => $kette->count(),
+        ];
+    }
+
+    /** Redirect nach dem Speichern gemäß Auswahl „weiter" (nächstes/voriges Fach bzw. Zeugnis-Tabelle). */
+    private function klassentextZiel(Request $request, Klasse $klasse, ?int $fachId, string $label)
+    {
+        $weiter   = (string) $request->input('weiter');
+        $nachbarn = $this->klassentextNachbarn($klasse, $fachId);
+
+        $ziel = null;
+        if ($weiter === 'next' && $nachbarn['next']) {
+            $ziel = $nachbarn['next']['param'];
+        } elseif ($weiter === 'prev' && $nachbarn['prev']) {
+            $ziel = $nachbarn['prev']['param'];
+        }
+
+        if ($ziel !== null) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $ziel])
+                ->with('status', 'Klassentext (' . $label . ') gespeichert.');
+        }
+        if ($weiter === 'index') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                ->with('status', 'Klassentext (' . $label . ') gespeichert.');
+        }
+
+        $fachParam = $fachId === null ? 'haupt' : (string) $fachId;
+
+        return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fachParam])
+            ->with('status', 'Klassentext (' . $label . ') gespeichert.');
+    }
+
+    /** Eine Feld-Änderung am Klassentext protokollieren – nur wenn sie sich unterscheidet. */
+    private function logKlassentext(Klassentext $kt, ?int $schuljahrId, string $feld, ?string $alt, ?string $neu, string $aktion = 'klassentext_geaendert'): void
+    {
+        if ((string) $alt === (string) $neu) {
+            return;
+        }
+
+        Protokoll::log($aktion, [
+            'schuljahr_id'   => $schuljahrId,
+            'klassentext_id' => $kt->id,
+            'beschreibung'   => $feld,
+            'alt_wert'       => $alt,
+            'neu_wert'       => $neu,
+        ]);
+    }
+
+    /** Überlauf-Analyse aller Zeugnisse der Klasse verwerfen, wenn sich der Klassentext geändert hat. */
+    private function klassentextUeberlaufVerwerfen(Klasse $klasse, ?string $alt, ?string $neu): void
+    {
+        if ((string) $alt === (string) $neu) {
+            return;
+        }
+        Zeugnis::whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+            ->update(['ueberlauf_status' => null]);
+    }
+
+    /** Änderungsverlauf eines Klassentextes (Text/Notiz/Status) für die Editor-Anzeige. */
+    private function klassentextVerlauf(Klassentext $kt)
+    {
+        if (! $kt->exists) {
+            return collect();
+        }
+
+        $hex = self::STATUS_FARBE_HEX;
+
+        return Protokoll::where('klassentext_id', $kt->id)
+            ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_notiz', 'klassentext_status', 'klassentext_wiederhergestellt'])
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Protokoll $e) use ($hex) {
+                $istStatus  = $e->aktion === 'klassentext_status';
+                $istRestore = $e->aktion === 'klassentext_wiederhergestellt';
+                $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
+
+                $status  = null;
+                $summary = '';
+
+                if ($istStatus) {
+                    $meta = fn ($k) => Abschnitt::STATI[$k] ?? ['label' => $k, 'icon' => 'bx-circle', 'farbe' => 'gray'];
+                    $ma = $meta($e->alt_wert);
+                    $mn = $meta($e->neu_wert);
+                    $status = [
+                        'altLabel' => $ma['label'], 'altIcon' => $ma['icon'], 'altColor' => $hex[$ma['farbe']] ?? '#9ca3af',
+                        'neuLabel' => $mn['label'], 'neuIcon' => $mn['icon'], 'neuColor' => $hex[$mn['farbe']] ?? '#9ca3af',
+                    ];
+                } elseif ($istRestore) {
+                    $n = $wz($e->neu_wert);
+                    $summary = $n > 0
+                        ? ($n . ($n === 1 ? ' Wort' : ' Wörter') . ' wiederhergestellt')
+                        : 'Text geleert (wiederhergestellt)';
+                } else {
+                    $delta = $wz($e->neu_wert) - $wz($e->alt_wert);
+                    $summary = $delta > 0
+                        ? ($delta . ($delta === 1 ? ' Wort' : ' Wörter') . ' hinzugefügt')
+                        : ($delta < 0
+                            ? (abs($delta) . (abs($delta) === 1 ? ' Wort' : ' Wörter') . ' entfernt')
+                            : 'überarbeitet (gleiche Wortzahl)');
+                }
+
+                return [
+                    'id'                => $e->id,
+                    'zeit'              => $e->created_at,
+                    'akteur'            => $e->akteur_name,
+                    'feld'              => $e->beschreibung,
+                    'istStatus'         => $istStatus,
+                    'wiederhergestellt' => $istRestore,
+                    'status'            => $status,
+                    'summary'           => $summary,
+                    'alt'               => (string) $e->alt_wert,
+                    'neu'               => (string) $e->neu_wert,
+                    'restorable'        => in_array($e->aktion, ['klassentext_geaendert', 'klassentext_wiederhergestellt'], true),
+                ];
+            });
     }
 
     /** Überlauf-Analyse neu berechnen und am Zeugnis zwischenspeichern. */

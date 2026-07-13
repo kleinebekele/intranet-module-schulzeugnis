@@ -43,6 +43,7 @@ Route::middleware(['web', 'auth'])
         Route::get('klassenraeume/{klasse}/zeugnisse', [ZeugnisController::class, 'index'])->name('klassenraeume.zeugnisse.index');
         Route::get('klassenraeume/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextEdit'])->name('klassenraeume.klassentexte.edit');
         Route::put('klassenraeume/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextUpdate'])->name('klassenraeume.klassentexte.update');
+        Route::post('klassenraeume/{klasse}/klassentext/{fach}/wiederherstellen', [ZeugnisController::class, 'klassentextWiederherstellen'])->name('klassenraeume.klassentexte.wiederherstellen');
         Route::post('klassenraeume/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('klassenraeume.zeugnisse.store');
 
         // Sammel-Ausgabe: alle Zeugnisse eines Typs (fach|haupt) einer Klasse in einer Datei.
