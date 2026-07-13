@@ -14,15 +14,18 @@
         .sig { border-top: 0.3mm solid #374151; padding-top: 1mm; }
         .fach { margin-bottom: 2.5mm; }
         .fach b { display: block; }
-        .falz { position: absolute; top: 0; bottom: 0; border-left: 0.2mm dashed #cbd5e1; }
-        .falz-h { position: absolute; left: 0; right: 0; border-top: 0.2mm dashed #cbd5e1; }
+        /* Broschüre: jede A4-Seite (Panel) als eigener gestrichelter Rahmen, damit die
+           einzelnen Seiten klar erkennbar sind. Der mittige, geteilte Rand ist zugleich
+           die Falzlinie. */
+        .panel-falz { border: 0.2mm dashed #cbd5e1; }
     </style>
 </head>
 <body>
 @foreach ($seiten as $sheet)
+    @php $mehrseitig = count($sheet['panels']) > 1; @endphp
     <div class="sheet" style="width: {{ $sheet['b'] }}mm; height: {{ $sheet['h'] }}mm;">
         @foreach ($sheet['panels'] as $panel)
-            <div class="panel" style="left: {{ $panel['x'] }}mm; top: {{ $panel['y'] }}mm; width: {{ $panel['w'] }}mm; height: {{ $panel['h'] }}mm;">
+            <div class="panel {{ $mehrseitig ? 'panel-falz' : '' }}" style="left: {{ $panel['x'] }}mm; top: {{ $panel['y'] }}mm; width: {{ $panel['w'] }}mm; height: {{ $panel['h'] }}mm;">
                 @foreach ($panel['elemente'] as $el)
                     @php
                         $x = $el['x']; $y = $el['y']; $w = $el['w']; $h = $el['h'];
@@ -65,10 +68,6 @@
             </div>
         @endforeach
 
-        @if (count($sheet['panels']) > 1)
-            <div class="falz" style="left: {{ $sheet['b'] / 2 }}mm;"></div>
-            <div class="falz-h" style="top: {{ $sheet['h'] / 2 }}mm;"></div>
-        @endif
     </div>
 @endforeach
 </body>
