@@ -23,8 +23,8 @@ use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
  */
 class ZeugnisController
 {
-    /** Status, die ein zugewiesener Korrektor setzen darf (inkl. Ablehnen). */
-    private const KORREKTUR_STATI = ['in_korrektur', 'korrektur_durchgefuehrt', 'korrektur_abgelehnt'];
+    /** Status, die ein zugewiesener Korrektor setzen darf. */
+    private const KORREKTUR_STATI = ['in_korrektur', 'korrektur_durchgefuehrt'];
 
     /** Status, für die beim Speichern Korrektoren ausgewählt sein müssen. */
     private const BRAUCHT_KORREKTOREN = ['frei_zur_korrektur', 'korrektur_noetig'];
@@ -824,6 +824,48 @@ class ZeugnisController
             ->with('status', 'Früherer Stand wiederhergestellt.');
     }
 
+    /**
+     * Korrektor lehnt die Korrektur ab: er entfernt sich selbst aus den Korrektoren
+     * und der Status geht zurück auf „Frei zur Korrektur" – die verantwortliche
+     * Lehrkraft kann dann eine andere Korrektorin/einen anderen Korrektor wählen.
+     */
+    public function abschnittAblehnen(Abschnitt $abschnitt)
+    {
+        $abschnitt->load('zeugnis.schueler.klasse', 'korrektoren');
+        $zeugnis = $abschnitt->zeugnis;
+        $klasse  = $zeugnis?->schueler?->klasse;
+
+        if ($zeugnis?->istAbgeschlossen()) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
+                ->with('error', 'Das Zeugnis ist abgeschlossen.');
+        }
+        if ($this->berechtigung($abschnitt, auth()->user()) !== 'korrektor') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
+                ->with('error', 'Nur ein zugewiesener Korrektor kann die Korrektur ablehnen.');
+        }
+
+        $meine = $klasse
+            ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->where('core_user_id', auth()->id())->pluck('id')->all()
+            : [];
+        $alt = $abschnitt->korrektoren->pluck('id')->all();
+        $neu = array_values(array_diff($alt, $meine));
+
+        $abschnitt->korrektoren()->sync($neu);
+        $this->protokolliereKorrektoren([
+            'schuljahr_id' => $zeugnis?->schueler?->schuljahr_id,
+            'zeugnis_id'   => $zeugnis?->id,
+            'abschnitt_id' => $abschnitt->id,
+        ], 'abschnitt_korrektor', $alt, $neu);
+
+        $altStatus = $abschnitt->status;
+        $abschnitt->status = 'frei_zur_korrektur';
+        $abschnitt->save();
+        $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
+
+        return redirect()->route('module.schulzeugnis.todo.index')
+            ->with('status', 'Korrektur abgelehnt – der Text ist zurück bei der Lehrkraft.');
+    }
+
     /** Eine Feld-Änderung (Text/Notiz/Klassentext) protokollieren – nur wenn sie sich unterscheidet. */
     private function logFeld(Abschnitt $abschnitt, string $feld, ?string $alt, ?string $neu, string $aktion = 'abschnitt_geaendert'): void
     {
@@ -1110,6 +1152,40 @@ class ZeugnisController
 
         return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
             ->with('status', 'Früherer Klassentext-Stand wiederhergestellt.');
+    }
+
+    /** Korrektor lehnt die Korrektur eines Klassentexts ab (siehe abschnittAblehnen). */
+    public function klassentextAblehnen(Klasse $klasse, string $fach)
+    {
+        [$fachId] = $this->fachAusParam($fach);
+        $klasse->loadMissing('schuljahr');
+        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        if ($kt->exists) {
+            $kt->load('korrektoren');
+        }
+
+        if ($this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user()) !== 'korrektor') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->with('error', 'Nur ein zugewiesener Korrektor kann die Korrektur ablehnen.');
+        }
+
+        $meine = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->where('core_user_id', auth()->id())->pluck('id')->all();
+        $alt   = $kt->korrektoren->pluck('id')->all();
+        $neu   = array_values(array_diff($alt, $meine));
+
+        $kt->korrektoren()->sync($neu);
+        $this->protokolliereKorrektoren([
+            'schuljahr_id'   => $klasse->schuljahr_id,
+            'klassentext_id' => $kt->id,
+        ], 'klassentext_korrektor', $alt, $neu);
+
+        $altStatus = $kt->status;
+        $kt->status = 'frei_zur_korrektur';
+        $kt->save();
+        $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
+
+        return redirect()->route('module.schulzeugnis.todo.index')
+            ->with('status', 'Korrektur abgelehnt – der Klassentext ist zurück bei der Lehrkraft.');
     }
 
     /** Route-Parameter → [fachId|null, Fach|null]. "haupt" = Haupttext. */

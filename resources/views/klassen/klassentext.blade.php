@@ -160,6 +160,20 @@
                 </div>
             </div>
         </form>
+
+        {{-- Korrektor: Korrektur ablehnen (entfernt sich selbst, Status zurück auf „Frei zur Korrektur"). --}}
+        @if ($berechtigung === 'korrektor')
+            <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.klassentexte.ablehnen', ['klasse' => $klasse, 'fach' => $fachParam]) }}"
+                  class="mt-4 rounded-xl border border-red-100 bg-red-50/40 p-4"
+                  onsubmit="return confirm('Korrektur ablehnen? Du wirst als Korrektor entfernt und der Text geht als „Frei zur Korrektur“ zurück an die Lehrkraft.');">
+                @csrf
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100">
+                    <i class="bx bx-x-circle text-lg"></i> Korrektur ablehnen
+                </button>
+                <p class="mt-1 text-xs text-gray-500">Entfernt dich als Korrektor und setzt den Status zurück auf „Frei zur Korrektur" – die Lehrkraft wählt dann jemand anderen.</p>
+            </form>
+        @endif
         </div>{{-- /zt-main --}}
 
         <div class="zt-side">

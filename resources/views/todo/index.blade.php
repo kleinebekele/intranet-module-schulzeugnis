@@ -177,7 +177,7 @@
             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
                 Es ist kein Schuljahr aktiv geschaltet.
             </div>
-        @elseif ($meineTexteAnzahl === 0 && $erledigtAnzahl === 0 && $korrigierteAnzahl === 0 && $zuKorrigierenAnzahl === 0)
+        @elseif ($meineTexteAnzahl === 0 && $erledigtAnzahl === 0 && $korrigierteAnzahl === 0 && $zuKorrigierenAnzahl === 0 && $inKorrekturAnzahl === 0)
             <div class="rounded-xl border border-gray-200 bg-white p-8 text-center">
                 <i class="bx bx-check-circle text-3xl text-green-500"></i>
                 <p class="mt-2 font-medium text-gray-800">Alles erledigt.</p>
@@ -188,10 +188,10 @@
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div class="todo-tabs">
                     <button type="button" class="todo-tab-btn" data-tab="meine">
-                        Meine Zeugnistexte
+                        Meine Aufgaben
                         <span class="todo-tab-anzahl" title="offen">{{ $meineTexteAnzahl }}</span>
                         @if ($erledigtAnzahl > 0)
-                            <span class="todo-tab-anzahl todo-tab-gruen" title="erledigt">{{ $erledigtAnzahl }}</span>
+                            <span class="todo-tab-anzahl todo-tab-gruen" title="vollständig">{{ $erledigtAnzahl }}</span>
                         @endif
                     </button>
                     <button type="button" class="todo-tab-btn" data-tab="korrigierte">
@@ -199,6 +199,9 @@
                     </button>
                     <button type="button" class="todo-tab-btn" data-tab="zu">
                         zu Korrigieren <span class="todo-tab-anzahl" title="offen">{{ $zuKorrigierenAnzahl }}</span>
+                    </button>
+                    <button type="button" class="todo-tab-btn" data-tab="inkorrektur">
+                        In Korrektur <span class="todo-tab-anzahl" title="offen">{{ $inKorrekturAnzahl }}</span>
                     </button>
                 </div>
 
@@ -213,9 +216,10 @@
 
             @php
                 $panels = [
-                    'meine'       => ['gruppen' => $meineTexteGruppen,    'leer' => 'Keine eigenen Texte.'],
+                    'meine'       => ['gruppen' => $meineTexteGruppen,    'leer' => 'Keine eigenen Aufgaben.'],
                     'korrigierte' => ['gruppen' => $korrigierteGruppen,   'leer' => 'Noch nichts mit „Korrektur durchgeführt".'],
                     'zu'          => ['gruppen' => $zuKorrigierenGruppen, 'leer' => 'Aktuell nichts zu korrigieren.'],
+                    'inkorrektur' => ['gruppen' => $inKorrekturGruppen,   'leer' => 'Aktuell nichts in Korrektur.'],
                 ];
             @endphp
             <div class="todo-panels">

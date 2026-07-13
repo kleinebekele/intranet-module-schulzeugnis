@@ -44,11 +44,13 @@ class TodoController
             'meineTexteGruppen'     => [],
             'korrigierteGruppen'    => [],
             'zuKorrigierenGruppen'  => [],
+            'inKorrekturGruppen'    => [],
             'zuKorrigierenKlassentexte' => [],
             'meineTexteAnzahl'      => 0,
             'erledigtAnzahl'        => 0,
             'korrigierteAnzahl'     => 0,
             'zuKorrigierenAnzahl'   => 0,
+            'inKorrekturAnzahl'     => 0,
             'stati'                 => Abschnitt::STATI,
         ];
 
@@ -145,28 +147,34 @@ class TodoController
             ->values()
             ->all();
 
-        // Eigene Texte aufteilen:
-        //  - „Korrigierte" = Status „Korrektur durchgeführt" (eigener Tab)
-        //  - „Meine Zeugnistexte" = der Rest (offen + erledigt); die Erledigten sind
-        //    je Gruppe einzeln einblendbar (Aufteilung passiert in gruppiere()).
-        $korrigierte = $eigene->filter(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
-        $meineTexte  = $eigene->reject(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
+        // Eigene Texte in die ToDo-Kategorien aufteilen:
+        //  - „In Korrektur"   = meine Texte, die ich zur Korrektur freigegeben habe und
+        //                       die gerade bearbeitet werden (in_korrektur / korrektur_noetig)
+        //  - „Korrigierte"    = Status „Korrektur durchgeführt"
+        //  - „Meine Aufgaben" = alle übrigen eigenen Texte; „Vollständig" ist je Gruppe
+        //                       per Toggle einblendbar (Aufteilung in gruppiere()).
+        $imKorrekturLauf = ['in_korrektur', 'korrektur_noetig'];
+        $inKorrektur     = $eigene->filter(fn (Abschnitt $a) => in_array($a->status, $imKorrekturLauf, true))->values();
+        $korrigierte     = $eigene->filter(fn (Abschnitt $a) => $a->status === 'korrektur_durchgefuehrt')->values();
+        $meineAufgaben   = $eigene->reject(fn (Abschnitt $a) => in_array($a->status, $imKorrekturLauf, true))->values();
 
-        $offenAnzahl    = $meineTexte->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig')->count();
-        $erledigtAnzahl = $meineTexte->count() - $offenAnzahl;
+        $offenAnzahl    = $meineAufgaben->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig')->count();
+        $erledigtAnzahl = $meineAufgaben->count() - $offenAnzahl;
 
         return view('schulzeugnis::todo.index', [
             'schuljahr'            => $schuljahr,
             'istAdmin'             => false,
             'modus'                => $modus,
-            'meineTexteGruppen'    => $this->gruppiere($meineTexte, $modus),
+            'meineTexteGruppen'    => $this->gruppiere($meineAufgaben, $modus),
             'korrigierteGruppen'   => $this->gruppiere($korrigierte, $modus),
             'zuKorrigierenGruppen' => $this->gruppiere($korrektur, $modus),
+            'inKorrekturGruppen'   => $this->gruppiere($inKorrektur, $modus),
             'zuKorrigierenKlassentexte' => $ktGruppen,
             'meineTexteAnzahl'     => $offenAnzahl,
             'erledigtAnzahl'       => $erledigtAnzahl,
             'korrigierteAnzahl'    => $korrigierte->count(),
             'zuKorrigierenAnzahl'  => $korrektur->count() + $ktKorrektur->count(),
+            'inKorrekturAnzahl'    => $inKorrektur->count(),
             'stati'                => Abschnitt::STATI,
         ]);
     }
