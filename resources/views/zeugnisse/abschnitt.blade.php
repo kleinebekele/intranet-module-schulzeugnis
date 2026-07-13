@@ -48,8 +48,12 @@
                 Du bist als <strong>Korrektor:in</strong> für diesen Text zugewiesen. Du kannst den Text korrigieren und den Status auf „In Korrektur" oder „Korrektur durchgeführt" setzen.
             </div>
         @elseif ($berechtigung === 'keine')
-            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                Nur-Ansicht – du bist für diesen Text nicht berechtigt.
+            <div class="flex items-center gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900 shadow-sm">
+                <i class="bx bxs-error text-3xl text-amber-500"></i>
+                <div>
+                    <p class="font-bold">Nur-Ansicht</p>
+                    <p class="text-sm">Du bist für diesen Text nicht berechtigt und kannst ihn nicht bearbeiten.</p>
+                </div>
             </div>
         @endif
 
