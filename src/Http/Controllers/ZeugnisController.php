@@ -617,21 +617,25 @@ class ZeugnisController
             $data = $request->validate([
                 'inhalt' => ['nullable', 'string'],
                 'note'   => ['nullable', 'string', 'max:20'],
+                'notiz'  => ['nullable', 'string'],
                 'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
                 'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altInhalt = $abschnitt->inhalt;
+            $altNotiz  = $abschnitt->notiz;
             $altStatus = $abschnitt->status;
             $abschnitt->inhalt = $data['inhalt'] ?? null;
             if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
                 $abschnitt->note = $data['note'] ?? null;
             }
+            $abschnitt->notiz = $data['notiz'] ?? null;
             $abschnitt->status = $data['status'];
             $abschnitt->save();
 
             $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
             $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
+            $this->logFeld($abschnitt, 'Notiz', $altNotiz, $abschnitt->notiz, 'abschnitt_notiz');
             $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
             $this->ueberlaufNeuBerechnen($zeugnis);
@@ -1084,21 +1088,25 @@ class ZeugnisController
         if ($b === 'korrektor') {
             $data = $request->validate([
                 'text'   => ['nullable', 'string'],
+                'notiz'  => ['nullable', 'string'],
                 'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
                 'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altText   = $kt->text;
+            $altNotiz  = $kt->notiz;
             $altStatus = $kt->status;
             $kt->text = $data['text'] ?? null;
+            $kt->notiz = $data['notiz'] ?? null;
             $kt->status = $data['status'];
             $kt->save();
 
             $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
+            $this->logKlassentext($kt, $klasse->schuljahr_id, 'Notiz', $altNotiz, $kt->notiz, 'klassentext_notiz');
             $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
             $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
-            return $this->klassentextZiel($request, $klasse, $fachId, $label);
+            return $this->klassentextZiel($request, $klasse, $fachId, $label, $b);
         }
 
         // Voll berechtigt: Text, Notiz, Status, Korrektoren.
@@ -1140,7 +1148,7 @@ class ZeugnisController
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
         $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
-        return $this->klassentextZiel($request, $klasse, $fachId, $label);
+        return $this->klassentextZiel($request, $klasse, $fachId, $label, $b);
     }
 
     /** Einen früheren Textstand eines Klassentextes aus dem Verlauf wiederherstellen. */
@@ -1290,9 +1298,18 @@ class ZeugnisController
         ];
     }
 
-    /** Redirect nach dem Speichern gemäß Auswahl „weiter" (nächstes/voriges Fach bzw. Zeugnis-Tabelle). */
-    private function klassentextZiel(Request $request, Klasse $klasse, ?int $fachId, string $label)
+    /**
+     * Redirect nach dem Speichern gemäß Auswahl „weiter" (nächstes/voriges Fach bzw.
+     * Zeugnis-Tabelle). Korrektoren dürfen NICHT zu Nachbar-Fächern springen (dort sind
+     * sie nicht zugewiesen → 403); sie landen wieder in ihren ToDos.
+     */
+    private function klassentextZiel(Request $request, Klasse $klasse, ?int $fachId, string $label, string $berechtigung = 'voll')
     {
+        if ($berechtigung !== 'voll') {
+            return redirect()->route('module.schulzeugnis.todo.index')
+                ->with('status', 'Klassentext (' . $label . ') gespeichert.');
+        }
+
         $weiter   = (string) $request->input('weiter');
         $nachbarn = $this->klassentextNachbarn($klasse, $fachId);
 

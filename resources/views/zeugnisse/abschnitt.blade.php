@@ -180,7 +180,7 @@
                 </label>
             @endif
 
-            @if ($berechtigung === 'voll')
+            @if (in_array($berechtigung, ['voll', 'korrektor']))
                 <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
                     <textarea name="notiz" rows="2" @disabled($readonly)
                               class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"

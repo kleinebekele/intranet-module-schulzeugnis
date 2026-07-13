@@ -59,7 +59,7 @@
                 @error('text') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            @if ($berechtigung === 'voll')
+            @if (in_array($berechtigung, ['voll', 'korrektor']))
                 <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
                     <textarea name="notiz" rows="2"
                               class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -113,35 +113,42 @@
             </div>
 
             @php
-                $vorauswahl = $navNext ? 'next' : ($navPrev ? 'prev' : 'index');
+                $istVoll = $berechtigung === 'voll';
                 $urlPrev  = $navPrev ? route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $navPrev['param']]) : '';
                 $urlNext  = $navNext ? route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $navNext['param']]) : '';
                 $labelNext = $navNext ? 'Nächstes Fach: ' . $navNext['name'] : 'Nächstes Fach (keins)';
                 $labelPrev = $navPrev ? 'Vorheriges Fach: ' . $navPrev['name'] : 'Vorheriges Fach (keins)';
+                // Korrektoren dürfen nicht zu Nachbar-Fächern springen (dort nicht zugewiesen → 403);
+                // sie kehren zu ihren ToDos zurück.
+                $zurueckUrl   = $istVoll ? $indexUrl : route('module.schulzeugnis.todo.index');
+                $zurueckLabel = $istVoll ? 'Zurück zur Zeugnis-Tabelle' : 'Zurück zu meinen ToDos';
+                $vorauswahl = $istVoll ? ($navNext ? 'next' : ($navPrev ? 'prev' : 'index')) : 'index';
             @endphp
             <div class="space-y-3 border-t border-gray-100 pt-4" id="zt-nav">
                 <p class="text-sm font-medium text-gray-700">Danach weiter zu:</p>
                 <div class="space-y-1.5 text-sm">
-                    <label class="flex items-center gap-2 {{ $navNext ? 'text-gray-700' : 'text-gray-400' }}">
-                        <input type="radio" name="weiter" value="next" data-url="{{ $urlNext }}"
-                               @checked($vorauswahl === 'next') @disabled(! $navNext)
-                               class="text-indigo-600 focus:ring-indigo-500">
-                        <i class="bx bx-right-arrow-alt text-lg text-indigo-500"></i>
-                        <span>{{ $labelNext }}</span>
-                    </label>
-                    <label class="flex items-center gap-2 {{ $navPrev ? 'text-gray-700' : 'text-gray-400' }}">
-                        <input type="radio" name="weiter" value="prev" data-url="{{ $urlPrev }}"
-                               @checked($vorauswahl === 'prev') @disabled(! $navPrev)
-                               class="text-indigo-600 focus:ring-indigo-500">
-                        <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
-                        <span>{{ $labelPrev }}</span>
-                    </label>
+                    @if ($istVoll)
+                        <label class="flex items-center gap-2 {{ $navNext ? 'text-gray-700' : 'text-gray-400' }}">
+                            <input type="radio" name="weiter" value="next" data-url="{{ $urlNext }}"
+                                   @checked($vorauswahl === 'next') @disabled(! $navNext)
+                                   class="text-indigo-600 focus:ring-indigo-500">
+                            <i class="bx bx-right-arrow-alt text-lg text-indigo-500"></i>
+                            <span>{{ $labelNext }}</span>
+                        </label>
+                        <label class="flex items-center gap-2 {{ $navPrev ? 'text-gray-700' : 'text-gray-400' }}">
+                            <input type="radio" name="weiter" value="prev" data-url="{{ $urlPrev }}"
+                                   @checked($vorauswahl === 'prev') @disabled(! $navPrev)
+                                   class="text-indigo-600 focus:ring-indigo-500">
+                            <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
+                            <span>{{ $labelPrev }}</span>
+                        </label>
+                    @endif
                     <label class="flex items-center gap-2 text-gray-700">
-                        <input type="radio" name="weiter" value="index" data-url="{{ $indexUrl }}"
+                        <input type="radio" name="weiter" value="index" data-url="{{ $zurueckUrl }}"
                                @checked($vorauswahl === 'index')
                                class="text-indigo-600 focus:ring-indigo-500">
-                        <i class="bx bx-table text-lg text-indigo-500"></i>
-                        Zurück zur Zeugnis-Tabelle
+                        <i class="bx {{ $istVoll ? 'bx-table' : 'bx-list-check' }} text-lg text-indigo-500"></i>
+                        {{ $zurueckLabel }}
                     </label>
                 </div>
 
@@ -154,7 +161,7 @@
                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         <i class="bx bx-x text-lg"></i> Abbrechen
                     </button>
-                    @if ($navGesamt)
+                    @if ($istVoll && $navGesamt)
                         <span class="ml-auto text-xs text-gray-400">Fach {{ $navPosition }} von {{ $navGesamt }}</span>
                     @endif
                 </div>
