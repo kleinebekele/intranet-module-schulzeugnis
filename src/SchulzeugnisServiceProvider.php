@@ -76,8 +76,8 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user', group: $verwaltung)
             ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list', group: $verwaltung)
             ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'book', group: $verwaltung)
-            ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category')
-            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'category')
+            ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category', group: $verwaltung)
+            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'category', group: $verwaltung)
             ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category')
             ->item('altfachzeugnisse', 'Alte Fachzeugnisse umwandeln', 'module.schulzeugnis.altfachzeugnisse.form', icon: 'category');
     }
