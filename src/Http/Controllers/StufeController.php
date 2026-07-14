@@ -93,10 +93,24 @@ class StufeController
             'name'        => ['required', 'string', 'max:255'],
             'farbe'       => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'reihenfolge' => ['nullable', 'integer', 'min:0'],
+            'von_klasse'  => ['nullable', 'integer', 'min:1', 'max:13'],
+            'bis_klasse'  => ['nullable', 'integer', 'min:1', 'max:13'],
+        ], [], [
+            'von_klasse' => 'Klassenstufe von',
+            'bis_klasse' => 'Klassenstufe bis',
         ]);
 
         $data['farbe']       = strtolower($data['farbe']);
         $data['reihenfolge'] = $request->integer('reihenfolge');
+
+        // Klassenstufen-Bereich: leer bleibt leer; von/bis ggf. sortieren.
+        $von = $request->filled('von_klasse') ? (int) $request->input('von_klasse') : null;
+        $bis = $request->filled('bis_klasse') ? (int) $request->input('bis_klasse') : null;
+        if ($von !== null && $bis !== null && $von > $bis) {
+            [$von, $bis] = [$bis, $von];
+        }
+        $data['von_klasse'] = $von;
+        $data['bis_klasse'] = $bis;
 
         return $data;
     }

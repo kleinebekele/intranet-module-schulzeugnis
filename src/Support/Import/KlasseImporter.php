@@ -66,7 +66,7 @@ class KlasseImporter
         }
 
         $stufen = [];
-        foreach (Stufe::all() as $s) {
+        foreach (Stufe::orderBy('reihenfolge')->orderBy('id')->get() as $s) {
             $stufen[$this->key($s->name)] = $s;
         }
         $formate = [];
@@ -102,8 +102,8 @@ class KlasseImporter
             }
             $gesehen[$this->key($name)] = $zeilenNr;
 
-            // Optionale Zuordnungen auflösen. Rückgabe je: [wert-oder-null, zelle, warnungOderLeer, angegeben]
-            [$stufeId, $stufeZelle, $stufeWarn]     = $this->aufloesen($stufeKey, $zeile, $stufen, 'Stufe', fn ($s) => $s->id, fn ($s) => $s->name);
+            // Optionale Zuordnungen auflösen. Rückgabe je: [wert-oder-null, zelle, warnungOderLeer]
+            [$stufeId, $stufeZelle, $stufeWarn]     = $this->stufeAufloesen($stufeKey, $zeile, $stufen);
             [$formatId, $formatZelle, $formatWarn]  = $this->aufloesen($formatKey, $zeile, $formate, 'Format', fn ($f) => $f->id, fn ($f) => $f->name);
             [$lehrerId, $lehrerZelle, $lehrerWarn]  = $this->aufloesen($lehrerKey, $zeile, $lehrer, 'Klassenlehrer-ID', fn ($l) => $l->id, fn ($l) => $l->fullName(), true);
 
@@ -234,6 +234,49 @@ class KlasseImporter
         }
 
         return [null, "⚠ {$wert}?", "{$bezeichnung} „{$wert}“ nicht gefunden"];
+    }
+
+    /**
+     * Stufe auflösen: erst als Name, sonst als Klassenstufe (führende Nullen weg,
+     * Zahl 1–13 → Schulstufe). Rückgabe [id-oder-null, anzeige-zelle, warnung].
+     *
+     * @param  array<string,string>  $zeile
+     * @param  array<string,object>  $stufen  Schlüssel → Stufe
+     * @return array{0:?int,1:string,2:string}
+     */
+    private function stufeAufloesen(?string $key, array $zeile, array $stufen): array
+    {
+        if ($key === null) {
+            return [null, '—', ''];
+        }
+        $wert = trim($zeile[$key] ?? '');
+        if ($wert === '') {
+            return [null, '—', ''];
+        }
+
+        // 1) Direkter Namenstreffer.
+        if (isset($stufen[$this->key($wert)])) {
+            $s = $stufen[$this->key($wert)];
+
+            return [(int) $s->id, $s->name, ''];
+        }
+
+        // 2) Als Klassenstufe interpretieren: führende Nullen entfernen, dann die
+        // Schulstufe suchen, deren gepflegter Bereich (von–bis) die Zahl abdeckt.
+        $zahl = ltrim($wert, '0');
+        if ($zahl !== '' && ctype_digit($zahl)) {
+            $klassenstufe = (int) $zahl;
+            foreach ($stufen as $s) {
+                if ($s->von_klasse !== null && $s->bis_klasse !== null
+                    && $klassenstufe >= $s->von_klasse && $klassenstufe <= $s->bis_klasse) {
+                    return [(int) $s->id, "{$s->name} (Kl. {$klassenstufe})", ''];
+                }
+            }
+
+            return [null, "⚠ {$wert}?", "Keine Schulstufe deckt Klassenstufe {$klassenstufe} ab (Bereich unter „Schulstufen“ pflegen)"];
+        }
+
+        return [null, "⚠ {$wert}?", "Stufe „{$wert}“ nicht gefunden"];
     }
 
     private function spalte(array $kopf, array $aliase): ?string

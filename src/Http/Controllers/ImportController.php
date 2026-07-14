@@ -57,11 +57,11 @@ class ImportController
             'weiter'    => ['route' => 'module.schulzeugnis.klassen.jahr', 'label' => 'Zu den Klassen'],
             'spalten'   => [
                 ['name' => 'Klasse',          'pflicht' => true,  'info' => 'Name der Klasse, z. B. „5a" (Wiedererkennung je Schuljahr)'],
-                ['name' => 'Stufe',           'pflicht' => false, 'info' => 'Name einer vorhandenen Schulstufe (wird nicht neu angelegt)'],
+                ['name' => 'Stufe',           'pflicht' => false, 'info' => 'Name einer vorhandenen Schulstufe ODER Klassenstufe 1–13 (wird zugeordnet: 1–4 Primarstufe, 5–7 Sek I, 8–10 Sek II, 11–13 Oberstufe)'],
                 ['name' => 'Standardformat',  'pflicht' => false, 'info' => 'Name eines vorhandenen Zeugnisformats (Fachzeugnis-Vorlage)'],
                 ['name' => 'KlassenlehrerID', 'pflicht' => false, 'info' => 'externe ID (Linear) der Lehrkraft – muss als Lehrer im Schuljahr existieren'],
             ],
-            'beispiel'  => "Klasse;Stufe;Standardformat;KlassenlehrerID\n5a;Unterstufe;Textzeugnis 5-8;L-1042\n6b;Mittelstufe;Textzeugnis 5-8;L-1043",
+            'beispiel'  => "Klasse;Stufe;Standardformat;KlassenlehrerID\n5a;05;Textzeugnis;5133\n11b;11;Notenzeugnis;5140",
         ],
     ];
 

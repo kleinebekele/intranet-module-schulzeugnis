@@ -84,6 +84,22 @@
                         <p class="mt-1 text-xs text-gray-400">Sortierung der Stufen (klein zuerst).</p>
                         @error('reihenfolge') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Klassenstufen</label>
+                        <div class="mt-1 flex items-center gap-2">
+                            <input type="number" name="von_klasse" id="von_klasse" min="1" max="13"
+                                   value="{{ old('von_klasse', $stufe->von_klasse) }}" placeholder="von"
+                                   class="w-20 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <span class="text-gray-400">bis</span>
+                            <input type="number" name="bis_klasse" id="bis_klasse" min="1" max="13"
+                                   value="{{ old('bis_klasse', $stufe->bis_klasse) }}" placeholder="bis"
+                                   class="w-20 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <p class="mt-1 text-xs text-gray-400">Für den Klassenimport: welche Klassenstufen (1–13) gehören zu dieser Schulstufe? Leer lassen, wenn nicht per Zahl zugeordnet werden soll.</p>
+                        @error('von_klasse') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        @error('bis_klasse') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
                 </div>
 
                 <div class="pt-6 text-center">

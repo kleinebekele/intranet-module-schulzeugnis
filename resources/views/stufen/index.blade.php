@@ -36,6 +36,9 @@
                         <div class="text-xs text-gray-400">
                             {{ $stufe->farbe }}
                             &middot; {{ $stufe->klassen_count }} {{ $stufe->klassen_count === 1 ? 'Klasse' : 'Klassen' }}
+                            @if ($stufe->klassenBereich())
+                                &middot; <span class="text-gray-500">{{ $stufe->klassenBereich() }}</span>
+                            @endif
                         </div>
                     </div>
                 </div>
