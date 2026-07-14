@@ -94,7 +94,7 @@ class TodoController
                     if (! $klasseId) {
                         return false;
                     }
-                    if ($a->typ === Abschnitt::TYP_HAUPTTEXT) {
+                    if (in_array($a->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_SPRUCH], true)) {
                         return $klassenAlsKL->contains($klasseId);
                     }
 
@@ -130,13 +130,13 @@ class TodoController
                     'farbe' => $klasse->stufe?->farbe ?: '#64748b',
                     'sub'   => $klasse->stufe?->name,
                     'items' => $g
-                        ->sortBy(fn (Klassentext $kt) => $kt->fach_id === null ? -1 : ($kt->fach?->reihenfolge ?? 999))
+                        ->sortBy(fn (Klassentext $kt) => $kt->art === 'spruch' ? 9999 : ($kt->fach_id === null ? -1 : ($kt->fach?->reihenfolge ?? 999)))
                         ->map(fn (Klassentext $kt) => [
                             'url'    => route('module.schulzeugnis.klassenraeume.klassentexte.edit', [
                                 'klasse' => $kt->klasse_id,
-                                'fach'   => $kt->fach_id === null ? 'haupt' : $kt->fach_id,
+                                'fach'   => $kt->art === 'spruch' ? 'spruch' : ($kt->fach_id === null ? 'haupt' : $kt->fach_id),
                             ]),
-                            'fach'   => $kt->fach?->name ?? 'Hauptzeugnis',
+                            'fach'   => $kt->art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($kt->fach?->name ?? 'Hauptzeugnis'),
                             'status' => $kt->statusMeta(),
                         ])
                         ->values()
@@ -209,12 +209,13 @@ class TodoController
             'natural' => true,
         ];
         $fachMeta = function (Abschnitt $a) {
-            $istHaupt = $a->typ === Abschnitt::TYP_HAUPTTEXT;
+            $istHaupt  = $a->typ === Abschnitt::TYP_HAUPTTEXT;
+            $istSpruch = $a->typ === Abschnitt::TYP_SPRUCH;
 
             return [
-                'key'     => $istHaupt ? 'haupt' : (string) $a->fach_id,
-                'label'   => $istHaupt ? 'Haupttext' : ($a->fach?->name ?? 'Fachtext'),
-                'sort'    => $istHaupt ? -1 : ($a->fach?->reihenfolge ?? 999),
+                'key'     => $istHaupt ? 'haupt' : ($istSpruch ? 'spruch' : (string) $a->fach_id),
+                'label'   => $istHaupt ? 'Haupttext' : ($istSpruch ? 'Zeugnisspruch' : ($a->fach?->name ?? 'Fachtext')),
+                'sort'    => $istHaupt ? -1 : ($istSpruch ? 9999 : ($a->fach?->reihenfolge ?? 999)),
                 'farbe'   => null,
                 'sub'     => null,
                 'natural' => false,
