@@ -10,6 +10,7 @@ use Intranet\Modules\Schulzeugnis\Support\Import\FaecherImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\ImportFehler;
 use Intranet\Modules\Schulzeugnis\Support\Import\KlasseImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\LehrerImporter;
+use Intranet\Modules\Schulzeugnis\Support\Import\SchuelerImporter;
 
 /**
  * Stammdaten-Import aus dem Schulverwaltungsprogramm (Linear/MSSQL → CSV im storage).
@@ -62,6 +63,23 @@ class ImportController
                 ['name' => 'KlassenlehrerID', 'pflicht' => false, 'info' => 'externe ID (Linear) der Lehrkraft – muss als Lehrer im Schuljahr existieren'],
             ],
             'beispiel'  => "Klasse;Stufe;Standardformat;KlassenlehrerID\n5a;05;Textzeugnis;5133\n11b;11;Notenzeugnis;5140",
+        ],
+        'schueler' => [
+            'titel'     => 'Schüler',
+            'hinweis'   => 'Schüler je Schuljahr. Wiedererkennung über die SchuelerID (sonst Name + Geburtsdatum). Klasse per Name; unbekannte Klasse → Schüler wird ohne Klasse angelegt (Klassen zuerst importieren).',
+            'schuljahr' => true,
+            'importer'  => SchuelerImporter::class,
+            'weiter'    => ['route' => 'module.schulzeugnis.schueler.jahr', 'label' => 'Zu den Schülern'],
+            'spalten'   => [
+                ['name' => 'SchuelerID',   'pflicht' => false, 'info' => 'Stabile ID aus Linear = Match-Schlüssel (verbindet dieselbe Person über die Jahre)'],
+                ['name' => 'Klasse',       'pflicht' => false, 'info' => 'Name der Klasse im Ziel-Schuljahr (muss vorhanden sein)'],
+                ['name' => 'Vorname',      'pflicht' => true,  'info' => 'Vorname'],
+                ['name' => 'Nachname',     'pflicht' => true,  'info' => 'Nachname'],
+                ['name' => 'Geburtsdatum', 'pflicht' => false, 'info' => 'TT.MM.JJJJ oder JJJJ-MM-TT'],
+                ['name' => 'Geburtsort',   'pflicht' => false, 'info' => 'Geburtsort'],
+                ['name' => 'Geschlecht',   'pflicht' => false, 'info' => 'm / w / d (auch „männlich/weiblich/divers")'],
+            ],
+            'beispiel'  => "SchuelerID;Klasse;Vorname;Nachname;Geburtsdatum;Geburtsort;Geschlecht\nS-2042;5a;Anna;Muster;14.03.2015;Bielefeld;w",
         ],
     ];
 
