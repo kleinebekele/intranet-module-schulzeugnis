@@ -597,13 +597,16 @@
             var el = document.getElementById('zt-scroll');
             if (!el) { return; }
             function anpassen() {
-                var oben  = el.getBoundingClientRect().top;
-                var hoehe = window.innerHeight - oben - 16; // etwas Luft nach unten
-                el.style.maxHeight = Math.max(320, hoehe) + 'px';
+                var rect = el.getBoundingClientRect();
+                // Was steht UNTER der Tabelle (Footer etc.)? = Dokumenthöhe minus Container-Unterkante.
+                var unten = document.documentElement.scrollHeight - (window.scrollY + rect.bottom);
+                // Tabelle nur bis knapp über den Footer aufziehen → Seite passt exakt ins Fenster.
+                var ziel  = window.innerHeight - rect.top - Math.max(0, unten) - 8;
+                el.style.maxHeight = Math.max(320, ziel) + 'px';
             }
             anpassen();
-            window.addEventListener('resize', anpassen);
             window.addEventListener('load', anpassen);
+            window.addEventListener('resize', anpassen);
         })();
     </script>
 </x-app-layout>
