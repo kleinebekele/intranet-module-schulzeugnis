@@ -21,11 +21,6 @@ class AltZeugnisController
     private const A4_BREITE = 210.0;
     private const A4_HOEHE = 297.0;
 
-    public function form()
-    {
-        return view('schulzeugnis::altzeugnisse.form');
-    }
-
     public function umwandeln(Request $request)
     {
         $request->validate([
@@ -130,7 +125,7 @@ class AltZeugnisController
         $pfad = storage_path('app/schulzeugnis-tmp/' . $token . '.pdf');
 
         if (! is_file($pfad)) {
-            return redirect()->route('module.schulzeugnis.altzeugnisse.form')
+            return redirect()->route('module.schulzeugnis.altumwandeln.index')
                 ->with('error', 'Die umgewandelte Datei ist nicht mehr verfügbar (abgelaufen). Bitte erneut umwandeln.');
         }
 

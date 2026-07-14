@@ -66,19 +66,20 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
         // eigenen Eintrag, seine Rollen und seine Zugriffsregel.
         $verwaltung = 'Zeugnisverwaltung';
 
+        // Jede Zeile ein eigenes Symbol – bei 11 Unterpunkten sind mehrfach
+        // vergebene Icons als Orientierung wertlos.
         return ModuleManifest::make('schulzeugnis', 'Schulzeugnis', icon: 'book')
-            ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'home')
+            ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'door')
             ->item('todo', 'Meine ToDos', 'module.schulzeugnis.todo.index', icon: 'list')
             ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar', group: $verwaltung)
             ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.index', icon: 'users', group: $verwaltung)
-            ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'category', group: $verwaltung)
+            ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'layers', group: $verwaltung)
             ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user', group: $verwaltung)
-            ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user', group: $verwaltung)
-            ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list', group: $verwaltung)
-            ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'book', group: $verwaltung)
-            ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category', group: $verwaltung)
-            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'category', group: $verwaltung)
-            ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category')
-            ->item('altfachzeugnisse', 'Alte Fachzeugnisse umwandeln', 'module.schulzeugnis.altfachzeugnisse.form', icon: 'category');
+            ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'chalkboard', group: $verwaltung)
+            ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'book-content', group: $verwaltung)
+            ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'quote', group: $verwaltung)
+            ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'layout', group: $verwaltung)
+            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'import', group: $verwaltung)
+            ->item('altumwandeln', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altumwandeln.index', icon: 'transfer');
     }
 }

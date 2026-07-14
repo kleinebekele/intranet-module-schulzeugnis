@@ -18,11 +18,6 @@ class AltFachzeugnisController
 {
     use VerarbeitetAlteZeugnisse;
 
-    public function form()
-    {
-        return view('schulzeugnis::altfachzeugnisse.form');
-    }
-
     public function umwandeln(Request $request)
     {
         $request->validate([
@@ -112,7 +107,7 @@ class AltFachzeugnisController
         $pfad = storage_path('app/schulzeugnis-tmp/' . $token . '.pdf');
 
         if (! is_file($pfad)) {
-            return redirect()->route('module.schulzeugnis.altfachzeugnisse.form')
+            return redirect()->route('module.schulzeugnis.altumwandeln.index')
                 ->with('error', 'Die umgewandelte Datei ist nicht mehr verfügbar (abgelaufen). Bitte erneut umwandeln.');
         }
 

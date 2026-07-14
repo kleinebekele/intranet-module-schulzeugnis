@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltFachzeugnisController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\AltUmwandelnController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltZeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
@@ -77,15 +78,20 @@ Route::middleware(['web', 'auth'])
         Route::post('import/vorschau', [ImportController::class, 'vorschau'])->name('import.vorschau');
         Route::post('import/ausfuehren', [ImportController::class, 'ausfuehren'])->name('import.ausfuehren');
 
-        // Werkzeug: alte Zeugnis-PDF (je 4 A4-Seiten) in A3-Broschüre umschießen.
-        Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');
-        Route::post('alt-zeugnisse/umwandeln', [AltZeugnisController::class, 'umwandeln'])->name('altzeugnisse.umwandeln');
-        Route::get('alt-zeugnisse/download/{token}', [AltZeugnisController::class, 'download'])->name('altzeugnisse.download');
-
-        // Werkzeug: alte Fachzeugnisse (A4, duplex) – Leerseite bei ungerader Seitenzahl anhängen.
-        Route::get('alt-fachzeugnisse', [AltFachzeugnisController::class, 'form'])->name('altfachzeugnisse.form');
-        Route::post('alt-fachzeugnisse/umwandeln', [AltFachzeugnisController::class, 'umwandeln'])->name('altfachzeugnisse.umwandeln');
-        Route::get('alt-fachzeugnisse/download/{token}', [AltFachzeugnisController::class, 'download'])->name('altfachzeugnisse.download');
+        // Werkzeuge für PDFs aus dem alten Zeugnisprogramm – EIN Einstieg mit
+        // Format-Auswahl (Zeugnisse: je 4 A4-Seiten → A3-Broschüre umschießen;
+        // Fachzeugnisse: Leerseite bei ungerader Seitenzahl für sauberen Duplexdruck).
+        //
+        // Namenspräfix `altumwandeln.*` mit dem paramlosen `altumwandeln.index` als
+        // Anker: So ordnet EnsureModuleAccess auch die POST- und Download-Routen
+        // diesem Menüpunkt zu. Vorher hießen sie `altzeugnisse.form` – ein Name ohne
+        // `.index` deckt seine Unterrouten NICHT ab, wodurch Umwandeln und Download
+        // nur unter die Modul-Auffangregel fielen (erreichbar für jeden mit Modulzugang).
+        Route::get('alt-umwandeln', [AltUmwandelnController::class, 'index'])->name('altumwandeln.index');
+        Route::post('alt-umwandeln/zeugnisse', [AltZeugnisController::class, 'umwandeln'])->name('altumwandeln.zeugnisse');
+        Route::get('alt-umwandeln/zeugnisse/download/{token}', [AltZeugnisController::class, 'download'])->name('altumwandeln.zeugnisse.download');
+        Route::post('alt-umwandeln/fachzeugnisse', [AltFachzeugnisController::class, 'umwandeln'])->name('altumwandeln.fachzeugnisse');
+        Route::get('alt-umwandeln/fachzeugnisse/download/{token}', [AltFachzeugnisController::class, 'download'])->name('altumwandeln.fachzeugnisse.download');
 
         // Schuljahre – Anker des Moduls.
         Route::get('schuljahre', [SchuljahrController::class, 'index'])->name('schuljahre.index');

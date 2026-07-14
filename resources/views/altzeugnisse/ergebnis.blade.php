@@ -10,7 +10,7 @@
     </x-slot>
 
     <div class="max-w-xl space-y-4">
-        <a href="{{ route('module.schulzeugnis.altzeugnisse.form') }}"
+        <a href="{{ route('module.schulzeugnis.altumwandeln.index') }}"
            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
             &larr; Neue Datei umwandeln
         </a>
@@ -58,7 +58,7 @@
         @endif
 
         <div class="rounded-xl border border-gray-200 bg-white p-6">
-            <a href="{{ route('module.schulzeugnis.altzeugnisse.download', ['token' => $token, 'name' => $ausgabeName]) }}"
+            <a href="{{ route('module.schulzeugnis.altumwandeln.zeugnisse.download', ['token' => $token, 'name' => $ausgabeName]) }}"
                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                 <i class="bx bxs-file-pdf text-lg"></i> A3-Broschüre herunterladen
             </a>
