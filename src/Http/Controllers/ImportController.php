@@ -8,6 +8,7 @@ use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
 use Intranet\Modules\Schulzeugnis\Support\Import\CsvLeser;
 use Intranet\Modules\Schulzeugnis\Support\Import\FaecherImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\ImportFehler;
+use Intranet\Modules\Schulzeugnis\Support\Import\KlasseImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\LehrerImporter;
 
 /**
@@ -47,6 +48,20 @@ class ImportController
                 ['name' => 'Nachname',  'pflicht' => true,  'info' => 'Nachname der Lehrkraft'],
             ],
             'beispiel'  => "ExterneID;Vorname;Nachname\nL-1042;Anna;Muster\nL-1043;Bob;Beispiel",
+        ],
+        'klassen' => [
+            'titel'     => 'Klassen',
+            'hinweis'   => 'Klassen je Schuljahr. Wiedererkennung über den Klassennamen. Stufe/Format per Name, Klassenlehrer per externe ID – jeweils nur, wenn schon vorhanden (Lehrer zuerst importieren).',
+            'schuljahr' => true,
+            'importer'  => KlasseImporter::class,
+            'weiter'    => ['route' => 'module.schulzeugnis.klassen.jahr', 'label' => 'Zu den Klassen'],
+            'spalten'   => [
+                ['name' => 'Klasse',          'pflicht' => true,  'info' => 'Name der Klasse, z. B. „5a" (Wiedererkennung je Schuljahr)'],
+                ['name' => 'Stufe',           'pflicht' => false, 'info' => 'Name einer vorhandenen Schulstufe (wird nicht neu angelegt)'],
+                ['name' => 'Standardformat',  'pflicht' => false, 'info' => 'Name eines vorhandenen Zeugnisformats (Fachzeugnis-Vorlage)'],
+                ['name' => 'KlassenlehrerID', 'pflicht' => false, 'info' => 'externe ID (Linear) der Lehrkraft – muss als Lehrer im Schuljahr existieren'],
+            ],
+            'beispiel'  => "Klasse;Stufe;Standardformat;KlassenlehrerID\n5a;Unterstufe;Textzeugnis 5-8;L-1042\n6b;Mittelstufe;Textzeugnis 5-8;L-1043",
         ],
     ];
 
