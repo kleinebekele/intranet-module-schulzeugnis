@@ -13,6 +13,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\SpruchController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\StufeController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\TodoController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\ZeugnisController;
@@ -132,6 +133,15 @@ Route::middleware(['web', 'auth'])
         Route::put('faecher/{fach}', [FachController::class, 'update'])->name('faecher.update');
         Route::post('faecher/{fach}/archivieren', [FachController::class, 'toggle'])->name('faecher.toggle');
         Route::delete('faecher/{fach}', [FachController::class, 'destroy'])->name('faecher.destroy');
+
+        // Zeugnisspruch-Katalog – feste, jahresübergreifende Liste zum Auswählen.
+        Route::get('sprueche', [SpruchController::class, 'index'])->name('sprueche.index');
+        Route::get('sprueche/neu', [SpruchController::class, 'create'])->name('sprueche.create');
+        Route::post('sprueche', [SpruchController::class, 'store'])->name('sprueche.store');
+        Route::get('sprueche/{spruch}/bearbeiten', [SpruchController::class, 'edit'])->name('sprueche.edit');
+        Route::put('sprueche/{spruch}', [SpruchController::class, 'update'])->name('sprueche.update');
+        Route::post('sprueche/{spruch}/archivieren', [SpruchController::class, 'toggle'])->name('sprueche.toggle');
+        Route::delete('sprueche/{spruch}', [SpruchController::class, 'destroy'])->name('sprueche.destroy');
 
         // Schulstufen – feste, jahresübergreifende Liste mit Türfarbe.
         Route::get('stufen', [StufeController::class, 'index'])->name('stufen.index');

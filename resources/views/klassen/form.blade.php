@@ -16,8 +16,9 @@
         $bereicheListe = $bereiche->isNotEmpty()
             ? $bereiche
             : collect([(object) ['id' => null, 'name' => 'Allgemein']]);
-        $hatFach  = (bool) old('hat_fachzeugnis', $klasse->exists ? $klasse->hat_fachzeugnis : true);
-        $hatHaupt = (bool) old('hat_hauptzeugnis', $klasse->exists ? $klasse->hat_hauptzeugnis : false);
+        $hatFach   = (bool) old('hat_fachzeugnis', $klasse->exists ? $klasse->hat_fachzeugnis : true);
+        $hatHaupt  = (bool) old('hat_hauptzeugnis', $klasse->exists ? $klasse->hat_hauptzeugnis : false);
+        $hatSpruch = (bool) old('hat_zeugnisspruch', $klasse->exists ? $klasse->hat_zeugnisspruch : false);
     @endphp
 
     <div class="max-w-2xl">
@@ -154,6 +155,19 @@
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {{-- ============ Zeugnisspruch ============ --}}
+            <div class="rounded-lg border border-gray-200 p-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="hat_zeugnisspruch" id="hat_zeugnisspruch" value="1" @checked($hatSpruch)
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-semibold text-gray-800">Zeugnisspruch</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">
+                    Jeder Schüler erhält einen Spruch (in der Übersicht wie ein Fach). Nur der Klassenlehrer kann ihn setzen –
+                    Auswahl aus dem <a href="{{ route('module.schulzeugnis.sprueche.index') }}" class="text-indigo-600 hover:text-indigo-700">Spruch-Katalog</a>, danach frei editierbar.
+                </p>
             </div>
 
             <div class="flex items-center gap-3 pt-2">

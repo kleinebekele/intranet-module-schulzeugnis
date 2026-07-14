@@ -23,6 +23,9 @@ class Abschnitt extends Model
     /** Der eine Abschnitt eines Hauptzeugnisses – trägt Status/Korrektoren/Klassentext,
      *  seine mehreren Schülertexte (je Fachbereich) hängen als Bereichtext-Zeilen dran. */
     public const TYP_HAUPTZEUGNIS = 'hauptzeugnis';
+    /** Zeugnisspruch je Schüler – eigener Baustein (wie ein Fach), nur vom
+     *  Klassenlehrer setzbar; Inhalt aus dem Spruch-Katalog, danach frei editierbar. */
+    public const TYP_SPRUCH = 'zeugnisspruch';
 
     public const STATUS_STANDARD = 'unbearbeitet';
 

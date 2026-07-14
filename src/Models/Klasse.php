@@ -17,8 +17,9 @@ class Klasse extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'hat_fachzeugnis'  => 'boolean',
-        'hat_hauptzeugnis' => 'boolean',
+        'hat_fachzeugnis'   => 'boolean',
+        'hat_hauptzeugnis'  => 'boolean',
+        'hat_zeugnisspruch' => 'boolean',
     ];
 
     public function schuljahr(): BelongsTo

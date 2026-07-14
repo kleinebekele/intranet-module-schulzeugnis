@@ -20,11 +20,14 @@ class KlasseController
 {
     public function index(Schuljahr $schuljahr)
     {
+        // Natürliche Sortierung: "1, 2, … 10, 11, 12, 13" statt alphabetisch
+        // "1, 10, 11, 12, 13, 2, …". Cross-DB sicher in PHP (strnatcasecmp).
         $klassen = $schuljahr->klassen()
             ->with(['standardFormat', 'klassenlehrer'])
             ->withCount('lehrauftraege')
-            ->orderBy('name')
-            ->get();
+            ->get()
+            ->sort(fn ($a, $b) => strnatcasecmp($a->name, $b->name))
+            ->values();
 
         return view('schulzeugnis::klassen.index', compact('schuljahr', 'klassen'));
     }
@@ -146,8 +149,9 @@ class KlasseController
         ]);
 
         // Checkboxen kommen nur beim Anhaken mit – daher explizit als bool lesen.
-        $data['hat_fachzeugnis']  = $request->boolean('hat_fachzeugnis');
-        $data['hat_hauptzeugnis'] = $request->boolean('hat_hauptzeugnis');
+        $data['hat_fachzeugnis']   = $request->boolean('hat_fachzeugnis');
+        $data['hat_hauptzeugnis']  = $request->boolean('hat_hauptzeugnis');
+        $data['hat_zeugnisspruch'] = $request->boolean('hat_zeugnisspruch');
         if (! $data['hat_hauptzeugnis']) {
             $data['hauptzeugnis_format_id'] = null;
         }

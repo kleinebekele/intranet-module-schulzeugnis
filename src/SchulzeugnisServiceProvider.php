@@ -55,6 +55,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user')
             ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user')
             ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list')
+            ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'book')
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category')
             ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'category')
             ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category')
