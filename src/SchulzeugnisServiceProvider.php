@@ -2,11 +2,13 @@
 
 namespace Intranet\Modules\Schulzeugnis;
 
+use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
 use Intranet\Modules\Schulzeugnis\Console\Commands\LehrerKontenVerknuepfen;
 use Intranet\Modules\Schulzeugnis\Console\Commands\SeedDemo;
+use Intranet\Modules\Schulzeugnis\Support\LehrerKontenAbgleich;
 
 /**
  * Anmelde-Klasse des Schulzeugnis-Moduls.
@@ -41,6 +43,19 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
                     ->withoutOverlapping();
             });
         }
+
+        // Sofort-Verknüpfung (Insel-konform, kein Core-Eingriff): wird ein Intranet-
+        // Benutzer angelegt oder seine externe ID gesetzt, verknüpfen wir passende
+        // importierte Lehrer ohne Konto direkt – ohne auf den täglichen Abgleich zu
+        // warten. Greift auch für den User des Benutzer-Import-Moduls.
+        User::created(function (User $user): void {
+            LehrerKontenAbgleich::fuerBenutzer($user);
+        });
+        User::updated(function (User $user): void {
+            if ($user->wasChanged('externe_id')) {
+                LehrerKontenAbgleich::fuerBenutzer($user);
+            }
+        });
     }
 
     public function manifest(): ModuleManifest
