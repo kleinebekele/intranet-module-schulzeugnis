@@ -1181,6 +1181,7 @@ class ZeugnisController
             'fach'           => $fachModel,
             'fachParam'      => $fach,
             'bezeichnung'    => $art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($fachModel?->name ?? 'Haupttext'),
+            'kannBereiche'   => $this->kannKlassenVerwalten(auth()->user()),
             'klassentext'    => $kt,
             'stati'          => Abschnitt::STATI,
             'korrekturStati' => self::KORREKTUR_STATI,

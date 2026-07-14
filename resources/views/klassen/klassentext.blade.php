@@ -1,5 +1,10 @@
 @php
     $istSpruch = ($fachParam ?? '') === 'spruch';
+    $istHaupt  = ($fachParam ?? '') === 'haupt';
+    // "keine Fachbereiche" = kein Bereich außer dem Pflicht-Standard „Allgemein".
+    $ohneBereiche = $istHaupt && $klasse->hauptbereiche
+        ->reject(fn ($b) => $b->name === \Intranet\Modules\Schulzeugnis\Models\Hauptbereich::STANDARD)
+        ->isEmpty();
     $titel   = $bezeichnung ?? ($fach?->name ?? 'Haupttext (Klassenlehrer)');
     $indexUrl = route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse);
 @endphp
@@ -47,6 +52,18 @@
             <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-indigo-900">
                 Dieser Text gilt <strong>klassenweit</strong> für {{ $fach?->name ?? 'den Haupttext' }} und erscheint auf jedem
                 Zeugnis dieser Klasse <strong>vor</strong> dem jeweiligen Schülertext.
+            </div>
+        @endif
+
+        @if ($ohneBereiche)
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Für diese Klasse sind noch <strong>keine eigenen Fachbereiche</strong> angelegt (nur der Standard „Allgemein") – das Hauptzeugnis kann aus mehreren benannten Fachbereichen (z. B. Rechnen, Formenzeichnen …) bestehen.
+                @if ($kannBereiche)
+                    <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}"
+                       class="font-medium text-amber-800 underline hover:no-underline">Jetzt Fachbereiche anlegen</a>.
+                @else
+                    Bitte die Zeugnisverwaltung bitten, Fachbereiche für diese Klasse anzulegen.
+                @endif
             </div>
         @endif
 
