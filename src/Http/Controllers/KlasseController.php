@@ -23,8 +23,8 @@ class KlasseController
         // Natürliche Sortierung: "1, 2, … 10, 11, 12, 13" statt alphabetisch
         // "1, 10, 11, 12, 13, 2, …". Cross-DB sicher in PHP (strnatcasecmp).
         $klassen = $schuljahr->klassen()
-            ->with(['standardFormat', 'klassenlehrer'])
-            ->withCount('lehrauftraege')
+            ->with(['standardFormat', 'klassenlehrer', 'stufe'])
+            ->withCount(['lehrauftraege', 'hauptbereiche'])
             ->get()
             ->sort(fn ($a, $b) => strnatcasecmp($a->name, $b->name))
             ->values();
