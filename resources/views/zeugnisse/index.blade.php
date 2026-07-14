@@ -193,7 +193,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white" style="max-height: 74vh; overflow: auto; width: fit-content; max-width: 100%;">
+        <div id="zt-scroll" class="rounded-xl border border-gray-200 bg-white" style="max-height: 74vh; overflow: auto; width: fit-content; max-width: 100%;">
             <table id="zt-table" class="border-collapse text-sm">
                 <thead>
                     <tr class="text-gray-600">
@@ -587,6 +587,23 @@
             // Über dem Tooltip bleibt er offen (damit der Link anklickbar ist).
             tip.addEventListener('mouseenter', cancelHide);
             tip.addEventListener('mouseleave', scheduleHide);
+        })();
+    </script>
+    <script>
+        // Fixer Tabellenkopf ohne Doppel-Scroll: den Scroll-Container exakt bis zum
+        // unteren Viewport-Rand aufziehen. Dann scrollt NUR die Tabelle (der Kopf bleibt
+        // per position:sticky fix) und die Seite selbst bekommt keinen zweiten Scrollbalken.
+        (function () {
+            var el = document.getElementById('zt-scroll');
+            if (!el) { return; }
+            function anpassen() {
+                var oben  = el.getBoundingClientRect().top;
+                var hoehe = window.innerHeight - oben - 16; // etwas Luft nach unten
+                el.style.maxHeight = Math.max(320, hoehe) + 'px';
+            }
+            anpassen();
+            window.addEventListener('resize', anpassen);
+            window.addEventListener('load', anpassen);
         })();
     </script>
 </x-app-layout>
