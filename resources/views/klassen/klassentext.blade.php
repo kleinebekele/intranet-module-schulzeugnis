@@ -59,7 +59,7 @@
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 Für diese Klasse sind noch <strong>keine eigenen Fachbereiche</strong> angelegt (nur der Standard „Allgemein") – das Hauptzeugnis kann aus mehreren benannten Fachbereichen (z. B. Rechnen, Formenzeichnen …) bestehen.
                 @if ($kannBereiche)
-                    <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}"
+                    <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}#fachbereiche"
                        class="font-medium text-amber-800 underline hover:no-underline">Jetzt Fachbereiche anlegen</a>.
                 @else
                     Bitte die Zeugnisverwaltung bitten, Fachbereiche für diese Klasse anzulegen.

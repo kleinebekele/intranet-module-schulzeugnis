@@ -101,11 +101,12 @@
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </label>
             @elseif ($abschnitt->typ === 'hauptzeugnis')
-                @if ($bereichtexte->isEmpty())
+                @php $ohneBereiche = $bereichtexte->reject(fn ($bt) => $bt->ueberschrift() === \Intranet\Modules\Schulzeugnis\Models\Hauptbereich::STANDARD)->isEmpty(); @endphp
+                @if ($ohneBereiche)
                     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        Für diese Klasse sind noch <strong>keine Fachbereiche</strong> angelegt – ohne Fachbereiche gibt es hier keine Textfelder.
+                        Für diese Klasse sind noch <strong>keine eigenen Fachbereiche</strong> angelegt (nur der Standard „Allgemein") – das Hauptzeugnis kann aus mehreren benannten Fachbereichen (z. B. Rechnen, Formenzeichnen …) bestehen.
                         @if ($kannBereiche && $klasse)
-                            <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}"
+                            <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}#fachbereiche"
                                class="font-medium text-amber-800 underline hover:no-underline">Jetzt Fachbereiche anlegen</a>.
                         @else
                             Bitte die Zeugnisverwaltung bitten, Fachbereiche für diese Klasse anzulegen.

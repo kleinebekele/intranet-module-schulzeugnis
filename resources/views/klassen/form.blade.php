@@ -126,7 +126,7 @@
                         @error('hauptzeugnis_format_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
-                    <div>
+                    <div id="fachbereiche" style="scroll-margin-top: 6rem;" class="rounded-lg p-2 -m-2">
                         <span class="block text-sm font-medium text-gray-700">Fachbereiche</span>
                         <p class="mt-0.5 text-xs text-gray-400">Reihenfolge = Abfolge im Zeugnis. „Allgemein" ist Pflicht.</p>
                         <div id="bereich-liste" class="mt-2 space-y-2">
@@ -181,6 +181,19 @@
         </form>
     </div>
 
+    <style>
+        .fb-highlight {
+            outline: 3px solid #f59e0b;
+            outline-offset: 4px;
+            background: #fffbeb;
+            animation: fb-pulse 0.9s ease-in-out 3;
+        }
+        @keyframes fb-pulse {
+            0%, 100% { outline-color: #f59e0b; }
+            50%      { outline-color: rgba(245, 158, 11, .25); }
+        }
+    </style>
+
     <script>
         (function () {
             // Detail-Bereiche je Schalter ein-/ausblenden.
@@ -191,6 +204,21 @@
             }
             bind('hat_fachzeugnis', 'fach-details');
             bind('hat_hauptzeugnis', 'haupt-details');
+
+            // Ankersprung #fachbereiche (aus dem Zeugnis-Hinweis): Box aufklappen,
+            // hinscrollen und kurz umrahmen, damit klar ist, was gemeint ist.
+            if (window.location.hash === '#fachbereiche') {
+                var ziel = document.getElementById('fachbereiche');
+                var box  = document.getElementById('haupt-details');
+                if (box) { box.classList.remove('hidden'); }
+                if (ziel) {
+                    setTimeout(function () {
+                        ziel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        ziel.classList.add('fb-highlight');
+                        setTimeout(function () { ziel.classList.remove('fb-highlight'); }, 3000);
+                    }, 120);
+                }
+            }
 
             // Fachbereiche dynamisch hinzufügen/entfernen. Index läuft fortlaufend weiter.
             var liste = document.getElementById('bereich-liste');
