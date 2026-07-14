@@ -4,7 +4,7 @@
             <x-module-icon name="list" class="text-2xl text-indigo-600" />
             <div>
                 <h1 class="text-xl font-semibold text-gray-800">Lehraufträge</h1>
-                <p class="text-sm text-gray-500">Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }}</p>
+                <p class="text-sm text-gray-500">{{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }}</p>
             </div>
         </div>
     </x-slot>

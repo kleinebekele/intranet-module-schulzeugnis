@@ -14,7 +14,7 @@
             <div class="shrink-0 text-right">
                 <div class="text-base font-semibold text-gray-700">{{ $titel }}</div>
                 <div class="text-sm text-gray-500">
-                    Klasse {{ $schueler?->klasse?->name ?? '—' }} &middot; Schuljahr {{ $schueler?->klasse?->schuljahr?->name ?? '—' }}
+                    {{ $schueler?->klasse?->name ?? '—' }} &middot; Schuljahr {{ $schueler?->klasse?->schuljahr?->name ?? '—' }}
                 </div>
                 @if ($readonly)
                     <span class="mt-1 inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Zeugnis abgeschlossen</span>

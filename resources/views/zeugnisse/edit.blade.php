@@ -7,7 +7,7 @@
                 <div>
                     <h1 class="text-xl font-semibold text-gray-800">Zeugnis · {{ $schueler->fullName() }}</h1>
                     <p class="text-sm text-gray-500">
-                        Klasse {{ $schueler->klasse?->name ?? '—' }} &middot; Schuljahr {{ $schueler->klasse?->schuljahr?->name ?? '—' }}
+                        {{ $schueler->klasse?->name ?? '—' }} &middot; Schuljahr {{ $schueler->klasse?->schuljahr?->name ?? '—' }}
                         @if ($zeugnis->format) &middot; {{ $zeugnis->format->name }} ({{ $zeugnis->format->typLabel() }}) @endif
                     </p>
                 </div>

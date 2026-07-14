@@ -132,7 +132,7 @@
             <div class="kr-grid">
                 @foreach ($klassen as $klasse)
                     <a class="kr-tuer" href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
-                       title="Zeugnisliste der Klasse {{ $klasse->name }}{{ $klasse->stufe ? ' · '.$klasse->stufe->name : '' }}">
+                       title="Zeugnisliste der {{ $klasse->name }}{{ $klasse->stufe ? ' · '.$klasse->stufe->name : '' }}">
                         <div class="kr-rahmen">
                             <div class="kr-oeffnung"></div>
                             <div class="kr-blatt" style="--kr: {{ $klasse->stufe?->farbe ?: '#64748b' }}">
@@ -145,7 +145,7 @@
                                 <div class="kr-griff"></div>
                             </div>
                         </div>
-                        <div class="kr-label">Klasse {{ $klasse->name }}</div>
+                        <div class="kr-label">{{ $klasse->name }}</div>
                         @if ($klasse->klassenlehrer)
                             <div class="kr-sub">{{ $klasse->klassenlehrer->fullName() }}</div>
                         @endif

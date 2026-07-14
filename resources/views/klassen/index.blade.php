@@ -96,7 +96,7 @@
                                            class="text-indigo-600 hover:text-indigo-700" title="Lehraufträge">Lehraufträge ({{ $klasse->lehrauftraege_count }})</a>
                                         <span class="text-gray-300">·</span>
                                         <form method="POST" action="{{ route('module.schulzeugnis.klassen.destroy', $klasse) }}"
-                                              onsubmit="return confirm('Klasse {{ $klasse->name }} wirklich löschen?');" class="inline">
+                                              onsubmit="return confirm('{{ $klasse->name }} wirklich löschen?');" class="inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="text-red-600 hover:text-red-700" title="Klasse löschen">Löschen</button>

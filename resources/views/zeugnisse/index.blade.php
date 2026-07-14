@@ -25,7 +25,7 @@
                     <x-module-icon name="book" class="zi-kopf-icon text-2xl" />
                     <div>
                         <h1 class="zi-kopf-titel text-xl font-semibold">Zeugnisse</h1>
-                        <p class="zi-kopf-sub text-sm">Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }} &middot; {{ $schueler->count() }} Schüler @if ($stufe) &middot; {{ $stufe->name }} @endif</p>
+                        <p class="zi-kopf-sub text-sm">{{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }} &middot; {{ $schueler->count() }} Schüler @if ($stufe) &middot; {{ $stufe->name }} @endif</p>
                     </div>
                 </div>
 
@@ -130,7 +130,7 @@
             <div class="flex-1">
                 @if ($prevKlasse)
                     <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $prevKlasse) }}" class="{{ $navBtn }}">
-                        <i class="bx bx-chevron-left text-lg"></i> Zurück zu Klasse {{ $prevKlasse->name }}
+                        <i class="bx bx-chevron-left text-lg"></i> Zurück zu {{ $prevKlasse->name }}
                     </a>
                 @endif
             </div>
@@ -142,7 +142,7 @@
             <div class="flex-1 text-right">
                 @if ($nextKlasse)
                     <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $nextKlasse) }}" class="{{ $navBtn }}">
-                        Weiter zu Klasse {{ $nextKlasse->name }} <i class="bx bx-chevron-right text-lg"></i>
+                        Weiter zu {{ $nextKlasse->name }} <i class="bx bx-chevron-right text-lg"></i>
                     </a>
                 @endif
             </div>

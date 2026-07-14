@@ -18,7 +18,7 @@
             <div class="shrink-0 text-right">
                 <div class="text-base font-semibold text-gray-700">{{ $titel }}</div>
                 <div class="text-sm text-gray-500">
-                    Klasse {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }}
+                    {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }}
                 </div>
             </div>
         </div>
