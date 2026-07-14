@@ -44,6 +44,16 @@ class ZeugnisController
             ->orderBy('name')
             ->get();
 
+        // Fachzeugnis: jeder Schüler bekommt automatisch eins (kein manuelles „+ anlegen"),
+        // damit immer mindestens „Unbearbeitet" gesetzt ist.
+        if ($klasse->hat_fachzeugnis) {
+            $klasse->loadMissing('klassenlehrer');
+            foreach ($klasse->schueler()->whereDoesntHave('fachzeugnis')->get() as $ohne) {
+                $ohne->setRelation('klasse', $klasse);
+                $this->erzeugeFachzeugnis($klasse, $ohne);
+            }
+        }
+
         // Hauptzeugnis: jeder Schüler bekommt automatisch eins (kein manuelles Anlegen).
         if ($klasse->hat_hauptzeugnis) {
             $klasse->loadMissing(['klassenlehrer', 'hauptbereiche']);

@@ -273,17 +273,10 @@
                             $abs = $z ? $z->abschnitte : collect();
                             $fachMap = $abs->whereIn('typ', ['fachtext', 'note'])->keyBy('fach_id');
                             $haz = $hz ? $hz->abschnitte->firstWhere('typ', 'hauptzeugnis') : null;
-                            $fehlt = $hatFach && ! $z;
                         @endphp
                         <tr class="border-b border-gray-100">
                             <td class="border-r border-gray-200 px-4 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10;">
                                 <span class="font-medium text-gray-800">{{ $s->nachname }}, {{ $s->vorname }}</span>
-                                @if ($fehlt)
-                                    <form method="POST" action="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.store', [$klasse, $s]) }}" class="inline">
-                                        @csrf
-                                        <button type="submit" class="ml-1 text-xs text-indigo-600 hover:underline">+ anlegen</button>
-                                    </form>
-                                @endif
                             </td>
 
                             @if ($hatHaupt)
