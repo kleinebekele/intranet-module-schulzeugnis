@@ -197,7 +197,7 @@
                                 style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
                                 data-fach="Zeugnisspruch" data-rolle="Klassenlehrer"
                                 data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
-                                title="Zeugnisspruch">Spruch</th>
+                                title="Zeugnisspruch">ZEU</th>
                         @endif
                         <th class="zt-mini border-b border-l border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
                         <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Vorschau (HTML)"><i class="bx bx-show"></i></th>
@@ -249,7 +249,17 @@
                             </td>
                         @endforeach
                         @if ($hatSpruch)
-                            <td class="border-l border-gray-200 px-2 text-center" style="background: #eef2ff;"><span class="text-gray-300">–</span></td>
+                            @php $ktS = $ktRows['spruch'] ?? null; $kmS = $ktS?->statusMeta() ?? $stati['unbearbeitet']; @endphp
+                            <td class="border-l border-gray-200 px-2 text-center" style="background: #eef2ff;">
+                                @if ($istAdmin || $binKlassenlehrer || in_array('spruch', $ktKorrektorKeys))
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'spruch']) }}"
+                                       title="Klassenweiter Zeugnisspruch – {{ $kmS['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                        <i class="bx {{ $kmS['icon'] }} text-lg {{ $farbeKlasse[$kmS['farbe']] ?? 'text-gray-300' }}"></i>
+                                    </a>
+                                @else
+                                    <i class="bx {{ $kmS['icon'] }} text-lg {{ $farbeKlasse[$kmS['farbe']] ?? 'text-gray-300' }}" title="Klassenweiter Zeugnisspruch – {{ $kmS['label'] }}"></i>
+                                @endif
+                            </td>
                         @endif
                         <td class="zt-mini border-l border-gray-200 text-center" style="background: #eef2ff;">
                             @if ($warnAgg['fach'])

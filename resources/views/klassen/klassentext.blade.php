@@ -1,5 +1,6 @@
 @php
-    $titel   = $fach?->name ?? 'Haupttext (Klassenlehrer)';
+    $istSpruch = ($fachParam ?? '') === 'spruch';
+    $titel   = $bezeichnung ?? ($fach?->name ?? 'Haupttext (Klassenlehrer)');
     $indexUrl = route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse);
 @endphp
 <x-app-layout>
@@ -35,6 +36,12 @@
         @if ($berechtigung === 'korrektor')
             <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
                 Du bist als <strong>Korrektor:in</strong> für diesen klassenweiten Text zugewiesen. Du kannst den Text korrigieren und den Status auf „In Korrektur" oder „Korrektur durchgeführt" setzen.
+            </div>
+        @elseif ($istSpruch)
+            <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-indigo-900">
+                Dies ist der <strong>klassenweite Zeugnisspruch</strong> als gemeinsame Arbeitshilfe/Vorlage. Auf dem Zeugnis
+                erscheint der <strong>individuelle Schüler-Spruch</strong> (Variable <code>{Zeugnisspruch}</code>) – dieser
+                klassenweite Text wird nicht direkt gedruckt.
             </div>
         @else
             <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-indigo-900">

@@ -92,7 +92,7 @@ class ZeugnisController
             ->map(fn ($g) => $g->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->values()->all());
 
         $ktRows = Klassentext::where('klasse_id', $klasse->id)->with('korrektoren')->get()
-            ->keyBy(fn ($kt) => $kt->fach_id === null ? 'haupt' : $kt->fach_id);
+            ->keyBy(fn ($kt) => $kt->art === 'spruch' ? 'spruch' : ($kt->fach_id === null ? 'haupt' : $kt->fach_id));
         $klassentexte = $ktRows->map(fn ($kt) => (string) $kt->text);
 
         // Klassenweit-Status auch für zugewiesene Korrektoren anklickbar machen (öffnet den Editor).
@@ -311,7 +311,9 @@ class ZeugnisController
             'beschreibung' => "Fachzeugnis für {$schueler->fullName()} angelegt",
         ]);
 
-        $this->ueberlaufNeuBerechnen($zeugnis);
+        // Leeres Zeugnis läuft nicht über – teures Rendern beim Anlegen sparen.
+        // Der echte Überlauf wird berechnet, sobald Text gespeichert wird.
+        $zeugnis->update(['ueberlauf_status' => 'ok', 'ueberlauf_passt_bei' => null]);
     }
 
     /**
@@ -365,7 +367,8 @@ class ZeugnisController
             'beschreibung' => "Hauptzeugnis für {$schueler->fullName()} angelegt",
         ]);
 
-        $this->ueberlaufNeuBerechnen($zeugnis);
+        // Leeres Zeugnis läuft nicht über – teures Rendern beim Anlegen sparen.
+        $zeugnis->update(['ueberlauf_status' => 'ok', 'ueberlauf_passt_bei' => null]);
     }
 
     /**
@@ -1099,12 +1102,12 @@ class ZeugnisController
     }
 
     /** Klassenweiter Text für (Klasse, Fach) – fach_id null = Haupttext. */
-    private function klassentextFuer(int $klasseId, ?int $fachId): Klassentext
+    private function klassentextFuer(int $klasseId, ?int $fachId, string $art = 'fach'): Klassentext
     {
-        $q = Klassentext::where('klasse_id', $klasseId);
+        $q = Klassentext::where('klasse_id', $klasseId)->where('art', $art);
         $fachId ? $q->where('fach_id', $fachId) : $q->whereNull('fach_id');
 
-        return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId]);
+        return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId, 'art' => $art]);
     }
 
     /**
@@ -1114,9 +1117,9 @@ class ZeugnisController
      */
     public function klassentextEdit(Klasse $klasse, string $fach)
     {
-        [$fachId, $fachModel] = $this->fachAusParam($fach);
+        [$fachId, $fachModel, $art] = $this->fachAusParam($fach);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
@@ -1126,12 +1129,16 @@ class ZeugnisController
             abort(403, 'Keine Berechtigung, diesen Klassentext zu bearbeiten.');
         }
 
-        $nachbarn = $this->klassentextNachbarn($klasse, $fachId);
+        // Der klassenweite Spruch ist einmalig je Klasse – keine Fach-zu-Fach-Navigation.
+        $nachbarn = $art === 'spruch'
+            ? ['prev' => null, 'next' => null, 'position' => 1, 'gesamt' => 1]
+            : $this->klassentextNachbarn($klasse, $fachId);
 
         return view('schulzeugnis::klassen.klassentext', [
             'klasse'         => $klasse,
             'fach'           => $fachModel,
             'fachParam'      => $fach,
+            'bezeichnung'    => $art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($fachModel?->name ?? 'Haupttext'),
             'klassentext'    => $kt,
             'stati'          => Abschnitt::STATI,
             'korrekturStati' => self::KORREKTUR_STATI,
@@ -1149,14 +1156,14 @@ class ZeugnisController
 
     public function klassentextUpdate(Request $request, Klasse $klasse, string $fach)
     {
-        [$fachId, $fachModel] = $this->fachAusParam($fach);
+        [$fachId, $fachModel, $art] = $this->fachAusParam($fach);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
         $b     = $this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user());
-        $label = $fachModel?->name ?? 'Haupttext';
+        $label = $art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($fachModel?->name ?? 'Haupttext');
 
         if ($b === 'keine') {
             return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
@@ -1233,9 +1240,9 @@ class ZeugnisController
     /** Einen früheren Textstand eines Klassentextes aus dem Verlauf wiederherstellen. */
     public function klassentextWiederherstellen(Request $request, Klasse $klasse, string $fach)
     {
-        [$fachId] = $this->fachAusParam($fach);
+        [$fachId, , $art] = $this->fachAusParam($fach);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
@@ -1264,9 +1271,9 @@ class ZeugnisController
     /** Korrektor lehnt die Korrektur eines Klassentexts ab (siehe abschnittAblehnen). */
     public function klassentextAblehnen(Klasse $klasse, string $fach)
     {
-        [$fachId] = $this->fachAusParam($fach);
+        [$fachId, , $art] = $this->fachAusParam($fach);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
@@ -1299,11 +1306,14 @@ class ZeugnisController
     private function fachAusParam(string $fach): array
     {
         if ($fach === 'haupt') {
-            return [null, null];
+            return [null, null, 'fach'];
+        }
+        if ($fach === 'spruch') {
+            return [null, null, 'spruch'];
         }
         $model = Fach::findOrFail((int) $fach);
 
-        return [$model->id, $model];
+        return [$model->id, $model, 'fach'];
     }
 
     /**
