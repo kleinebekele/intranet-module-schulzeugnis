@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Fach;
@@ -44,34 +45,11 @@ class ZeugnisController
             ->orderBy('name')
             ->get();
 
-        // Fachzeugnis: jeder Schüler bekommt automatisch eins (kein manuelles „+ anlegen"),
-        // damit immer mindestens „Unbearbeitet" gesetzt ist.
-        if ($klasse->hat_fachzeugnis) {
-            $klasse->loadMissing('klassenlehrer');
-            foreach ($klasse->schueler()->whereDoesntHave('fachzeugnis')->get() as $ohne) {
-                $ohne->setRelation('klasse', $klasse);
-                $this->erzeugeFachzeugnis($klasse, $ohne);
-            }
-        }
-
-        // Hauptzeugnis: jeder Schüler bekommt automatisch eins (kein manuelles Anlegen).
-        if ($klasse->hat_hauptzeugnis) {
-            $klasse->loadMissing(['klassenlehrer', 'hauptbereiche']);
-            foreach ($klasse->schueler()->whereDoesntHave('hauptzeugnis')->get() as $ohne) {
-                $ohne->setRelation('klasse', $klasse);
-                $this->erzeugeHauptzeugnis($klasse, $ohne);
-            }
-        }
-
-        // Zeugnisspruch: fehlenden Spruch-Abschnitt am Container-Zeugnis nachziehen
-        // (für Zeugnisse, die vor Aktivierung des Flags angelegt wurden).
-        if ($klasse->hat_zeugnisspruch) {
-            $klasse->loadMissing('klassenlehrer');
-            $containerRel = $klasse->hat_fachzeugnis ? 'fachzeugnis' : 'hauptzeugnis';
-            foreach ($klasse->schueler()->whereHas($containerRel)->with($containerRel)->get() as $s) {
-                $this->spruchAbschnittAnlegen($s->getRelation($containerRel), $klasse);
-            }
-        }
+        // Auto-Anlage (Fach-/Hauptzeugnis + Spruch) für alle Schüler, sodass immer
+        // mindestens „Unbearbeitet" gesetzt ist – nur nötig, wenn wirklich etwas fehlt.
+        // Alle Inserts laufen in EINER Transaktion, sonst committet SQLite jede Zeile
+        // einzeln (fsync) und der erste Aufruf wird sehr langsam.
+        $this->zeugnisseSicherstellen($klasse);
 
         $schueler = $klasse->schueler()
             ->with(['fachzeugnis.abschnitte', 'hauptzeugnis.abschnitte'])
@@ -270,6 +248,47 @@ class ZeugnisController
         return redirect()
             ->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
             ->with('status', $meldung);
+    }
+
+    /**
+     * Legt fehlende Fach-/Hauptzeugnisse und Spruch-Abschnitte für alle Schüler der
+     * Klasse an – in EINER Transaktion (sonst committet SQLite jede Zeile einzeln und
+     * der erste Aufruf wird sehr langsam). Läuft nur, wenn wirklich etwas fehlt.
+     */
+    private function zeugnisseSicherstellen(Klasse $klasse): void
+    {
+        $klasse->loadMissing(['klassenlehrer', 'hauptbereiche']);
+        $containerRel = $klasse->hat_fachzeugnis ? 'fachzeugnis' : 'hauptzeugnis';
+
+        $fehltFach   = $klasse->hat_fachzeugnis && $klasse->schueler()->whereDoesntHave('fachzeugnis')->exists();
+        $fehltHaupt  = $klasse->hat_hauptzeugnis && $klasse->schueler()->whereDoesntHave('hauptzeugnis')->exists();
+        $fehltSpruch = $klasse->hat_zeugnisspruch && $klasse->schueler()
+            ->whereHas($containerRel, fn ($q) => $q->whereDoesntHave('abschnitte', fn ($a) => $a->where('typ', Abschnitt::TYP_SPRUCH)))
+            ->exists();
+
+        if (! $fehltFach && ! $fehltHaupt && ! $fehltSpruch) {
+            return; // alles vorhanden – kein Schreibaufwand
+        }
+
+        DB::transaction(function () use ($klasse, $containerRel, $fehltFach, $fehltHaupt, $fehltSpruch): void {
+            if ($fehltFach) {
+                foreach ($klasse->schueler()->whereDoesntHave('fachzeugnis')->get() as $ohne) {
+                    $ohne->setRelation('klasse', $klasse);
+                    $this->erzeugeFachzeugnis($klasse, $ohne);
+                }
+            }
+            if ($fehltHaupt) {
+                foreach ($klasse->schueler()->whereDoesntHave('hauptzeugnis')->get() as $ohne) {
+                    $ohne->setRelation('klasse', $klasse);
+                    $this->erzeugeHauptzeugnis($klasse, $ohne);
+                }
+            }
+            if ($fehltSpruch) {
+                foreach ($klasse->schueler()->whereHas($containerRel)->with($containerRel)->get() as $s) {
+                    $this->spruchAbschnittAnlegen($s->getRelation($containerRel), $klasse);
+                }
+            }
+        });
     }
 
     /** Fachzeugnis + je Fach (mit Lehrauftrag) einen Fach- bzw. Notenabschnitt. */
