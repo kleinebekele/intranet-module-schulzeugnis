@@ -9,6 +9,7 @@ use Intranet\Modules\Schulzeugnis\Support\Import\CsvLeser;
 use Intranet\Modules\Schulzeugnis\Support\Import\FaecherImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\ImportFehler;
 use Intranet\Modules\Schulzeugnis\Support\Import\KlasseImporter;
+use Intranet\Modules\Schulzeugnis\Support\Import\LehrauftragImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\LehrerImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\SchuelerImporter;
 
@@ -80,6 +81,19 @@ class ImportController
                 ['name' => 'Geschlecht',   'pflicht' => false, 'info' => 'm / w / d (auch „männlich/weiblich/divers")'],
             ],
             'beispiel'  => "SchuelerID;Klasse;Vorname;Nachname;Geburtsdatum;Geburtsort;Geschlecht\nS-2042;5a;Anna;Muster;14.03.2015;Bielefeld;w",
+        ],
+        'lehrauftraege' => [
+            'titel'     => 'Lehraufträge',
+            'hinweis'   => 'Fach × Lehrer je Klasse (Team-Teaching = mehrere Zeilen). Alle drei müssen im Schuljahr existieren; additiv, es wird nichts entfernt. Zuerst Klassen, Fächer und Lehrer importieren.',
+            'schuljahr' => true,
+            'importer'  => LehrauftragImporter::class,
+            'weiter'    => ['route' => 'module.schulzeugnis.klassen.jahr', 'label' => 'Zu den Klassen'],
+            'spalten'   => [
+                ['name' => 'Klasse',   'pflicht' => true, 'info' => 'Name der Klasse im Ziel-Schuljahr'],
+                ['name' => 'Fach',     'pflicht' => true, 'info' => 'Name oder Kürzel eines vorhandenen Fachs'],
+                ['name' => 'LehrerID', 'pflicht' => true, 'info' => 'externe ID (Linear) der Lehrkraft im Schuljahr'],
+            ],
+            'beispiel'  => "Klasse;Fach;LehrerID\n5a;Mathematik;5133\n5a;Deutsch;5140\n5a;Deutsch;5155",
         ],
     ];
 
