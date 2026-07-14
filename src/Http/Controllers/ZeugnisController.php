@@ -13,6 +13,7 @@ use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
 use Intranet\Modules\Schulzeugnis\Models\Lehrer;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schueler;
+use Intranet\Modules\Schulzeugnis\Models\Spruch;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 use Intranet\Modules\Schulzeugnis\Support\Ghostscript;
 use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
@@ -49,6 +50,16 @@ class ZeugnisController
             foreach ($klasse->schueler()->whereDoesntHave('hauptzeugnis')->get() as $ohne) {
                 $ohne->setRelation('klasse', $klasse);
                 $this->erzeugeHauptzeugnis($klasse, $ohne);
+            }
+        }
+
+        // Zeugnisspruch: fehlenden Spruch-Abschnitt am Container-Zeugnis nachziehen
+        // (für Zeugnisse, die vor Aktivierung des Flags angelegt wurden).
+        if ($klasse->hat_zeugnisspruch) {
+            $klasse->loadMissing('klassenlehrer');
+            $containerRel = $klasse->hat_fachzeugnis ? 'fachzeugnis' : 'hauptzeugnis';
+            foreach ($klasse->schueler()->whereHas($containerRel)->with($containerRel)->get() as $s) {
+                $this->spruchAbschnittAnlegen($s->getRelation($containerRel), $klasse);
             }
         }
 
@@ -98,10 +109,21 @@ class ZeugnisController
             }
         }
 
+        // Zeugnisspruch je Schüler (der eine Spruch-Abschnitt am Container-Zeugnis).
+        $spruchAbschnitte = [];
+        if ($klasse->hat_zeugnisspruch) {
+            foreach ($schueler as $s) {
+                $container = $klasse->hat_fachzeugnis ? $s->fachzeugnis : $s->hauptzeugnis;
+                $spruchAbschnitte[$s->id] = $container?->abschnitte->firstWhere('typ', Abschnitt::TYP_SPRUCH);
+            }
+        }
+
         return view('schulzeugnis::zeugnisse.index', [
             'klasse'           => $klasse,
             'faecher'          => $faecher,
             'schueler'         => $schueler,
+            'hatSpruch'        => (bool) $klasse->hat_zeugnisspruch,
+            'spruchAbschnitte' => $spruchAbschnitte,
             'stati'            => Abschnitt::STATI,
             'meineFachIds'     => $meineFachIds,
             'binKlassenlehrer' => $binKlassenlehrer,
@@ -268,6 +290,11 @@ class ZeugnisController
             ]);
         }
 
+        // Zeugnisspruch (falls aktiviert) lebt am Fachzeugnis.
+        if ($klasse->hat_zeugnisspruch) {
+            $this->spruchAbschnittAnlegen($zeugnis, $klasse);
+        }
+
         Protokoll::log('zeugnis_angelegt', [
             'schuljahr_id' => $klasse->schuljahr_id,
             'zeugnis_id'   => $zeugnis->id,
@@ -275,6 +302,26 @@ class ZeugnisController
         ]);
 
         $this->ueberlaufNeuBerechnen($zeugnis);
+    }
+
+    /**
+     * Legt den einen Zeugnisspruch-Abschnitt am Container-Zeugnis an, falls noch keiner
+     * existiert. Autor = Klassenlehrer (nur er darf ihn bearbeiten). Inhalt kommt später
+     * per Katalog-Auswahl bzw. freier Eingabe im Editor.
+     */
+    private function spruchAbschnittAnlegen(Zeugnis $zeugnis, Klasse $klasse): void
+    {
+        if ($zeugnis->abschnitte()->where('typ', Abschnitt::TYP_SPRUCH)->exists()) {
+            return;
+        }
+
+        $zeugnis->abschnitte()->create([
+            'typ'             => Abschnitt::TYP_SPRUCH,
+            'autor_lehrer_id' => $klasse->klassenlehrer_id,
+            'autor_name'      => $klasse->klassenlehrer?->fullName(),
+            'reihenfolge'     => 900, // hinter den Fächern
+            'status'          => Abschnitt::STATUS_STANDARD,
+        ]);
     }
 
     /** Hauptzeugnis = EIN Abschnitt (Status/Korrektoren/Klassentext), je Fachbereich ein Schülertext. */
@@ -296,6 +343,11 @@ class ZeugnisController
         ]);
 
         $this->syncBereichtexte($abschnitt, $klasse);
+
+        // Nur bei reinen Hauptzeugnis-Klassen lebt der Spruch hier (sonst am Fachzeugnis).
+        if ($klasse->hat_zeugnisspruch && ! $klasse->hat_fachzeugnis) {
+            $this->spruchAbschnittAnlegen($zeugnis, $klasse);
+        }
 
         Protokoll::log('zeugnis_angelegt', [
             'schuljahr_id' => $klasse->schuljahr_id,
@@ -539,6 +591,9 @@ class ZeugnisController
             'navNext'        => $nachbarn['next'],
             'navPosition'    => $nachbarn['position'],
             'navGesamt'      => $nachbarn['gesamt'],
+            'sprueche'       => $abschnitt->typ === Abschnitt::TYP_SPRUCH
+                ? Spruch::where('aktiv', true)->orderBy('reihenfolge')->orderBy('id')->get()
+                : collect(),
         ]);
     }
 
@@ -599,9 +654,12 @@ class ZeugnisController
         // Für die Rückmeldung: wessen Text (Name + Fach) tatsächlich gespeichert wurde
         // – wichtig beim Blättern, wo danach schon der nächste Schüler angezeigt wird.
         $gespeichertName = $zeugnis->schueler?->fullName() ?: 'Schüler';
-        $gespeichertWas  = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS
-            ? 'Hauptzeugnis'
-            : ($abschnitt->typ === Abschnitt::TYP_HAUPTTEXT ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext'));
+        $gespeichertWas  = match ($abschnitt->typ) {
+            Abschnitt::TYP_HAUPTZEUGNIS => 'Hauptzeugnis',
+            Abschnitt::TYP_HAUPTTEXT    => 'Haupttext',
+            Abschnitt::TYP_SPRUCH       => 'Zeugnisspruch',
+            default                     => $abschnitt->fach?->name ?? 'Fachtext',
+        };
 
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
@@ -916,8 +974,8 @@ class ZeugnisController
             ->where('core_user_id', $user->id)
             ->pluck('id');
 
-        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_HAUPTZEUGNIS], true)) {
-            // Haupttext / Hauptzeugnis: nur der Klassenlehrer ist voll berechtigt.
+        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_SPRUCH], true)) {
+            // Haupttext / Hauptzeugnis / Zeugnisspruch: nur der Klassenlehrer ist voll berechtigt.
             if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
                 return 'voll';
             }
@@ -966,7 +1024,7 @@ class ZeugnisController
      */
     private function klassentextParamFuerAbschnitt(Abschnitt $abschnitt): ?string
     {
-        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH], true)) {
+        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH, Abschnitt::TYP_SPRUCH], true)) {
             return null;
         }
 
@@ -980,6 +1038,12 @@ class ZeugnisController
             return (object) ['text' => $abschnitt->bereich?->klassentext];
         }
 
+        // Zeugnisspruch nutzt keinen Fach-/Haupt-Klassentext (sein klassenweiter Text ist eine
+        // eigene Schiene, art='spruch').
+        if ($abschnitt->typ === Abschnitt::TYP_SPRUCH) {
+            return null;
+        }
+
         return $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null;
     }
 
@@ -990,6 +1054,11 @@ class ZeugnisController
      */
     private function klassentextSpeichern(Abschnitt $abschnitt, ?Klasse $klasse, ?string $neu): array
     {
+        // Zeugnisspruch fasst keinen Fach-/Haupt-Klassentext an.
+        if ($abschnitt->typ === Abschnitt::TYP_SPRUCH) {
+            return [null, false];
+        }
+
         if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
             $bereich = $abschnitt->bereich;
             if (! $bereich) {

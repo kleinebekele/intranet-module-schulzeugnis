@@ -192,6 +192,13 @@
                                 data-klassentext="{{ $klassentexte[$fach->id] ?? '' }}"
                                 @if ($istAdmin || in_array($fach->id, $meineFachIds) || in_array($fach->id, $ktKorrektorKeys)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}" @endif>{{ $fach->kuerzel ?: $fach->name }}</th>
                         @endforeach
+                        @if ($hatSpruch)
+                            <th class="zt-kopf border-b border-l border-gray-200 px-2 text-center font-semibold"
+                                style="position: sticky; top: 0; z-index: 20; background: #f9fafb;"
+                                data-fach="Zeugnisspruch" data-rolle="Klassenlehrer"
+                                data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
+                                title="Zeugnisspruch">Spruch</th>
+                        @endif
                         <th class="zt-mini border-b border-l border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Warnhinweis Textlänge">⚠</th>
                         <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;" title="Vorschau (HTML)"><i class="bx bx-show"></i></th>
                         <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: #f9fafb;">PDF</th>
@@ -241,6 +248,9 @@
                                 @endif
                             </td>
                         @endforeach
+                        @if ($hatSpruch)
+                            <td class="border-l border-gray-200 px-2 text-center" style="background: #eef2ff;"><span class="text-gray-300">–</span></td>
+                        @endif
                         <td class="zt-mini border-l border-gray-200 text-center" style="background: #eef2ff;">
                             @if ($warnAgg['fach'])
                                 <i class="bx bxs-error text-amber-600" title="Bei mindestens einem Schüler ist der Fachzeugnis-Text zu lang"></i>
@@ -334,6 +344,22 @@
                                     @endif
                                 </td>
                             @endforeach
+
+                            {{-- Zeugnisspruch (Schüler) --}}
+                            @if ($hatSpruch)
+                                @php $sp = $spruchAbschnitte[$s->id] ?? null; @endphp
+                                <td class="border-l border-gray-200 px-2 text-center" data-status="{{ $sp?->status ?? '' }}">
+                                    @if ($sp)
+                                        @php $sm = $sp->statusMeta(); @endphp
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $sp) }}" title="Zeugnisspruch – {{ $sm['label'] }}"
+                                           data-ab="{{ $sp->id }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                            <i class="bx {{ $sm['icon'] }} text-lg {{ $farbeKlasse[$sm['farbe']] ?? 'text-gray-300' }}"></i>
+                                        </a>
+                                    @else
+                                        <span class="text-gray-200">–</span>
+                                    @endif
+                                </td>
+                            @endif
 
                             {{-- Warnhinweis Textlänge (Fachzeugnis) --}}
                             @php $w = $warnungen[$s->id]['fach'] ?? null; @endphp

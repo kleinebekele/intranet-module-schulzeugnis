@@ -173,11 +173,37 @@
                     </div>
                 </div>
             @else
-                <label class="block text-sm font-medium text-gray-700">{{ $klassentext ? 'Schülertext' : 'Text' }}
-                    <textarea name="inhalt" rows="8" @disabled($readonly)
+                @php $istSpruch = $abschnitt->typ === \Intranet\Modules\Schulzeugnis\Models\Abschnitt::TYP_SPRUCH; @endphp
+                @if ($istSpruch && ! $readonly && $sprueche->isNotEmpty())
+                    <div class="mb-2">
+                        <label for="spruch-katalog" class="block text-sm font-medium text-gray-700">Aus dem Spruch-Katalog übernehmen</label>
+                        <select id="spruch-katalog"
+                                class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">— Spruch auswählen (überschreibt das Textfeld) —</option>
+                            @foreach ($sprueche as $sp)
+                                <option value="{{ $sp->text }}">{{ $sp->titel ? $sp->titel . ' — ' : '' }}{{ $sp->vorschau(60) }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">Danach im Textfeld frei anpassbar. <a href="{{ route('module.schulzeugnis.sprueche.index') }}" target="_blank" class="text-indigo-600 hover:text-indigo-700">Katalog pflegen</a>.</p>
+                    </div>
+                @endif
+                <label class="block text-sm font-medium text-gray-700">{{ $istSpruch ? 'Zeugnisspruch' : ($klassentext ? 'Schülertext' : 'Text') }}
+                    <textarea name="inhalt" id="inhalt-feld" rows="8" @disabled($readonly)
                               class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               placeholder="Text …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
                 </label>
+                @if ($istSpruch && ! $readonly && $sprueche->isNotEmpty())
+                    <script>
+                        (function () {
+                            var sel = document.getElementById('spruch-katalog'), feld = document.getElementById('inhalt-feld');
+                            if (sel && feld) {
+                                sel.addEventListener('change', function () {
+                                    if (sel.value !== '') { feld.value = sel.value; feld.focus(); sel.selectedIndex = 0; }
+                                });
+                            }
+                        })();
+                    </script>
+                @endif
             @endif
 
             @if (in_array($berechtigung, ['voll', 'korrektor']))

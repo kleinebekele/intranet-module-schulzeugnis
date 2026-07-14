@@ -195,6 +195,16 @@ class ZeugnisRenderer
             ? 'Gütersloh, den ' . $schuljahr->ausgabe_datum->format('d.m.Y')
             : '';
 
+        // Zeugnisspruch: der eine Spruch-Abschnitt des Schülers (liegt am Fach- bzw.
+        // Hauptzeugnis). Wird beim Rendern eines anderen Zeugnistyps mit-nachgeschlagen.
+        $spruchAb = $abschnitte->firstWhere('typ', Abschnitt::TYP_SPRUCH);
+        if (! $spruchAb && $schueler) {
+            $spruchAb = Abschnitt::where('typ', Abschnitt::TYP_SPRUCH)
+                ->whereHas('zeugnis', fn ($q) => $q->where('schueler_id', $schueler->id))
+                ->first();
+        }
+        $zeugnisspruch = trim((string) ($spruchAb?->inhalt ?? ''));
+
         return [
             'schulname'             => self::SCHULNAME,
             'titel'                 => 'Zeugnis ' . ($schuljahr?->name ?? ''),
@@ -208,7 +218,7 @@ class ZeugnisRenderer
             'haupttext'             => $haupttext,
             'fachtexte'             => $fachtexte,
             'zeugnistext'           => $zeugnistext,
-            'zeugnisspruch'         => '',
+            'zeugnisspruch'         => $zeugnisspruch,
             'ausgabe.zeile'         => $ausgabe,
             'unterschrift'          => $klasse?->klassenlehrer?->fullName() ?: 'Klassenlehrer/in',
         ];
