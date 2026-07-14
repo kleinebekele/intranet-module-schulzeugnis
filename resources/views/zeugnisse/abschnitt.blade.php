@@ -101,6 +101,17 @@
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </label>
             @elseif ($abschnitt->typ === 'hauptzeugnis')
+                @if ($bereichtexte->isEmpty())
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        Für diese Klasse sind noch <strong>keine Fachbereiche</strong> angelegt – ohne Fachbereiche gibt es hier keine Textfelder.
+                        @if ($kannBereiche && $klasse)
+                            <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}"
+                               class="font-medium text-amber-800 underline hover:no-underline">Jetzt Fachbereiche anlegen</a>.
+                        @else
+                            Bitte die Zeugnisverwaltung bitten, Fachbereiche für diese Klasse anzulegen.
+                        @endif
+                    </div>
+                @endif
                 {{-- Hauptzeugnis: je Fachbereich ein Schülertext-Tab + ein Klassentext-Tab. --}}
                 @php $ktGefuellt = $klassentext && trim((string) old('klassentext', $klassentext->text ?? '')) !== ''; @endphp
                 <div class="zt-txt" id="zt-txt">

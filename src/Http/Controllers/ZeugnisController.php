@@ -73,8 +73,7 @@ class ZeugnisController
         $nextKlasse = ($pos !== false && $pos < $geschwister->count() - 1) ? $geschwister[$pos + 1] : null;
 
         // Admin oder Zeugnisadmin darf den Klassenlehrer setzen (Link im Kopf).
-        $u = auth()->user();
-        $kannKlassenlehrer = (bool) ($u && ($u->is_admin || $u->roles()->where('roles.role_id', 'zeugnis_admin')->exists()));
+        $kannKlassenlehrer = $this->kannKlassenVerwalten(auth()->user());
 
         // Für die Spaltenkopf-Tooltips: Fachlehrer je Fach + Klassentext je Fach (und Haupttext).
         $fachlehrer = $klasse->lehrauftraege()->with('lehrer')->get()
@@ -629,6 +628,8 @@ class ZeugnisController
             'klassentext'    => $this->klassentextAnzeige($abschnitt, $klasse),
             'klassentextZeileUrl' => $klassentextZeileUrl,
             'bereichtexte'   => $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS ? $abschnitt->bereichtexte : collect(),
+            'klasse'         => $klasse,
+            'kannBereiche'   => $this->kannKlassenVerwalten(auth()->user()),
             'berechtigung'   => $berechtigung,
             'korrekturStati' => self::KORREKTUR_STATI,
             'alleLehrer'     => $klasse ? Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->whereNotIn('id', $this->meineLehrerIds($klasse))->orderBy('nachname')->orderBy('vorname')->get() : collect(),
@@ -1043,6 +1044,13 @@ class ZeugnisController
         }
 
         return 'keine';
+    }
+
+    /** Darf der Nutzer Klassen verwalten (Admin oder Zeugnisadmin)? */
+    private function kannKlassenVerwalten($user): bool
+    {
+        return (bool) ($user && ($user->is_admin
+            || $user->roles()->where('roles.role_id', 'zeugnis_admin')->exists()));
     }
 
     /** Lehrer-IDs, die zum eingeloggten Nutzer im Schuljahr der Klasse gehören. */
