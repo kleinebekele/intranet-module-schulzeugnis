@@ -15,55 +15,68 @@
         </div>
     </x-slot>
 
-    <div class="max-w-3xl space-y-3">
+    <div class="space-y-4">
         <a href="{{ route('module.schulzeugnis.schuljahre.index') }}"
            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
             &larr; Zurück zu den Schuljahren
         </a>
 
-        {{-- Erfolgsmeldungen rendert das Core-Layout global – hier nur Fehler. --}}
         @if (session('error'))
-            <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-                {{ session('error') }}
-            </div>
+            <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
 
-        @forelse ($lehrer as $l)
-            @php $konto = $l->core_user_id ? ($benutzer[$l->core_user_id] ?? null) : null; @endphp
-            <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4">
-                <div>
-                    <h2 class="font-semibold text-gray-800">{{ $l->fullName() }}</h2>
-                    <p class="mt-0.5 text-sm">
-                        @if ($l->core_user_id && $konto)
-                            <span class="text-green-600">Konto: {{ $konto->name }}</span>
-                        @elseif ($l->core_user_id && ! $konto)
-                            <span class="text-amber-600">Konto gelöscht (ID {{ $l->core_user_id }}) &ndash; Daten bleiben erhalten</span>
-                        @else
-                            <span class="text-gray-400">kein Konto verknüpft</span>
-                        @endif
-                    </p>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('module.schulzeugnis.lehrer.edit', $l) }}"
-                       class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                        Bearbeiten
-                    </a>
-                    <form method="POST" action="{{ route('module.schulzeugnis.lehrer.destroy', $l) }}"
-                          onsubmit="return confirm('Lehrer {{ $l->fullName() }} wirklich löschen?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit"
-                                class="rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50">
-                            Löschen
-                        </button>
-                    </form>
-                </div>
-            </div>
-        @empty
+        @if ($lehrer->isEmpty())
             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
                 Noch kein Lehrer in diesem Schuljahr. Lege den ersten an.
             </div>
-        @endforelse
+        @else
+            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
+                            <th class="px-4 py-2 font-medium">Nachname</th>
+                            <th class="px-4 py-2 font-medium">Vorname</th>
+                            <th class="px-4 py-2 font-medium">Intranet-Konto</th>
+                            <th class="px-4 py-2 font-medium">Externe ID</th>
+                            <th class="px-4 py-2 text-right font-medium">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($lehrer as $l)
+                            @php $konto = $l->core_user_id ? ($benutzer[$l->core_user_id] ?? null) : null; @endphp
+                            <tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                                <td class="px-4 py-2">
+                                    <a href="{{ route('module.schulzeugnis.lehrer.edit', $l) }}"
+                                       class="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline" title="Lehrer bearbeiten">{{ $l->nachname }}</a>
+                                </td>
+                                <td class="px-4 py-2 text-gray-700">{{ $l->vorname }}</td>
+                                <td class="px-4 py-2">
+                                    @if ($l->core_user_id && $konto)
+                                        <span class="inline-flex items-center gap-1 text-green-700"><i class="bx bx-check-circle"></i> {{ $konto->name }}</span>
+                                    @elseif ($l->core_user_id && ! $konto)
+                                        <span class="text-amber-600" title="Konto-ID {{ $l->core_user_id }}">Konto gelöscht</span>
+                                    @else
+                                        <span class="text-gray-400">nicht verknüpft</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-2 text-gray-600">{{ $l->quell_id ?: '—' }}</td>
+                                <td class="px-4 py-2">
+                                    <div class="flex items-center justify-end gap-2 whitespace-nowrap">
+                                        <a href="{{ route('module.schulzeugnis.lehrer.edit', $l) }}" class="text-indigo-600 hover:text-indigo-700">Bearbeiten</a>
+                                        <span class="text-gray-300">·</span>
+                                        <form method="POST" action="{{ route('module.schulzeugnis.lehrer.destroy', $l) }}"
+                                              onsubmit="return confirm('Lehrer {{ $l->fullName() }} wirklich löschen?');" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-600 hover:text-red-700">Löschen</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
     </div>
 </x-app-layout>
