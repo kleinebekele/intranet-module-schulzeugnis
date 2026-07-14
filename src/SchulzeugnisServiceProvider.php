@@ -4,6 +4,9 @@ namespace Intranet\Modules\Schulzeugnis;
 
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
+use Intranet\Modules\Schulzeugnis\Console\Commands\LehrerKontenVerknuepfen;
+use Intranet\Modules\Schulzeugnis\Console\Commands\SeedDemo;
 
 /**
  * Anmelde-Klasse des Schulzeugnis-Moduls.
@@ -23,8 +26,20 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
-                \Intranet\Modules\Schulzeugnis\Console\Commands\SeedDemo::class,
+                SeedDemo::class,
+                LehrerKontenVerknuepfen::class,
             ]);
+
+            // Täglicher Abgleich: importierte Lehrer ohne Konto per E-Mail mit ihrem
+            // Intranet-Benutzer verknüpfen, sobald dieser existiert. Modul-lokal
+            // angemeldet (Insel-Prinzip, kein Eingriff in den Core-Scheduler).
+            // Voraussetzung am Server: ein Cron, der minütlich `artisan schedule:run` ruft.
+            $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+                $schedule->command('schulzeugnis:lehrer-verknuepfen')
+                    ->dailyAt('03:00')
+                    ->timezone('Europe/Berlin')
+                    ->withoutOverlapping();
+            });
         }
     }
 
@@ -41,6 +56,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user')
             ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list')
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category')
+            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'category')
             ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category')
             ->item('altfachzeugnisse', 'Alte Fachzeugnisse umwandeln', 'module.schulzeugnis.altfachzeugnisse.form', icon: 'category');
     }

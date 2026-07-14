@@ -6,6 +6,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\AltZeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\ImportController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\KlasseController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\KlassenraumController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
@@ -67,6 +68,13 @@ Route::middleware(['web', 'auth'])
 
         // Meine ToDos – offene Aufgaben der Lehrkraft, gruppiert nach Klasse/Fach.
         Route::get('todo', [TodoController::class, 'index'])->name('todo.index');
+
+        // Stammdaten-Import (CSV) – additive Übernahme aus dem Schulverwaltungsprogramm.
+        // Menü-/Gating-Anker ist der paramlose `.index`; vorschau/ausfuehren tragen das
+        // Namenspräfix `import.*`, damit sie derselben Zugriffssteuerung unterliegen.
+        Route::get('import', [ImportController::class, 'index'])->name('import.index');
+        Route::post('import/vorschau', [ImportController::class, 'vorschau'])->name('import.vorschau');
+        Route::post('import/ausfuehren', [ImportController::class, 'ausfuehren'])->name('import.ausfuehren');
 
         // Werkzeug: alte Zeugnis-PDF (je 4 A4-Seiten) in A3-Broschüre umschießen.
         Route::get('alt-zeugnisse', [AltZeugnisController::class, 'form'])->name('altzeugnisse.form');
