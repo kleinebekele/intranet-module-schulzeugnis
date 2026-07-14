@@ -64,6 +64,18 @@ class ZeugnisController
             ->pluck('fach_id')->unique()->values()->all();
         $binKlassenlehrer = $klasse->klassenlehrer && (int) $klasse->klassenlehrer->core_user_id === (int) $userId;
 
+        // Nachbar-Klassen (natürliche Sortierung wie die Klassenliste) für die Navigation.
+        $geschwister = $klasse->schuljahr->klassen()->get(['id', 'name', 'schuljahr_id'])
+            ->sort(fn ($a, $b) => strnatcasecmp($a->name, $b->name))
+            ->values();
+        $pos = $geschwister->search(fn ($g) => $g->id === $klasse->id);
+        $prevKlasse = ($pos !== false && $pos > 0) ? $geschwister[$pos - 1] : null;
+        $nextKlasse = ($pos !== false && $pos < $geschwister->count() - 1) ? $geschwister[$pos + 1] : null;
+
+        // Admin oder Zeugnisadmin darf den Klassenlehrer setzen (Link im Kopf).
+        $u = auth()->user();
+        $kannKlassenlehrer = (bool) ($u && ($u->is_admin || $u->roles()->where('roles.role_id', 'zeugnis_admin')->exists()));
+
         // Für die Spaltenkopf-Tooltips: Fachlehrer je Fach + Klassentext je Fach (und Haupttext).
         $fachlehrer = $klasse->lehrauftraege()->with('lehrer')->get()
             ->groupBy('fach_id')
@@ -112,6 +124,9 @@ class ZeugnisController
             'schueler'         => $schueler,
             'hatSpruch'        => (bool) $klasse->hat_zeugnisspruch,
             'spruchAbschnitte' => $spruchAbschnitte,
+            'prevKlasse'       => $prevKlasse,
+            'nextKlasse'       => $nextKlasse,
+            'kannKlassenlehrer' => $kannKlassenlehrer,
             'stati'            => Abschnitt::STATI,
             'meineFachIds'     => $meineFachIds,
             'binKlassenlehrer' => $binKlassenlehrer,

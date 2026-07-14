@@ -35,6 +35,11 @@
                         <div class="zi-kopf-boxlabel text-xs font-semibold uppercase tracking-wide">Klassenlehrer</div>
                         @if ($klasse->klassenlehrer)
                             <div class="zi-kopf-titel text-sm font-semibold">{{ $klasse->klassenlehrer->fullName() }}</div>
+                        @elseif ($kannKlassenlehrer)
+                            <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}"
+                               class="zi-kopf-titel inline-flex items-center gap-1 text-sm font-semibold underline hover:no-underline">
+                                <i class="bx bx-plus-circle"></i> Klassenlehrer setzen
+                            </a>
                         @else
                             <div class="zi-kopf-sub text-sm">— nicht gesetzt —</div>
                         @endif
@@ -118,10 +123,30 @@
     </style>
 
     <div class="space-y-3">
-        <a href="{{ route('module.schulzeugnis.klassenraeume.index') }}"
-           class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-            &larr; Zurück zu den Klassenräumen
-        </a>
+        @php
+            $navBtn = 'inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50';
+        @endphp
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex-1">
+                @if ($prevKlasse)
+                    <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $prevKlasse) }}" class="{{ $navBtn }}">
+                        <i class="bx bx-chevron-left text-lg"></i> Zurück zu Klasse {{ $prevKlasse->name }}
+                    </a>
+                @endif
+            </div>
+
+            <a href="{{ route('module.schulzeugnis.klassenraeume.index') }}" class="{{ $navBtn }}">
+                <i class="bx bx-table text-lg"></i> Zurück zu den Klassenräumen
+            </a>
+
+            <div class="flex-1 text-right">
+                @if ($nextKlasse)
+                    <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $nextKlasse) }}" class="{{ $navBtn }}">
+                        Weiter zu Klasse {{ $nextKlasse->name }} <i class="bx bx-chevron-right text-lg"></i>
+                    </a>
+                @endif
+            </div>
+        </div>
 
         @if ($istAdmin && ! $gsVerfuegbar)
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
