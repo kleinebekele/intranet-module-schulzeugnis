@@ -60,16 +60,22 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
 
     public function manifest(): ModuleManifest
     {
+        // Die Stammdaten-Pflege bündeln wir optisch unter „Zeugnisverwaltung“ – sie
+        // wird selten gebraucht und drängte den täglichen Einstieg (Klassenräume,
+        // ToDos) sonst nach unten. Rein Darstellung: jeder Punkt behält seinen
+        // eigenen Eintrag, seine Rollen und seine Zugriffsregel.
+        $verwaltung = 'Zeugnisverwaltung';
+
         return ModuleManifest::make('schulzeugnis', 'Schulzeugnis', icon: 'book')
             ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'home')
             ->item('todo', 'Meine ToDos', 'module.schulzeugnis.todo.index', icon: 'list')
-            ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar')
-            ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.index', icon: 'users')
-            ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'category')
-            ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user')
-            ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user')
-            ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list')
-            ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'book')
+            ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar', group: $verwaltung)
+            ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.index', icon: 'users', group: $verwaltung)
+            ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'category', group: $verwaltung)
+            ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user', group: $verwaltung)
+            ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'user', group: $verwaltung)
+            ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'list', group: $verwaltung)
+            ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'book', group: $verwaltung)
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'category')
             ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'category')
             ->item('altzeugnisse', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altzeugnisse.form', icon: 'category')
