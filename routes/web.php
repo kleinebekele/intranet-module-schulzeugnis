@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltFachzeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltZeugnisController;
-use Intranet\Modules\Schulzeugnis\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FachController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\FormatController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\ImportController;
@@ -30,7 +29,8 @@ Route::middleware(['web', 'auth'])
     ->prefix('modules/schulzeugnis')
     ->name('module.schulzeugnis.')
     ->group(function () {
-        Route::get('/', [DashboardController::class, 'index'])->name('index');
+        // Keine eigene Start-/Übersichtsseite: Wohin ein Klick auf das Modul führt,
+        // bestimmt der Core (erster für den Benutzer sichtbarer Menüpunkt).
 
         // Klassenräume – Lehrer-Einstieg: Klassen des aktiven Schuljahres als Türen.
         // Zugleich das Dach für die Beurteilungen (Zeugnisse/Abschnitte/Klassentexte):
