@@ -85,7 +85,9 @@
                                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
                     @else
-                        <textarea name="abschnitte[{{ $a->id }}][inhalt]" rows="5" @disabled($readonly)
+                        <textarea name="abschnitte[{{ $a->id }}][inhalt]" rows="5"
+                                  @unless ($a->typ === \Intranet\Modules\Schulzeugnis\Models\Abschnitt::TYP_SPRUCH) data-fmt @endunless
+                                  @disabled($readonly)
                                   class="mt-3 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Text …">{{ $a->inhalt }}</textarea>
                     @endif
@@ -138,4 +140,5 @@
         </div>
     </div>
     @include('schulzeugnis::zeugnisse._textarea-schrift')
+    @include('schulzeugnis::zeugnisse._toolbar')
 </x-app-layout>

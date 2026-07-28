@@ -130,7 +130,7 @@
 
                     @foreach ($bereichtexte as $bt)
                         <div class="zt-txt-panel" data-txt="b{{ $bt->id }}" @unless ($loop->first) hidden @endunless>
-                            <textarea name="bereichtexte[{{ $bt->id }}][inhalt]" rows="16" @disabled($readonly)
+                            <textarea name="bereichtexte[{{ $bt->id }}][inhalt]" rows="16" data-fmt @disabled($readonly)
                                       class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                       placeholder="Text für „{{ $bt->ueberschrift() }}" …">{{ old('bereichtexte.' . $bt->id . '.inhalt', $bt->inhalt) }}</textarea>
                             <p class="mt-1 text-xs text-gray-500">Text für <strong>diesen Schüler</strong> im Bereich „{{ $bt->ueberschrift() }}".</p>
@@ -139,7 +139,7 @@
 
                     @if ($klassentext && $berechtigung === 'voll')
                         <div class="zt-txt-panel" data-txt="klasse" hidden>
-                            <textarea name="klassentext" rows="16" @disabled($readonly)
+                            <textarea name="klassentext" rows="16" data-fmt @disabled($readonly)
                                       class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                       placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
                             <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> den individuellen Texten.</p>
@@ -165,7 +165,7 @@
 
                     {{-- Tab 1: Schülertext (individuell) --}}
                     <div class="zt-txt-panel" data-txt="schueler">
-                        <textarea name="inhalt" rows="16" @disabled($readonly)
+                        <textarea name="inhalt" rows="16" data-fmt @disabled($readonly)
                                   class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Individueller Text für diesen Schüler …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
                         <p class="mt-1 text-xs text-gray-500">Individueller Text für <strong>diesen Schüler</strong>.</p>
@@ -173,7 +173,7 @@
 
                     {{-- Tab 2: Klassenweiter Text (+ Umbruch-Option) --}}
                     <div class="zt-txt-panel" data-txt="klasse" hidden>
-                        <textarea name="klassentext" rows="16" @disabled($readonly)
+                        <textarea name="klassentext" rows="16" data-fmt @disabled($readonly)
                                   class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
                         <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> dem individuellen Text.</p>
@@ -200,7 +200,8 @@
                     </div>
                 @endif
                 <label class="block text-sm font-medium text-gray-700">{{ $istSpruch ? 'Zeugnisspruch' : ($klassentext ? 'Schülertext' : 'Text') }}
-                    <textarea name="inhalt" id="inhalt-feld" rows="8" @disabled($readonly)
+                    {{-- Der Zeugnisspruch druckt escaped über {Zeugnisspruch} – dort keine Formatierung. --}}
+                    <textarea name="inhalt" id="inhalt-feld" rows="8" @unless ($istSpruch) data-fmt @endunless @disabled($readonly)
                               class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               placeholder="Text …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
                 </label>
@@ -216,14 +217,6 @@
                         })();
                     </script>
                 @endif
-            @endif
-
-            @if (in_array($berechtigung, ['voll', 'korrektor']))
-                <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
-                    <textarea name="notiz" rows="2" @disabled($readonly)
-                              class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                              placeholder="z. B. Rückfrage, Erinnerung …">{{ old('notiz', $abschnitt->notiz) }}</textarea>
-                </label>
             @endif
 
             @php
@@ -381,6 +374,13 @@
         </div>{{-- /zt-main --}}
 
         <div class="zt-side">
+        {{-- Randnotizen (append-only; Eingabefeld ist nach jedem Laden leer) --}}
+        @include('schulzeugnis::zeugnisse._notizen', [
+            'notizen'      => $notizen,
+            'action'       => route('module.schulzeugnis.klassenraeume.abschnitte.notiz', $abschnitt),
+            'kannNotieren' => in_array($berechtigung, ['voll', 'korrektor']),
+        ])
+
         {{-- Änderungsverlauf / Wiederherstellung --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5">
             <h2 class="text-sm font-semibold text-gray-700">Änderungsverlauf</h2>
@@ -831,4 +831,6 @@
             });
         })();
     </script>
+
+    @include('schulzeugnis::zeugnisse._toolbar')
 </x-app-layout>

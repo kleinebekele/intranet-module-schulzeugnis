@@ -69,14 +69,10 @@ class Textverteilung
         $first  = $elemente[$sortiert[0]];
         $size   = (float) ($first['size'] ?? 11);
         $family = $first['font'] ?? 'DejaVu Sans';
-        $font   = ($fontMetrics && method_exists($fontMetrics, 'getFont')) ? $fontMetrics->getFont($family, 'normal') : null;
-        $mess   = function (string $s) use ($fontMetrics, $font, $size) {
-            if ($fontMetrics && $font) {
-                return (float) $fontMetrics->getTextWidth($s, $font, $size);
-            }
-
-            return mb_strlen($s) * $size * 0.52; // Fallback-Schätzung
-        };
+        $fonts  = Textauszeichnung::fonts($fontMetrics, $family);
+        // Misst eine Segmentliste – je Segment mit der passenden Schriftvariante
+        // (fett ist breiter als normal); Fallback-Schätzung steckt in breite().
+        $mess = fn (array $segs): float => Textauszeichnung::breite($segs, $fontMetrics, $fonts, $size);
 
         $minBreitePt = min(array_map(fn ($i) => ((float) ($elemente[$i]['w'] ?? 40)) * self::MM_TO_PT - 4, $tb));
         $zeilen      = self::umbrechen($text, max(10, $minBreitePt), $mess);
@@ -90,7 +86,8 @@ class Textverteilung
             foreach ($order as $i) {
                 $anteil = array_slice($zeilen, $pos, $maxZeilen($elemente[$i]));
                 $pos   += count($anteil);
-                $elemente[$i]['inhalt'] = implode("\n", $anteil);
+                $elemente[$i]['inhalt']      = implode("\n", array_map([Textauszeichnung::class, 'zeileText'], $anteil));
+                $elemente[$i]['inhalt_html'] = implode("\n", array_map([Textauszeichnung::class, 'zuHtml'], $anteil));
             }
 
             return $pos;
@@ -102,6 +99,7 @@ class Textverteilung
 
         foreach ($startTb as $i) {
             $elemente[$i]['inhalt'] = '';
+            $elemente[$i]['inhalt_html'] = '';
         }
         $pos = $fuellen($fest, 0);
         if ($pos < count($zeilen) && ! empty($bedingt)) {
@@ -129,7 +127,8 @@ class Textverteilung
                 foreach ($idx as $k) {
                     $anteil = array_slice($zeilen, $pos, $maxZeilen($kopie[$k]));
                     $pos   += count($anteil);
-                    $kopie[$k]['inhalt'] = implode("\n", $anteil);
+                    $kopie[$k]['inhalt']      = implode("\n", array_map([Textauszeichnung::class, 'zeileText'], $anteil));
+                    $kopie[$k]['inhalt_html'] = implode("\n", array_map([Textauszeichnung::class, 'zuHtml'], $anteil));
                 }
 
                 $instanzen[] = $kopie;
@@ -186,31 +185,48 @@ class Textverteilung
     }
 
     /**
-     * Bricht Text in sichtbare Zeilen um (respektiert \n als Absätze/Leerzeilen) –
-     * identisch zu FormatController/ZeugnisRenderer.
+     * Bricht Marker-Text in sichtbare Zeilen um (respektiert \n als Absätze/
+     * Leerzeilen) – identisch zu ZeugnisRenderer::umbrechen(). Eine Zeile ist
+     * eine Segmentliste (Textauszeichnung), die Leerzeile ein leeres Array.
      *
-     * @return array<int,string>
+     * @param  callable(array):float  $mess  misst eine Segmentliste in pt
+     * @return array<int,array<int,array{text:string,fett:bool,kursiv:bool,unterstrichen:bool}>>
      */
     private static function umbrechen(string $text, float $breitePt, callable $mess): array
     {
         $zeilen = [];
 
-        foreach (explode("\n", $text) as $absatz) {
-            if (trim($absatz) === '') {
-                $zeilen[] = '';
+        foreach (Textauszeichnung::parse($text) as $woerter) {
+            if ($woerter === []) {
+                $zeilen[] = [];
                 continue;
             }
 
-            $woerter = preg_split('/\s+/u', trim($absatz));
-            $aktuell = '';
+            $aktuell = [];
+            $breite  = 0.0;
 
-            foreach ($woerter as $w) {
-                $probe = $aktuell === '' ? $w : $aktuell . ' ' . $w;
-                if ($aktuell === '' || $mess($probe) <= $breitePt) {
-                    $aktuell = $probe;
+            foreach ($woerter as $wort) {
+                $wortBreite = $mess($wort);
+
+                if ($aktuell === []) {
+                    $aktuell = $wort;
+                    $breite  = $wortBreite;
+                    continue;
+                }
+
+                // Das Leerzeichen erbt den Stil des laufenden Zeilenendes.
+                $letzt = $aktuell[count($aktuell) - 1];
+                $leer  = [['text' => ' ', 'fett' => $letzt['fett'], 'kursiv' => $letzt['kursiv'], 'unterstrichen' => $letzt['unterstrichen']]];
+                $leerBreite = $mess($leer);
+
+                if ($breite + $leerBreite + $wortBreite <= $breitePt) {
+                    $aktuell[count($aktuell) - 1]['text'] .= ' ';
+                    $aktuell = Textauszeichnung::verbinde($aktuell, $wort);
+                    $breite += $leerBreite + $wortBreite;
                 } else {
                     $zeilen[] = $aktuell;
-                    $aktuell  = $w;
+                    $aktuell  = $wort;
+                    $breite   = $wortBreite;
                 }
             }
 

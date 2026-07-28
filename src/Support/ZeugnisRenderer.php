@@ -179,12 +179,14 @@ class ZeugnisRenderer
         }
 
         // {Zeugnistext} = (Klassentext-Vorspann beim Hauptzeugnis) + je Eintrag „Überschrift\nText".
+        // Jeder Teiltext wird „versiegelt": ein offener Formatierungs-Marker in einem
+        // Fachtext darf nicht alle folgenden Fächer mitfärben.
         $teile = [];
         if (trim($haupttext) !== '') {
-            $teile[] = $haupttext;
+            $teile[] = Textauszeichnung::abschliessen($haupttext);
         }
         foreach ($fachtexte as $f) {
-            $teile[] = trim($f['fach'] . "\n" . $f['text']);
+            $teile[] = trim($f['fach'] . "\n" . Textauszeichnung::abschliessen($f['text']));
         }
         $zeugnistext = implode("\n\n", $teile);
 
@@ -203,7 +205,8 @@ class ZeugnisRenderer
                 ->whereHas('zeugnis', fn ($q) => $q->where('schueler_id', $schueler->id))
                 ->first();
         }
-        $zeugnisspruch = trim((string) ($spruchAb?->inhalt ?? ''));
+        // Der Spruch wird als {Zeugnisspruch}-Variable escaped gedruckt – Marker raus.
+        $zeugnisspruch = Textauszeichnung::ohneMarker(trim((string) ($spruchAb?->inhalt ?? '')));
 
         return [
             'schulname'             => self::SCHULNAME,
@@ -287,30 +290,28 @@ class ZeugnisRenderer
             $first  = $elemente[$order[0]];
             $size   = (float) ($first['size'] ?? 11);
             $family = $first['font'] ?? 'DejaVu Sans';
-            $font   = ($fm && method_exists($fm, 'getFont')) ? $fm->getFont($family, 'normal') : null;
-            $mess = function (string $s) use ($fm, $font, $size) {
-                if ($fm && $font) {
-                    return (float) $fm->getTextWidth($s, $font, $size);
-                }
-
-                return mb_strlen($s) * $size * 0.52;
-            };
+            $fonts  = Textauszeichnung::fonts($fm, $family);
+            // Misst eine Segmentliste – je Segment mit der passenden Schriftvariante
+            // (fett ist breiter als normal, deshalb reicht ein Einzel-Font nicht mehr).
+            $mess = fn (array $segs): float => Textauszeichnung::breite($segs, $fm, $fonts, $size);
 
             $minBreitePt = min(array_map(fn ($i) => ((float) ($elemente[$i]['w'] ?? 40)) * $mmToPt - 4, $order));
             $zeilen = $this->umbrechen($text, max(10, $minBreitePt), $mess);
 
             $pos = 0;
             $inhalt = [];
+            $inhaltHtml = [];
             foreach ($order as $i) {
                 $hPt       = ((float) ($elemente[$i]['h'] ?? 10)) * $mmToPt;
                 $sz        = (float) ($elemente[$i]['size'] ?? 11);
                 $maxZeilen = max(1, (int) floor($hPt / ($sz * 1.35)));
                 $anteil    = array_slice($zeilen, $pos, $maxZeilen);
                 $pos      += count($anteil);
-                $inhalt[$i] = implode("\n", $anteil);
+                $inhalt[$i]     = implode("\n", array_map([Textauszeichnung::class, 'zeileText'], $anteil));
+                $inhaltHtml[$i] = implode("\n", array_map([Textauszeichnung::class, 'zuHtml'], $anteil));
             }
 
-            return ['inhalt' => $inhalt, 'rest' => count($zeilen) - $pos];
+            return ['inhalt' => $inhalt, 'inhalt_html' => $inhaltHtml, 'rest' => count($zeilen) - $pos];
         };
 
         if (! empty($fest)) {
@@ -328,32 +329,55 @@ class ZeugnisRenderer
 
         foreach ($alle as $i) {
             $elemente[$i]['inhalt'] = $res['inhalt'][$i] ?? '';
+            $elemente[$i]['inhalt_html'] = $res['inhalt_html'][$i] ?? '';
         }
 
         return ['elemente' => $elemente, 'rest' => (int) $res['rest']];
     }
 
-    /** @return array<int,string> */
+    /**
+     * Bricht Marker-Text in Zeilen um. Eine Zeile ist eine Segmentliste
+     * (Textauszeichnung), die Leerzeile ein leeres Array. Gemessen wird
+     * inkrementell: Wortbreite einmal statt Ganz-Zeile bei jedem Schritt.
+     *
+     * @param  callable(array):float  $mess  misst eine Segmentliste in pt
+     * @return array<int,array<int,array{text:string,fett:bool,kursiv:bool,unterstrichen:bool}>>
+     */
     private function umbrechen(string $text, float $breitePt, callable $mess): array
     {
         $zeilen = [];
 
-        foreach (explode("\n", $text) as $absatz) {
-            if (trim($absatz) === '') {
-                $zeilen[] = '';
+        foreach (Textauszeichnung::parse($text) as $woerter) {
+            if ($woerter === []) {
+                $zeilen[] = [];
                 continue;
             }
 
-            $woerter = preg_split('/\s+/u', trim($absatz));
-            $aktuell = '';
+            $aktuell = [];
+            $breite  = 0.0;
 
-            foreach ($woerter as $w) {
-                $probe = $aktuell === '' ? $w : $aktuell . ' ' . $w;
-                if ($aktuell === '' || $mess($probe) <= $breitePt) {
-                    $aktuell = $probe;
+            foreach ($woerter as $wort) {
+                $wortBreite = $mess($wort);
+
+                if ($aktuell === []) {
+                    $aktuell = $wort;
+                    $breite  = $wortBreite;
+                    continue;
+                }
+
+                // Das Leerzeichen erbt den Stil des laufenden Zeilenendes.
+                $letzt = $aktuell[count($aktuell) - 1];
+                $leer  = [['text' => ' ', 'fett' => $letzt['fett'], 'kursiv' => $letzt['kursiv'], 'unterstrichen' => $letzt['unterstrichen']]];
+                $leerBreite = $mess($leer);
+
+                if ($breite + $leerBreite + $wortBreite <= $breitePt) {
+                    $aktuell[count($aktuell) - 1]['text'] .= ' ';
+                    $aktuell = Textauszeichnung::verbinde($aktuell, $wort);
+                    $breite += $leerBreite + $wortBreite;
                 } else {
                     $zeilen[] = $aktuell;
-                    $aktuell  = $w;
+                    $aktuell  = $wort;
+                    $breite   = $wortBreite;
                 }
             }
 

@@ -77,19 +77,12 @@
 
             <div>
                 <label for="text" class="block text-sm font-medium text-gray-700">Klassenweiter Text</label>
-                <textarea name="text" id="text" rows="12"
+                {{-- Der Spruch dient als Vorlage und druckt nicht selbst – dort keine Formatierung. --}}
+                <textarea name="text" id="text" rows="12" @unless ($istSpruch) data-fmt @endunless
                           class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           placeholder="Text, der für alle Schüler dieser Klasse gilt …">{{ old('text', $klassentext->text) }}</textarea>
                 @error('text') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
-
-            @if (in_array($berechtigung, ['voll', 'korrektor']))
-                <label class="block text-sm font-medium text-gray-700">Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
-                    <textarea name="notiz" rows="2"
-                              class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                              placeholder="z. B. Rückfrage, Erinnerung …">{{ old('notiz', $klassentext->notiz) }}</textarea>
-                </label>
-            @endif
 
             @php
                 $statusOptionen = $berechtigung === 'korrektor' ? collect($stati)->only($korrekturStati) : $stati;
@@ -208,6 +201,13 @@
         </div>{{-- /zt-main --}}
 
         <div class="zt-side">
+        {{-- Randnotizen (append-only; Eingabefeld ist nach jedem Laden leer) --}}
+        @include('schulzeugnis::zeugnisse._notizen', [
+            'notizen'      => $notizen,
+            'action'       => route('module.schulzeugnis.klassenraeume.klassentexte.notiz', ['klasse' => $klasse, 'fach' => $fachParam]),
+            'kannNotieren' => in_array($berechtigung, ['voll', 'korrektor']),
+        ])
+
         {{-- Änderungsverlauf / Wiederherstellung --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5">
             <h2 class="text-sm font-semibold text-gray-700">Änderungsverlauf</h2>
@@ -299,4 +299,5 @@
 
     @include('schulzeugnis::zeugnisse._editor-styles')
     @include('schulzeugnis::zeugnisse._editor-scripts')
+    @include('schulzeugnis::zeugnisse._toolbar')
 </x-app-layout>

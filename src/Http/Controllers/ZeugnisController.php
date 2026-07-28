@@ -12,11 +12,13 @@ use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Klassentext;
 use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
 use Intranet\Modules\Schulzeugnis\Models\Lehrer;
+use Intranet\Modules\Schulzeugnis\Models\Notiz;
 use Intranet\Modules\Schulzeugnis\Models\Protokoll;
 use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Spruch;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 use Intranet\Modules\Schulzeugnis\Support\Ghostscript;
+use Intranet\Modules\Schulzeugnis\Support\Textauszeichnung;
 use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
 
 /**
@@ -552,7 +554,7 @@ class ZeugnisController
                 $istStatus  = $e->aktion === 'abschnitt_status';
                 $istRestore = in_array($e->aktion, ['abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt'], true);
                 $istMeta    = in_array($e->aktion, ['abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt'], true);
-                $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
+                $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim(Textauszeichnung::ohneMarker((string) $s))));
 
                 $status  = null;
                 $summary = '';
@@ -642,7 +644,30 @@ class ZeugnisController
             'sprueche'       => $abschnitt->typ === Abschnitt::TYP_SPRUCH
                 ? Spruch::where('aktiv', true)->orderBy('reihenfolge')->orderBy('id')->get()
                 : collect(),
+            'notizen'        => Notiz::where('abschnitt_id', $abschnitt->id)->orderByDesc('id')->get(),
         ]);
+    }
+
+    /**
+     * Notiz an einen Abschnitt anhängen (append-only, Randspalte). Erlaubt für
+     * voll + korrektor, AUCH bei abgeschlossenem Zeugnis – Notizen sind interne
+     * Kommunikation, kein Zeugnisinhalt. Bewusst KEIN Protokoll-Eintrag: die
+     * Notiz-Tabelle ist selbst die unveränderliche Historie.
+     */
+    public function notizStore(Request $request, Abschnitt $abschnitt)
+    {
+        $abschnitt->load('zeugnis.schueler.klasse', 'korrektoren');
+
+        if ($this->berechtigung($abschnitt, auth()->user()) === 'keine') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
+                ->with('error', 'Du bist für diesen Text nicht berechtigt.');
+        }
+
+        $data = $request->validate(['notiz_text' => ['required', 'string', 'max:2000']]);
+        Notiz::anlegen(['abschnitt_id' => $abschnitt->id, 'text' => $data['notiz_text']]);
+
+        // back() erhält Query-Parameter wie ?quelle=todo.
+        return redirect()->back()->with('status', 'Notiz hinzugefügt.');
     }
 
     /**
@@ -723,25 +748,21 @@ class ZeugnisController
             $data = $request->validate([
                 'inhalt' => ['nullable', 'string'],
                 'note'   => ['nullable', 'string', 'max:20'],
-                'notiz'  => ['nullable', 'string'],
                 'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
                 'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altInhalt = $abschnitt->inhalt;
-            $altNotiz  = $abschnitt->notiz;
             $altStatus = $abschnitt->status;
             $abschnitt->inhalt = $data['inhalt'] ?? null;
             if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
                 $abschnitt->note = $data['note'] ?? null;
             }
-            $abschnitt->notiz = $data['notiz'] ?? null;
             $abschnitt->status = $data['status'];
             $abschnitt->save();
 
             $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
             $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
-            $this->logFeld($abschnitt, 'Notiz', $altNotiz, $abschnitt->notiz, 'abschnitt_notiz');
             $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
             $this->ueberlaufNeuBerechnen($zeugnis);
@@ -755,7 +776,6 @@ class ZeugnisController
             'inhalt'        => ['nullable', 'string'],
             'note'          => ['nullable', 'string', 'max:20'],
             'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
-            'notiz'         => ['nullable', 'string'],
             'klassentext'   => ['nullable', 'string'],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
@@ -774,7 +794,6 @@ class ZeugnisController
         }
 
         $altInhalt = $abschnitt->inhalt;
-        $altNotiz  = $abschnitt->notiz;
         $altStatus = $abschnitt->status;
 
         $istHaupt = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS;
@@ -785,7 +804,6 @@ class ZeugnisController
             $abschnitt->note = $data['note'] ?? null;
         }
         $abschnitt->status = $data['status'];
-        $abschnitt->notiz = $data['notiz'] ?? null;
         $abschnitt->klassentext_neue_zeile = $request->boolean('klassentext_neue_zeile');
         $abschnitt->save();
 
@@ -813,7 +831,6 @@ class ZeugnisController
             $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
             $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
         }
-        $this->logFeld($abschnitt, 'Notiz', $altNotiz, $abschnitt->notiz, 'abschnitt_notiz');
         $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
         // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Fachbereich).
@@ -1194,7 +1211,39 @@ class ZeugnisController
             'navNext'        => $nachbarn['next'],
             'navPosition'    => $nachbarn['position'],
             'navGesamt'      => $nachbarn['gesamt'],
+            'notizen'        => $kt->exists ? Notiz::where('klassentext_id', $kt->id)->orderByDesc('id')->get() : collect(),
         ]);
+    }
+
+    /**
+     * Notiz an einen Klassentext anhängen (append-only, Randspalte).
+     * Wie notizStore(): kein Protokoll-Eintrag, die Tabelle ist die Historie.
+     */
+    public function klassentextNotizStore(Request $request, Klasse $klasse, string $fach)
+    {
+        [$fachId, , $art] = $this->fachAusParam($fach);
+        $klasse->loadMissing('schuljahr');
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
+        if ($kt->exists) {
+            $kt->load('korrektoren');
+        }
+
+        if ($this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user()) === 'keine') {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->with('error', 'Du bist für diesen Klassentext nicht berechtigt.');
+        }
+
+        $data = $request->validate(['notiz_text' => ['required', 'string', 'max:2000']]);
+
+        // klassentextFuer() liefert für noch unbearbeitete Fächer ein ungespeichertes
+        // Model – erst anlegen, damit die Notiz einen Anker hat.
+        if (! $kt->exists) {
+            $kt->save();
+        }
+        Notiz::anlegen(['klassentext_id' => $kt->id, 'text' => $data['notiz_text']]);
+
+        return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+            ->with('status', 'Notiz hinzugefügt.');
     }
 
     public function klassentextUpdate(Request $request, Klasse $klasse, string $fach)
@@ -1217,21 +1266,17 @@ class ZeugnisController
         if ($b === 'korrektor') {
             $data = $request->validate([
                 'text'   => ['nullable', 'string'],
-                'notiz'  => ['nullable', 'string'],
                 'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
                 'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altText   = $kt->text;
-            $altNotiz  = $kt->notiz;
             $altStatus = $kt->status;
             $kt->text = $data['text'] ?? null;
-            $kt->notiz = $data['notiz'] ?? null;
             $kt->status = $data['status'];
             $kt->save();
 
             $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
-            $this->logKlassentext($kt, $klasse->schuljahr_id, 'Notiz', $altNotiz, $kt->notiz, 'klassentext_notiz');
             $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
             $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
@@ -1241,7 +1286,6 @@ class ZeugnisController
         // Voll berechtigt: Text, Notiz, Status, Korrektoren.
         $data = $request->validate([
             'text'          => ['nullable', 'string'],
-            'notiz'         => ['nullable', 'string'],
             'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
@@ -1258,10 +1302,8 @@ class ZeugnisController
         }
 
         $altText   = $kt->text;
-        $altNotiz  = $kt->notiz;
         $altStatus = $kt->status;
         $kt->text = $data['text'] ?? null;
-        $kt->notiz = $data['notiz'] ?? null;
         $kt->status = $data['status'];
         $kt->save();
 
@@ -1273,7 +1315,6 @@ class ZeugnisController
         ], 'klassentext_korrektor', $altKorrektoren, $korrektoren);
 
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
-        $this->logKlassentext($kt, $klasse->schuljahr_id, 'Notiz', $altNotiz, $kt->notiz, 'klassentext_notiz');
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
         $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
@@ -1547,7 +1588,7 @@ class ZeugnisController
                 $istStatus  = $e->aktion === 'klassentext_status';
                 $istRestore = $e->aktion === 'klassentext_wiederhergestellt';
                 $istMeta    = in_array($e->aktion, ['klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt'], true);
-                $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim((string) $s)));
+                $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim(Textauszeichnung::ohneMarker((string) $s))));
 
                 $status  = null;
                 $summary = '';

@@ -48,11 +48,12 @@
                     @elseif ($el['typ'] === 'block' && ($el['bindung'] ?? '') === 'fachtexte')
                         <div class="el" style="{{ $style }}">
                             @foreach ($val('fachtexte') as $f)
-                                <div class="fach"><b>{{ $f['fach'] }}</b>{{ $f['text'] }}</div>
+                                {{-- zuHtmlFliesstext escapt jeden Nutzertext, Markup ist hartverdrahtet --}}
+                                <div class="fach"><b>{{ $f['fach'] }}</b>{!! \Intranet\Modules\Schulzeugnis\Support\Textauszeichnung::zuHtmlFliesstext((string) $f['text']) !!}</div>
                             @endforeach
                         </div>
                     @elseif ($el['typ'] === 'block')
-                        <div class="el" style="{{ $style }}white-space: pre-line;">{{ $val($el['bindung'] ?? '') }}</div>
+                        <div class="el" style="{{ $style }}white-space: pre-line;">{!! \Intranet\Modules\Schulzeugnis\Support\Textauszeichnung::zuHtmlFliesstext((string) $val($el['bindung'] ?? '')) !!}</div>
                     @elseif ($el['typ'] === 'unterschrift')
                         <div class="el sig" style="{{ $style }}">{{ $val($el['bindung'] ?? '') ?: ($el['text'] ?? '') }}</div>
                     @elseif ($el['typ'] === 'bild')
@@ -62,7 +63,9 @@
                     @elseif ($el['typ'] === 'linie')
                         <div class="el" style="left:{{ $x }}mm;top:{{ $y }}mm;width:{{ $w }}mm;height:0;border-top:{{ $el['staerke'] ?? 0.3 }}mm {{ $el['stil'] ?? 'solid' }} #374151;"></div>
                     @elseif ($el['typ'] === 'textbereich')
-                        <div class="el" style="{{ $style }}white-space: pre-line;">{{ $el['inhalt'] ?? '' }}</div>
+                        {{-- inhalt_html kommt ausschließlich vom Renderer (Segmente escapt, Spans in sich
+                             geschlossen); der Fallback deckt den Designer-Pfad (Beispieltexte) ab. --}}
+                        <div class="el" style="{{ $style }}white-space: pre-line;">{!! $el['inhalt_html'] ?? e($el['inhalt'] ?? '') !!}</div>
                     @endif
                 @endforeach
             </div>
