@@ -48,7 +48,6 @@ Route::middleware(['web', 'auth'])
         Route::put('klassenraeume/{klasse}/klassentext/{fach}', [ZeugnisController::class, 'klassentextUpdate'])->name('klassenraeume.klassentexte.update');
         Route::post('klassenraeume/{klasse}/klassentext/{fach}/wiederherstellen', [ZeugnisController::class, 'klassentextWiederherstellen'])->name('klassenraeume.klassentexte.wiederherstellen');
         Route::post('klassenraeume/{klasse}/klassentext/{fach}/ablehnen', [ZeugnisController::class, 'klassentextAblehnen'])->name('klassenraeume.klassentexte.ablehnen');
-        Route::post('klassenraeume/{klasse}/klassentext/{fach}/notiz', [ZeugnisController::class, 'klassentextNotizStore'])->name('klassenraeume.klassentexte.notiz');
         Route::post('klassenraeume/{klasse}/schueler/{schueler}/zeugnis', [ZeugnisController::class, 'store'])->name('klassenraeume.zeugnisse.store');
 
         // Sammel-Ausgabe: alle Zeugnisse eines Typs (fach|haupt) einer Klasse in einer Datei.
@@ -68,7 +67,6 @@ Route::middleware(['web', 'auth'])
         Route::put('klassenraeume/abschnitt/{abschnitt}', [ZeugnisController::class, 'abschnittUpdate'])->name('klassenraeume.abschnitte.update');
         Route::post('klassenraeume/abschnitt/{abschnitt}/wiederherstellen', [ZeugnisController::class, 'abschnittWiederherstellen'])->name('klassenraeume.abschnitte.wiederherstellen');
         Route::post('klassenraeume/abschnitt/{abschnitt}/ablehnen', [ZeugnisController::class, 'abschnittAblehnen'])->name('klassenraeume.abschnitte.ablehnen');
-        Route::post('klassenraeume/abschnitt/{abschnitt}/notiz', [ZeugnisController::class, 'notizStore'])->name('klassenraeume.abschnitte.notiz');
 
         // Meine ToDos – offene Aufgaben der Lehrkraft, gruppiert nach Klasse/Fach.
         Route::get('todo', [TodoController::class, 'index'])->name('todo.index');

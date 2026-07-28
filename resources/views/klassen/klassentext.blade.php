@@ -84,6 +84,16 @@
                 @error('text') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
+            @if (in_array($berechtigung, ['voll', 'korrektor']))
+                <label class="block text-sm font-medium text-gray-700">Neue Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
+                    {{-- bewusst leer bei jedem Aufruf (kein Vorbefüllen aus der DB): beim
+                         Speichern wird sie rechts im Protokoll angehängt, nie überschrieben. --}}
+                    <textarea name="notiz_text" rows="2" maxlength="2000"
+                              class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              placeholder="z. B. Rückfrage, Erinnerung – landet beim Speichern im Protokoll rechts">{{ old('notiz_text') }}</textarea>
+                </label>
+            @endif
+
             @php
                 $statusOptionen = $berechtigung === 'korrektor' ? collect($stati)->only($korrekturStati) : $stati;
                 $statusFarbe = ['gray' => '#9ca3af', 'amber' => '#f59e0b', 'red' => '#ef4444', 'green' => '#16a34a'];
@@ -201,18 +211,11 @@
         </div>{{-- /zt-main --}}
 
         <div class="zt-side">
-        {{-- Randnotizen (append-only; Eingabefeld ist nach jedem Laden leer) --}}
-        @include('schulzeugnis::zeugnisse._notizen', [
-            'notizen'      => $notizen,
-            'action'       => route('module.schulzeugnis.klassenraeume.klassentexte.notiz', ['klasse' => $klasse, 'fach' => $fachParam]),
-            'kannNotieren' => in_array($berechtigung, ['voll', 'korrektor']),
-        ])
-
-        {{-- Änderungsverlauf / Wiederherstellung --}}
+        {{-- Protokoll: Änderungen UND Notizen, zeitlich einsortiert --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5">
-            <h2 class="text-sm font-semibold text-gray-700">Änderungsverlauf</h2>
+            <h2 class="text-sm font-semibold text-gray-700">Protokoll</h2>
             @if ($verlauf->isEmpty())
-                <p class="mt-2 text-sm text-gray-400">Noch keine Änderungen protokolliert.</p>
+                <p class="mt-2 text-sm text-gray-400">Noch keine Einträge.</p>
             @else
                 <ul class="zt-log">
                     @foreach ($verlauf as $e)
@@ -235,13 +238,16 @@
                                     <span class="inline-flex items-center gap-1 text-gray-700">
                                         <i class="bx {{ $e['status']['neuIcon'] }}" style="color: {{ $e['status']['neuColor'] }}"></i>{{ $e['status']['neuLabel'] }}
                                     </span>
-                                @elseif (! empty($e['istMeta']))
-                                    {{-- Korrektor-Änderung: der Feld-Text oben genügt --}}
+                                @elseif (! empty($e['istNotiz']) || ! empty($e['istMeta']))
+                                    {{-- Notiz: Text steht darunter / Korrektor-Änderung: der Feld-Text oben genügt --}}
                                 @else
                                     <span class="{{ $e['wiederhergestellt'] ? 'text-amber-700' : 'text-gray-500' }}">— {{ $e['summary'] }}</span>
                                 @endif
                             </div>
-                            @unless ($e['istStatus'] || ! empty($e['istMeta']))
+                            @if (! empty($e['istNotiz']))
+                                <div class="mt-0.5 text-sm text-gray-700" style="white-space: pre-line;">{{ $e['notizText'] }}</div>
+                            @endif
+                            @unless ($e['istStatus'] || ! empty($e['istMeta']) || ! empty($e['istNotiz']))
                                 <div class="mt-1 text-xs">
                                     <button type="button" class="zt-vergleich inline-flex items-center gap-1 text-indigo-600 hover:underline"
                                             data-feld="{{ $e['feld'] }}" data-zeit="{{ $e['zeit']?->format('d.m.Y H:i') }}"

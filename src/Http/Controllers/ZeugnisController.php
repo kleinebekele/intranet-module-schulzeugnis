@@ -599,6 +599,12 @@ class ZeugnisController
                 ];
             });
 
+        // Notizen zeitlich zwischen die Protokoll-Einträge sortieren (ein Panel).
+        $verlauf = $verlauf
+            ->concat($this->notizEintraege(Notiz::where('abschnitt_id', $abschnitt->id)->get()))
+            ->sortByDesc('zeit')
+            ->values();
+
         $berechtigung = $this->berechtigung($abschnitt, auth()->user());
         $nachbarn     = $this->abschnittNachbarn($abschnitt);
 
@@ -644,30 +650,35 @@ class ZeugnisController
             'sprueche'       => $abschnitt->typ === Abschnitt::TYP_SPRUCH
                 ? Spruch::where('aktiv', true)->orderBy('reihenfolge')->orderBy('id')->get()
                 : collect(),
-            'notizen'        => Notiz::where('abschnitt_id', $abschnitt->id)->orderByDesc('id')->get(),
         ]);
     }
 
     /**
-     * Notiz an einen Abschnitt anhängen (append-only, Randspalte). Erlaubt für
-     * voll + korrektor, AUCH bei abgeschlossenem Zeugnis – Notizen sind interne
-     * Kommunikation, kein Zeugnisinhalt. Bewusst KEIN Protokoll-Eintrag: die
-     * Notiz-Tabelle ist selbst die unveränderliche Historie.
+     * Notizen in der Einheits-Form der Protokoll-Panel-Einträge – sie werden
+     * zeitlich zwischen die Änderungs-Einträge sortiert. Append-only, nie
+     * restorable; bewusst ohne Protokoll-Doppel (die Tabelle ist die Historie).
+     *
+     * @param  \Illuminate\Support\Collection<int,Notiz>  $notizen
+     * @return \Illuminate\Support\Collection<int,array<string,mixed>>
      */
-    public function notizStore(Request $request, Abschnitt $abschnitt)
+    private function notizEintraege($notizen)
     {
-        $abschnitt->load('zeugnis.schueler.klasse', 'korrektoren');
-
-        if ($this->berechtigung($abschnitt, auth()->user()) === 'keine') {
-            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
-                ->with('error', 'Du bist für diesen Text nicht berechtigt.');
-        }
-
-        $data = $request->validate(['notiz_text' => ['required', 'string', 'max:2000']]);
-        Notiz::anlegen(['abschnitt_id' => $abschnitt->id, 'text' => $data['notiz_text']]);
-
-        // back() erhält Query-Parameter wie ?quelle=todo.
-        return redirect()->back()->with('status', 'Notiz hinzugefügt.');
+        return $notizen->map(fn (Notiz $n) => [
+            'id'                => null,
+            'zeit'              => $n->created_at,
+            'akteur'            => $n->autor_name,
+            'feld'              => 'Notiz',
+            'istStatus'         => false,
+            'istMeta'           => false,
+            'istNotiz'          => true,
+            'notizText'         => (string) $n->text,
+            'wiederhergestellt' => false,
+            'status'            => null,
+            'summary'           => '',
+            'alt'               => '',
+            'neu'               => '',
+            'restorable'        => false,
+        ]);
     }
 
     /**
@@ -746,10 +757,11 @@ class ZeugnisController
         // Korrektor: nur Text korrigieren + Status auf „in Korrektur"/„Korrektur durchgeführt".
         if ($b === 'korrektor') {
             $data = $request->validate([
-                'inhalt' => ['nullable', 'string'],
-                'note'   => ['nullable', 'string', 'max:20'],
-                'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
-                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
+                'inhalt'     => ['nullable', 'string'],
+                'note'       => ['nullable', 'string', 'max:20'],
+                'notiz_text' => ['nullable', 'string', 'max:2000'],
+                'status'     => ['required', Rule::in(self::KORREKTUR_STATI)],
+                'weiter'     => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altInhalt = $abschnitt->inhalt;
@@ -765,6 +777,10 @@ class ZeugnisController
             $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
             $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
+            if (filled($data['notiz_text'] ?? null)) {
+                Notiz::anlegen(['abschnitt_id' => $abschnitt->id, 'text' => $data['notiz_text']]);
+            }
+
             $this->ueberlaufNeuBerechnen($zeugnis);
 
             return $this->zielNachSpeichern($request, $abschnitt)
@@ -775,6 +791,7 @@ class ZeugnisController
         $data = $request->validate([
             'inhalt'        => ['nullable', 'string'],
             'note'          => ['nullable', 'string', 'max:20'],
+            'notiz_text'    => ['nullable', 'string', 'max:2000'],
             'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
             'klassentext'   => ['nullable', 'string'],
             'korrektoren'   => ['array'],
@@ -832,6 +849,10 @@ class ZeugnisController
             $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
         }
         $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
+
+        if (filled($data['notiz_text'] ?? null)) {
+            Notiz::anlegen(['abschnitt_id' => $abschnitt->id, 'text' => $data['notiz_text']]);
+        }
 
         // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Fachbereich).
         $neu = $data['klassentext'] ?? null;
@@ -1211,39 +1232,7 @@ class ZeugnisController
             'navNext'        => $nachbarn['next'],
             'navPosition'    => $nachbarn['position'],
             'navGesamt'      => $nachbarn['gesamt'],
-            'notizen'        => $kt->exists ? Notiz::where('klassentext_id', $kt->id)->orderByDesc('id')->get() : collect(),
         ]);
-    }
-
-    /**
-     * Notiz an einen Klassentext anhängen (append-only, Randspalte).
-     * Wie notizStore(): kein Protokoll-Eintrag, die Tabelle ist die Historie.
-     */
-    public function klassentextNotizStore(Request $request, Klasse $klasse, string $fach)
-    {
-        [$fachId, , $art] = $this->fachAusParam($fach);
-        $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
-        if ($kt->exists) {
-            $kt->load('korrektoren');
-        }
-
-        if ($this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user()) === 'keine') {
-            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
-                ->with('error', 'Du bist für diesen Klassentext nicht berechtigt.');
-        }
-
-        $data = $request->validate(['notiz_text' => ['required', 'string', 'max:2000']]);
-
-        // klassentextFuer() liefert für noch unbearbeitete Fächer ein ungespeichertes
-        // Model – erst anlegen, damit die Notiz einen Anker hat.
-        if (! $kt->exists) {
-            $kt->save();
-        }
-        Notiz::anlegen(['klassentext_id' => $kt->id, 'text' => $data['notiz_text']]);
-
-        return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
-            ->with('status', 'Notiz hinzugefügt.');
     }
 
     public function klassentextUpdate(Request $request, Klasse $klasse, string $fach)
@@ -1265,9 +1254,10 @@ class ZeugnisController
         // Korrektor: nur Text korrigieren + Korrektur-Status.
         if ($b === 'korrektor') {
             $data = $request->validate([
-                'text'   => ['nullable', 'string'],
-                'status' => ['required', Rule::in(self::KORREKTUR_STATI)],
-                'weiter' => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
+                'text'       => ['nullable', 'string'],
+                'notiz_text' => ['nullable', 'string', 'max:2000'],
+                'status'     => ['required', Rule::in(self::KORREKTUR_STATI)],
+                'weiter'     => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             ]);
 
             $altText   = $kt->text;
@@ -1278,6 +1268,10 @@ class ZeugnisController
 
             $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
             $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
+
+            if (filled($data['notiz_text'] ?? null)) {
+                Notiz::anlegen(['klassentext_id' => $kt->id, 'text' => $data['notiz_text']]);
+            }
             $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
             return $this->klassentextZiel($request, $klasse, $fachId, $label, $b);
@@ -1286,6 +1280,7 @@ class ZeugnisController
         // Voll berechtigt: Text, Notiz, Status, Korrektoren.
         $data = $request->validate([
             'text'          => ['nullable', 'string'],
+            'notiz_text'    => ['nullable', 'string', 'max:2000'],
             'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
@@ -1316,6 +1311,11 @@ class ZeugnisController
 
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Klassenweiter Text', $altText, $kt->text);
         $this->logKlassentext($kt, $klasse->schuljahr_id, 'Status', $altStatus ?? 'unbearbeitet', $kt->status, 'klassentext_status');
+
+        if (filled($data['notiz_text'] ?? null)) {
+            Notiz::anlegen(['klassentext_id' => $kt->id, 'text' => $data['notiz_text']]);
+        }
+
         $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
         return $this->klassentextZiel($request, $klasse, $fachId, $label, $b);
@@ -1580,7 +1580,7 @@ class ZeugnisController
 
         $hex = self::STATUS_FARBE_HEX;
 
-        return Protokoll::where('klassentext_id', $kt->id)
+        $eintraege = Protokoll::where('klassentext_id', $kt->id)
             ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_notiz', 'klassentext_status', 'klassentext_wiederhergestellt', 'klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt'])
             ->orderByDesc('id')
             ->get()
@@ -1632,6 +1632,12 @@ class ZeugnisController
                     'restorable'        => in_array($e->aktion, ['klassentext_geaendert', 'klassentext_wiederhergestellt'], true),
                 ];
             });
+
+        // Notizen zeitlich zwischen die Protokoll-Einträge sortieren (ein Panel).
+        return $eintraege
+            ->concat($this->notizEintraege(Notiz::where('klassentext_id', $kt->id)->get()))
+            ->sortByDesc('zeit')
+            ->values();
     }
 
     /** Überlauf-Analyse neu berechnen und am Zeugnis zwischenspeichern. */
