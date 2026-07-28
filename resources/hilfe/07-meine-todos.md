@@ -3,6 +3,7 @@ titel: Meine ToDos
 route: module.schulzeugnis.todo.index
 kategorie: Schulzeugnis
 position: 7
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Ihre offenen Aufgaben in einer Liste, statt Klasse für Klasse zu suchen. Zwei Sorten stehen

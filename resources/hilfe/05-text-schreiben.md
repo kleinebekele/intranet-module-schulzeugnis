@@ -3,6 +3,7 @@ titel: Einen Zeugnistext schreiben
 route: module.schulzeugnis.klassenraeume.abschnitte.edit
 kategorie: Schulzeugnis
 position: 5
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Der Editor für einen einzelnen Abschnitt: links der Text, daneben Stand, Korrektoren,

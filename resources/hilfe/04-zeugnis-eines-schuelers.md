@@ -3,6 +3,7 @@ titel: Das Zeugnis eines Schülers
 route: module.schulzeugnis.klassenraeume.zeugnisse.edit
 kategorie: Schulzeugnis
 position: 4
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Alle Abschnitte eines Kindes auf einer Seite, dazu Vorschau, PDF und der Abschluss.

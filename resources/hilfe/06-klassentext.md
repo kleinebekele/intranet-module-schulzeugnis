@@ -3,6 +3,7 @@ titel: Klassentext schreiben
 route: module.schulzeugnis.klassenraeume.klassentexte.edit
 kategorie: Schulzeugnis
 position: 6
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Ein Text je Klasse **und** Fach, der auf dem Zeugnis jedes Kindes dieser Klasse vor dem

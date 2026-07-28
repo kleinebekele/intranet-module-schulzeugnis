@@ -2,6 +2,7 @@
 titel: Das Zeugnismodul im Überblick
 kategorie: Schulzeugnis
 position: 1
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Textzeugnisse schreiben, gemeinsam korrigieren, abschließen und als PDF ausgeben. Diese Seite

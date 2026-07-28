@@ -3,6 +3,7 @@ titel: Zeugnisliste einer Klasse
 route: module.schulzeugnis.klassenraeume.zeugnisse.index
 kategorie: Schulzeugnis
 position: 3
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Die Arbeitsfläche: alle Schüler der Klasse als Zeilen, alle Fächer mit Lehrauftrag als

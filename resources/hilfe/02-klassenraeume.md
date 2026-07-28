@@ -3,6 +3,7 @@ titel: Klassenräume
 route: module.schulzeugnis.klassenraeume.index
 kategorie: Schulzeugnis
 position: 2
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Der Einstieg: die Klassen des aktiven Schuljahres als Türen. Ein Klick führt in die

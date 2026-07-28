@@ -3,6 +3,7 @@ titel: Alte Zeugnisse umwandeln
 route: module.schulzeugnis.altumwandeln.index
 kategorie: Schulzeugnis
 position: 8
+rollen: teacher, staff, zeugnis_admin, zeugnis_moderator, admin
 ---
 
 Ein Hilfswerkzeug für den Übergang: PDFs aus dem alten Zeugnisprogramm in druckfertige
