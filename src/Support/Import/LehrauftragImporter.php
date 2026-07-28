@@ -184,11 +184,16 @@ class LehrauftragImporter
         });
 
         $z = $analyse['zaehl'];
-        Protokoll::log('importiert', [
+        $attrs = [
             'schuljahr_id' => (int) ($kontext['schuljahr_id'] ?? 0) ?: null,
             'beschreibung' => "Lehrauftrag-Import: {$z['neu']} neu, {$z['unveraendert']} bereits vorhanden, "
                 . "{$z['warnung']} übersprungen, {$z['fehler']} Fehler.",
-        ]);
+        ];
+        // Läufe ohne eingeloggten Benutzer (Task/Cron) geben ihren Akteur selbst an.
+        if (filled($kontext['akteur_name'] ?? null)) {
+            $attrs['akteur_name'] = (string) $kontext['akteur_name'];
+        }
+        Protokoll::log('importiert', $attrs);
 
         return $analyse;
     }

@@ -175,10 +175,15 @@ class FaecherImporter
         });
 
         $z = $analyse['zaehl'];
-        Protokoll::log('importiert', [
+        $attrs = [
             'beschreibung' => "Fächer-Import: {$z['neu']} neu, {$z['aktualisiert']} aktualisiert, "
                 . "{$z['unveraendert']} unverändert, {$z['warnung']} übersprungen, {$z['fehler']} Fehler.",
-        ]);
+        ];
+        // Läufe ohne eingeloggten Benutzer (Task/Cron) geben ihren Akteur selbst an.
+        if (filled($kontext['akteur_name'] ?? null)) {
+            $attrs['akteur_name'] = (string) $kontext['akteur_name'];
+        }
+        Protokoll::log('importiert', $attrs);
 
         return $analyse;
     }
