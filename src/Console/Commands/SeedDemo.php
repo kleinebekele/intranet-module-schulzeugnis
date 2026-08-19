@@ -123,7 +123,7 @@ class SeedDemo extends Command
                         'vorname'      => $vorname,
                         'nachname'     => $nachname,
                         'geburtsdatum' => sprintf('%04d-%02d-%02d', 2018 - $stufe, ($n % 12) + 1, ($n % 27) + 1),
-                        'geburtsort'   => 'Gütersloh',
+                        'geburtsort'   => 'Musterstadt',
                         'geschlecht'   => $n % 2 === 0 ? 'w' : 'm',
                         'quell_id'     => sprintf('DEMO-%02d-%03d', $stufe, $n + 1),
                     ]);

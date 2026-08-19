@@ -21,7 +21,8 @@ class ZeugnisRenderer
 {
     private const MM_TO_PT = 2.83465;
     private const MIN_GROESSE = 8;
-    private const SCHULNAME = 'Freie Waldorfschule Gütersloh';
+    // TODO vor dem Produktivstart: echten Schulnamen eintragen (oder konfigurierbar machen)
+    private const SCHULNAME = 'Freie Waldorfschule Musterstadt';
 
     /**
      * Vollständige Render-Daten für die Blade-Vorlage schulzeugnis::formate.render.
@@ -194,7 +195,7 @@ class ZeugnisRenderer
         $geboren = trim(($gebDatumStr ? 'geboren am ' . $gebDatumStr : '') . ($gebOrt ? ' in ' . $gebOrt : ''));
 
         $ausgabe = $schuljahr?->ausgabe_datum
-            ? 'Gütersloh, den ' . $schuljahr->ausgabe_datum->format('d.m.Y')
+            ? 'Musterstadt, den ' . $schuljahr->ausgabe_datum->format('d.m.Y')
             : '';
 
         // Zeugnisspruch: der eine Spruch-Abschnitt des Schülers (liegt am Fach- bzw.
