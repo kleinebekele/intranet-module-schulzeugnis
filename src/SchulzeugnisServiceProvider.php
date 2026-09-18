@@ -2,6 +2,7 @@
 
 namespace Intranet\Modules\Schulzeugnis;
 
+use App\Ekkon\Support\TaskRegistry;
 use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
@@ -22,6 +23,23 @@ use Intranet\Modules\Schulzeugnis\Support\LehrerKontenAbgleich;
  */
 class SchulzeugnisServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        parent::register();
+
+        // Der nächtliche Import aus Linear (Task Linear/ZeugnisImport) – bis 2026-09
+        // im Modul ekkon-linear. Ordner- und Klassenname sind geblieben, damit der
+        // Task-Key und mit ihm Pause, Historie und Benachrichtigungs-Routen bleiben.
+        $this->app->singletonIf(TaskRegistry::class);
+
+        $this->app->make(TaskRegistry::class)->addSource(
+            $this->moduleBasePath().'/src/Tasks',
+            __NAMESPACE__.'\\Tasks',
+            'do1emu/module-schulzeugnis',
+            'schulzeugnis',
+        );
+    }
+
     public function boot(): void
     {
         parent::boot();
