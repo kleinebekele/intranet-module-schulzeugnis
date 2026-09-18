@@ -69,6 +69,9 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
         // Jede Zeile ein eigenes Symbol – bei 11 Unterpunkten sind mehrfach
         // vergebene Icons als Orientierung wertlos.
         return ModuleManifest::make('schulzeugnis', 'Schulzeugnis', icon: 'book')
+            ->rolle('zeugnis_admin', 'Zeugnisadmin')
+            ->rolle('zeugnis_moderator', 'Zeugnismoderator')
+            ->rolle('zeugnis_designer', 'Zeugnisdesigner')
             ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'door')
             ->item('todo', 'Meine ToDos', 'module.schulzeugnis.todo.index', icon: 'list')
             ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar', group: $verwaltung)
