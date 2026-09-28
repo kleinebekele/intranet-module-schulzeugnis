@@ -6,6 +6,7 @@ use App\Ekkon\Support\TaskRegistry;
 use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
+use App\Modules\Support\Zugriffsstufe;
 use Illuminate\Console\Scheduling\Schedule;
 use Intranet\Modules\Schulzeugnis\Console\Commands\LehrerKontenVerknuepfen;
 use Intranet\Modules\Schulzeugnis\Console\Commands\SeedDemo;
@@ -101,6 +102,11 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'quote', group: $verwaltung)
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'layout', group: $verwaltung)
             ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'import', group: $verwaltung)
-            ->item('altumwandeln', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altumwandeln.index', icon: 'transfer');
+            ->item('altumwandeln', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altumwandeln.index', icon: 'transfer')
+            // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
+            // (MODULES.md im Core, „Zugriffsstufen").
+            ->lesend('import.vorschau', 'altumwandeln.zeugnisse', 'altumwandeln.fachzeugnisse') // prüfen/umwandeln ohne Speichern
+            ->stufe(Zugriffsstufe::Verwalten, 'import.ausfuehren', 'formate.duplicate')          // legen an
+            ->stufe(Zugriffsstufe::Bearbeiten, 'beispieltexte.reset');                           // setzt nur zurück
     }
 }
