@@ -60,6 +60,16 @@ class ZeugnisImport extends EkkonTask
 {
     public string $category = 'Linear';
 
+    /** Liest die Linear-Datenbank: bei Ausfall nicht starten, sondern nachholen (Core, 2026-10-01). */
+    public bool $brauchtWawi = true;
+
+    /**
+     * Lehrer werden über users.externe_id zugeordnet, die Linear/BenutzerImport setzt: erst danach laufen.
+     *
+     * @var list<string>
+     */
+    public array $folgtAuf = ['Linear/BenutzerImport'];
+
     public string $description = 'Schuljahre samt Klassen, Fächern, Lehrern, Schülern und Lehraufträgen '
         .'aus Linear ins Zeugnis-Modul übernehmen (additiv, nie löschen).';
 
