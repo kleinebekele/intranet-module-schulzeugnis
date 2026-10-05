@@ -28,7 +28,7 @@
         /* Zweistufige Karte: oberste Ebene als sichtbare Kopfzeile, zweite Ebene als
            Akkordeon. Je nach Gruppierung ist die farbige Ebene die Klasse (Stufen-
            farbe, Schrift IMMER weiß) und die neutrale Ebene das Fach. */
-        .todo-node { border: 1px solid #e5e7eb; border-radius: .75rem; overflow: hidden; }
+        .todo-node { border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: .75rem; overflow: hidden; }
 
         /* Kacheln der obersten Ebene in ein responsives Raster (1→2→3→4 Spalten je Breite).
            align-items: start, damit eine aufgeklappte Kachel die Nachbarn nicht mitstreckt. */
@@ -72,63 +72,63 @@
         .todo-farbe .todo-chevron { color: rgba(255,255,255,.9); }
 
         /* Neutrale Kopfzeile (Fach als oberste Ebene). */
-        .todo-neutral-head { background: #eef2ff; color: #3730a3; }
-        .todo-neutral-head .todo-badge { background: #fff; color: #4f46e5; }
+        .todo-neutral-head { background: var(--color-indigo-50, #eef2ff); color: var(--color-indigo-800, #3730a3); }
+        .todo-neutral-head .todo-badge { background: var(--color-white, #fff); color: var(--color-indigo-600, #4f46e5); }
 
         /* Kopfzeile (oberste, nicht klappbar). */
         .todo-head { display: flex; align-items: center; gap: .625rem; padding: .7rem 1rem; }
 
         /* Akkordeon-Kopf (zweite Ebene, klappbar). */
-        .todo-kinder { background: #fff; }
-        .todo-kind + .todo-kind { border-top: 1px solid #f3f4f6; }
+        .todo-kinder { background: var(--color-white, #fff); }
+        .todo-kind + .todo-kind { border-top: 1px solid var(--color-gray-100, #f3f4f6); }
         .todo-akk {
             width: 100%; display: flex; align-items: center; gap: .5rem;
             padding: .55rem 1rem; border: 0; text-align: left; cursor: pointer;
         }
-        .todo-akk-neutral { background: transparent; color: #374151; }
+        .todo-akk-neutral { background: transparent; color: var(--color-gray-700, #374151); }
         .todo-akk-neutral:hover,
-        .todo-akk-neutral[aria-expanded="true"] { background: #f9fafb; }
-        .todo-akk-neutral .todo-badge  { background: #f3f4f6; color: #6b7280; }
-        .todo-akk-neutral .todo-chevron { color: #9ca3af; }
+        .todo-akk-neutral[aria-expanded="true"] { background: var(--color-gray-50, #f9fafb); }
+        .todo-akk-neutral .todo-badge  { background: var(--color-gray-100, #f3f4f6); color: var(--color-gray-500, #6b7280); }
+        .todo-akk-neutral .todo-chevron { color: var(--color-gray-400, #9ca3af); }
         .todo-akk-farbe:hover { filter: brightness(1.07); }
 
         .todo-chevron { transition: transform .18s ease; }
         .todo-akk[aria-expanded="true"] .todo-chevron { transform: rotate(90deg); }
         .todo-badge { border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 
-        .todo-inhalt { padding: .15rem 1rem .55rem 2.1rem; background: #fff; }
+        .todo-inhalt { padding: .15rem 1rem .55rem 2.1rem; background: var(--color-white, #fff); }
         .todo-inhalt[hidden] { display: none; }
 
         .todo-zeile { transition: background .12s ease, box-shadow .2s ease; }
-        .todo-zeile:hover { background: #f9fafb; }
-        .todo-zeile.todo-focus { background: #fffbeb; box-shadow: inset 0 0 0 2px #f59e0b; }
+        .todo-zeile:hover { background: var(--color-gray-50, #f9fafb); }
+        .todo-zeile.todo-focus { background: var(--color-amber-50, #fffbeb); box-shadow: inset 0 0 0 2px var(--color-amber-500, #f59e0b); }
         .todo-name { transition: color .12s ease; }
-        .todo-zeile:hover .todo-name { color: #4f46e5; }
+        .todo-zeile:hover .todo-name { color: var(--color-indigo-600, #4f46e5); }
         .todo-verlauf { max-width: 58%; }
 
         /* Umschalter der Gruppierung. */
-        .todo-toggle { display: inline-flex; gap: 2px; border: 1px solid #e5e7eb; border-radius: .6rem; background: #fff; padding: 3px; }
-        .todo-toggle a { padding: .3rem .75rem; border-radius: .45rem; font-size: .8rem; font-weight: 500; color: #6b7280; text-decoration: none; }
-        .todo-toggle a.aktiv { background: #4f46e5; color: #fff; }
+        .todo-toggle { display: inline-flex; gap: 2px; border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: .6rem; background: var(--color-white, #fff); padding: 3px; }
+        .todo-toggle a { padding: .3rem .75rem; border-radius: .45rem; font-size: .8rem; font-weight: 500; color: var(--color-gray-500, #6b7280); text-decoration: none; }
+        .todo-toggle a.aktiv { background: var(--color-indigo-600, #4f46e5); color: #fff; }
 
         /* Tabs als abgesetzte Karten (Rahmen + Schatten), damit sie klar voneinander
            und vom Inhalt getrennt sind; der aktive Tab ist indigo hervorgehoben. */
         .todo-tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
         .todo-tab-btn {
             display: inline-flex; align-items: center; gap: .45rem;
-            padding: .5rem .95rem; border: 1px solid #e5e7eb; border-radius: .6rem;
-            background: #fff; cursor: pointer; font-size: .875rem; font-weight: 500; color: #6b7280;
+            padding: .5rem .95rem; border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: .6rem;
+            background: var(--color-white, #fff); cursor: pointer; font-size: .875rem; font-weight: 500; color: var(--color-gray-500, #6b7280);
             box-shadow: 0 1px 2px rgba(0,0,0,.05);
             transition: color .15s, border-color .15s, box-shadow .15s, background .15s;
         }
-        .todo-tab-btn:hover { color: #374151; border-color: #c7d2fe; }
+        .todo-tab-btn:hover { color: var(--color-gray-700, #374151); border-color: var(--color-indigo-200, #c7d2fe); }
         .todo-tab-btn.aktiv {
-            color: #4f46e5; background: #eef2ff; border-color: #4f46e5;
+            color: var(--color-indigo-600, #4f46e5); background: var(--color-indigo-50, #eef2ff); border-color: var(--color-indigo-600, #4f46e5);
             box-shadow: 0 3px 10px -2px rgba(79,70,229,.35);
         }
-        .todo-tab-anzahl { border-radius: 9999px; background: #f3f4f6; color: #6b7280; padding: 0 .5rem; font-size: .7rem; font-weight: 600; }
-        .todo-tab-btn.aktiv .todo-tab-anzahl { background: #e0e7ff; color: #4f46e5; }
-        .todo-tab-gruen, .todo-tab-btn.aktiv .todo-tab-gruen { background: #dcfce7; color: #16a34a; }
+        .todo-tab-anzahl { border-radius: 9999px; background: var(--color-gray-100, #f3f4f6); color: var(--color-gray-500, #6b7280); padding: 0 .5rem; font-size: .7rem; font-weight: 600; }
+        .todo-tab-btn.aktiv .todo-tab-anzahl { background: var(--color-indigo-100, #e0e7ff); color: var(--color-indigo-600, #4f46e5); }
+        .todo-tab-gruen, .todo-tab-btn.aktiv .todo-tab-gruen { background: var(--color-green-100, #dcfce7); color: var(--color-green-600, #16a34a); }
         .todo-panel[hidden] { display: none; }
         .todo-erledigt-liste[hidden] { display: none; }
 
@@ -146,7 +146,7 @@
         .todo-panels.laedt .todo-loader { display: flex; }
         .todo-spinner {
             width: 34px; height: 34px; border-radius: 9999px;
-            border: 3px solid #e0e7ff; border-top-color: #4f46e5;
+            border: 3px solid var(--color-indigo-100, #e0e7ff); border-top-color: var(--color-indigo-600, #4f46e5);
             animation: todo-spin .6s linear infinite;
         }
         @keyframes todo-spin { to { transform: rotate(360deg); } }

@@ -65,9 +65,9 @@
         /* Türfarbe kommt aus der Schulstufe (--kr); Fallback für Klassen ohne Stufe. */
         .kr-blatt {
             background: linear-gradient(135deg,
-                color-mix(in srgb, var(--kr, #64748b) 78%, white),
-                var(--kr, #64748b) 55%,
-                color-mix(in srgb, var(--kr, #64748b) 80%, black));
+                color-mix(in srgb, var(--kr, var(--color-slate-500, #64748b)) 78%, white),
+                var(--kr, var(--color-slate-500, #64748b)) 55%,
+                color-mix(in srgb, var(--kr, var(--color-slate-500, #64748b)) 80%, black));
         }
 
         .kr-tuer:hover .kr-blatt,
@@ -101,9 +101,9 @@
             box-shadow: 0 1px 2px rgba(0,0,0,.4);
         }
 
-        .kr-label { margin-top: 14px; font-weight: 600; color: #374151; text-align: center; }
-        .kr-sub { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 1px; }
-        .kr-tuer:hover .kr-label { color: #4f46e5; }
+        .kr-label { margin-top: 14px; font-weight: 600; color: var(--color-gray-700, #374151); text-align: center; }
+        .kr-sub { font-size: 12px; color: var(--color-gray-400, #9ca3af); text-align: center; margin-top: 1px; }
+        .kr-tuer:hover .kr-label { color: var(--color-indigo-600, #4f46e5); }
     </style>
 
     <div class="space-y-3">

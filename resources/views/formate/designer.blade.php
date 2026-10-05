@@ -31,89 +31,89 @@
     <style>
         #dz-app { display: flex; gap: 16px; align-items: flex-start; }
         #dz-app .dz-side { width: 220px; flex: none; position: sticky; top: 16px; align-self: flex-start; }
-        #dz-app .dz-canvas { flex: 1; overflow-x: auto; background: #f3f4f6; border-radius: 12px; padding: 24px; }
+        #dz-app .dz-canvas { flex: 1; overflow-x: auto; background: var(--color-gray-100, #f3f4f6); border-radius: 12px; padding: 24px; }
         #dz-pages { display: flex; flex-direction: column; gap: 22px; align-items: center; }
-        .dz-pagelabel { font-size: 12px; color: #6b7280; text-align: center; }
+        .dz-pagelabel { font-size: 12px; color: var(--color-gray-500, #6b7280); text-align: center; }
         .dz-pagebar { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px; }
-        .dz-swap { font-size: 12px; border: 1px solid #d1d5db; border-radius: 6px; padding: 2px 6px; color: #4f46e5; background: #fff; cursor: pointer; }
-        .dz-page { position: relative; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.15); }
-        .dz-page.dz-active { outline: 2px solid #a5b4fc; }
-        .dz-page.dz-page-folge { outline: 2px dashed #c7d2fe; }
-        .dz-page.dz-page-folge.dz-active { outline: 2px solid #a5b4fc; }
-        .dz-folgetag { position: absolute; right: 6px; top: 6px; z-index: 7; background: #eef2ff; color: #4f46e5; font: 600 10px/1.2 sans-serif; padding: 2px 7px; border-radius: 999px; pointer-events: none; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
-        .dz-pagedel { font-size: 12px; border: 1px solid #fecaca; border-radius: 6px; padding: 2px 7px; color: #dc2626; background: #fff; cursor: pointer; }
-        .dz-pagedel:hover { background: #fef2f2; }
+        .dz-swap { font-size: 12px; border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 6px; padding: 2px 6px; color: var(--color-indigo-600, #4f46e5); background: var(--color-white, #fff); cursor: pointer; }
+        .dz-page { position: relative; background: #fff; /* Papier bleibt weiß, auch im dunklen Schema */ box-shadow: 0 1px 8px rgba(0,0,0,.15); }
+        .dz-page.dz-active { outline: 2px solid var(--color-indigo-300, #a5b4fc); }
+        .dz-page.dz-page-folge { outline: 2px dashed var(--color-indigo-200, #c7d2fe); }
+        .dz-page.dz-page-folge.dz-active { outline: 2px solid var(--color-indigo-300, #a5b4fc); }
+        .dz-folgetag { position: absolute; right: 6px; top: 6px; z-index: 7; background: var(--color-indigo-50, #eef2ff); color: var(--color-indigo-600, #4f46e5); font: 600 10px/1.2 sans-serif; padding: 2px 7px; border-radius: 999px; pointer-events: none; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+        .dz-pagedel { font-size: 12px; border: 1px solid var(--color-red-200, #fecaca); border-radius: 6px; padding: 2px 7px; color: var(--color-red-600, #dc2626); background: var(--color-white, #fff); cursor: pointer; }
+        .dz-pagedel:hover { background: var(--color-red-50, #fef2f2); }
         .dz-el { position: absolute; overflow: hidden; box-sizing: border-box; cursor: move; border: 1px dashed transparent; line-height: 1.3; padding: 0 1px; }
-        .dz-el:hover { border-color: #c7d2fe; }
-        .dz-el.dz-sel { border: 1px solid #6366f1; z-index: 5; }
+        .dz-el:hover { border-color: var(--color-indigo-200, #c7d2fe); }
+        .dz-el.dz-sel { border: 1px solid var(--color-indigo-500, #6366f1); z-index: 5; }
         .dz-el img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
         .dz-el b { display: block; }
         .dz-el.dz-tb { line-height: 1.35; }
-        .dz-el.dz-tb-of { outline: 2px solid #f59e0b; }
-        .dz-tb-badge { position: absolute; z-index: 6; background: #f59e0b; color: #fff; font: 600 10px/1.2 sans-serif; padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-        .dz-tb-catch { position: absolute; z-index: 6; background: #6366f1; color: #fff; font: 600 10px/1.2 sans-serif; padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-        .dz-sig { border-top: 1px solid #374151; padding-top: 2px; }
-        .dz-h { position: absolute; width: 10px; height: 10px; background: #6366f1; border: 1px solid #fff; box-sizing: border-box; }
+        .dz-el.dz-tb-of { outline: 2px solid var(--color-amber-500, #f59e0b); }
+        .dz-tb-badge { position: absolute; z-index: 6; background: var(--color-amber-500, #f59e0b); color: #fff; font: 600 10px/1.2 sans-serif; padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .dz-tb-catch { position: absolute; z-index: 6; background: var(--color-indigo-500, #6366f1); color: #fff; font: 600 10px/1.2 sans-serif; padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .dz-sig { border-top: 1px solid var(--color-gray-700, #374151); padding-top: 2px; }
+        .dz-h { position: absolute; width: 10px; height: 10px; background: var(--color-indigo-500, #6366f1); border: 1px solid var(--color-white, #fff); box-sizing: border-box; }
         .dz-h-e { right: -5px; top: 50%; margin-top: -5px; cursor: ew-resize; }
         .dz-h-s { bottom: -5px; left: 50%; margin-left: -5px; cursor: ns-resize; }
         .dz-h-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
-        #dz-app .dz-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-        #dz-app .dz-add { display: block; width: 100%; text-align: left; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 10px; margin-top: 6px; font-size: 13px; color: #374151; background: #fff; cursor: pointer; }
-        #dz-app .dz-add:hover { background: #f9fafb; }
-        #dz-props label { display: block; font-size: 12px; color: #6b7280; margin-top: 8px; }
-        #dz-props input[type=text], #dz-props input[type=number], #dz-props select { width: 100%; margin-top: 2px; border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 7px; font-size: 13px; }
-        #dz-props textarea { width: 100%; margin-top: 2px; border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 7px; font-size: 13px; resize: vertical; font-family: inherit; }
+        #dz-app .dz-card { background: var(--color-white, #fff); border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: 12px; padding: 14px; }
+        #dz-app .dz-add { display: block; width: 100%; text-align: left; border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: 8px; padding: 7px 10px; margin-top: 6px; font-size: 13px; color: var(--color-gray-700, #374151); background: var(--color-white, #fff); cursor: pointer; }
+        #dz-app .dz-add:hover { background: var(--color-gray-50, #f9fafb); }
+        #dz-props label { display: block; font-size: 12px; color: var(--color-gray-500, #6b7280); margin-top: 8px; }
+        #dz-props input[type=text], #dz-props input[type=number], #dz-props select { width: 100%; margin-top: 2px; border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 6px; padding: 5px 7px; font-size: 13px; }
+        #dz-props textarea { width: 100%; margin-top: 2px; border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 6px; padding: 5px 7px; font-size: 13px; resize: vertical; font-family: inherit; }
         #dz-props .dz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        #dz-props .dz-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: #374151; }
+        #dz-props .dz-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--color-gray-700, #374151); }
         #dz-props .dz-check input { margin-top: 0; width: auto; }
         #dz-props .dz-fmt { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
         /* Umschalt-Buttons (F/K/U): leuchten aktiv */
         .dz-toggle { position: relative; display: inline-flex; }
         .dz-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-        .dz-toggle span { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 34px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; cursor: pointer; font-size: 15px; user-select: none; }
-        .dz-toggle span:hover { background: #f3f4f6; }
-        .dz-toggle input:checked + span { background: #4f46e5; border-color: #4f46e5; color: #fff; }
-        .dz-toggle input:focus-visible + span { outline: 2px solid #a5b4fc; outline-offset: 1px; }
+        .dz-toggle span { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 34px; padding: 0 10px; border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 8px; background: var(--color-white, #fff); color: var(--color-gray-700, #374151); cursor: pointer; font-size: 15px; user-select: none; }
+        .dz-toggle span:hover { background: var(--color-gray-100, #f3f4f6); }
+        .dz-toggle input:checked + span { background: var(--color-indigo-600, #4f46e5); border-color: var(--color-indigo-600, #4f46e5); color: #fff; }
+        .dz-toggle input:focus-visible + span { outline: 2px solid var(--color-indigo-300, #a5b4fc); outline-offset: 1px; }
         /* Ein/Aus-Schalter (Auffangfeld) */
-        #dz-props label.dz-switch { display: flex; align-items: center; gap: 10px; margin-top: 12px; cursor: pointer; font-size: 13px; color: #374151; }
+        #dz-props label.dz-switch { display: flex; align-items: center; gap: 10px; margin-top: 12px; cursor: pointer; font-size: 13px; color: var(--color-gray-700, #374151); }
         .dz-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
-        .dz-switch .dz-track { flex: none; width: 40px; height: 22px; border-radius: 999px; background: #d1d5db; position: relative; transition: background .15s; margin-top: 1px; }
-        .dz-switch .dz-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
-        .dz-switch input:checked + .dz-track { background: #4f46e5; }
+        .dz-switch .dz-track { flex: none; width: 40px; height: 22px; border-radius: 999px; background: var(--color-gray-300, #d1d5db); position: relative; transition: background .15s; margin-top: 1px; }
+        .dz-switch .dz-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-white, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+        .dz-switch input:checked + .dz-track { background: var(--color-indigo-600, #4f46e5); }
         .dz-switch input:checked + .dz-track .dz-thumb { left: 20px; }
-        .dz-switch input:focus-visible + .dz-track { outline: 2px solid #a5b4fc; outline-offset: 2px; }
-        #dz-props input[type=color] { width: 100%; height: 30px; margin-top: 2px; padding: 2px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; }
+        .dz-switch input:focus-visible + .dz-track { outline: 2px solid var(--color-indigo-300, #a5b4fc); outline-offset: 2px; }
+        #dz-props input[type=color] { width: 100%; height: 30px; margin-top: 2px; padding: 2px; border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 6px; background: var(--color-white, #fff); }
         #dz-props .dz-bg { display: flex; align-items: center; gap: 6px; }
         #dz-props .dz-bg input[type=checkbox] { margin-top: 0; width: auto; }
         #dz-props .dz-bg input[type=color] { flex: 1; }
-        #dz-props .dz-typ { display: inline-block; font-size: 12px; font-weight: 600; color: #4f46e5; background: #eef2ff; border-radius: 999px; padding: 2px 10px; }
-        #dz-props .dz-btn { margin-top: 10px; width: 100%; border: 1px solid #d1d5db; color: #374151; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
-        #dz-props .dz-btn:hover { background: #f9fafb; }
-        #dz-props .dz-del { margin-top: 14px; width: 100%; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 7px; font-size: 13px; background: #fff; cursor: pointer; }
-        #dz-props .dz-del:hover { background: #fef2f2; }
-        #dz-app .dz-hint { font-size: 12px; color: #9ca3af; }
-        #dz-varhelp { display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-weight: 500; cursor: pointer; }
-        #dz-varhelp:hover { background: #fde68a; }
+        #dz-props .dz-typ { display: inline-block; font-size: 12px; font-weight: 600; color: var(--color-indigo-600, #4f46e5); background: var(--color-indigo-50, #eef2ff); border-radius: 999px; padding: 2px 10px; }
+        #dz-props .dz-btn { margin-top: 10px; width: 100%; border: 1px solid var(--color-gray-300, #d1d5db); color: var(--color-gray-700, #374151); border-radius: 8px; padding: 7px; font-size: 13px; background: var(--color-white, #fff); cursor: pointer; }
+        #dz-props .dz-btn:hover { background: var(--color-gray-50, #f9fafb); }
+        #dz-props .dz-del { margin-top: 14px; width: 100%; border: 1px solid var(--color-red-200, #fecaca); color: var(--color-red-600, #dc2626); border-radius: 8px; padding: 7px; font-size: 13px; background: var(--color-white, #fff); cursor: pointer; }
+        #dz-props .dz-del:hover { background: var(--color-red-50, #fef2f2); }
+        #dz-app .dz-hint { font-size: 12px; color: var(--color-gray-400, #9ca3af); }
+        #dz-varhelp { display: inline-flex; align-items: center; gap: 6px; background: var(--color-amber-100, #fef3c7); color: var(--color-amber-800, #92400e); border: 1px solid var(--color-amber-300, #fcd34d); border-radius: 8px; padding: 8px 12px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        #dz-varhelp:hover { background: var(--color-amber-200, #fde68a); }
         #dz-modal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 60; align-items: center; justify-content: center; padding: 20px; }
         #dz-modal.dz-open { display: flex; }
-        #dz-modal .dz-box { background: #fff; border-radius: 14px; max-width: 540px; width: 100%; max-height: 82vh; overflow: auto; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
-        #dz-modal h2 { font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 8px; }
-        #dz-modal p { font-size: 14px; color: #4b5563; margin: 0 0 14px; line-height: 1.5; }
+        #dz-modal .dz-box { background: var(--color-white, #fff); border-radius: 14px; max-width: 540px; width: 100%; max-height: 82vh; overflow: auto; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+        #dz-modal h2 { font-size: 18px; font-weight: 600; color: var(--color-gray-800, #1f2937); margin: 0 0 8px; }
+        #dz-modal p { font-size: 14px; color: var(--color-gray-600, #4b5563); margin: 0 0 14px; line-height: 1.5; }
         #dz-modal table { width: 100%; border-collapse: collapse; font-size: 13px; }
         #dz-modal th, #dz-modal td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eef2f7; }
-        #dz-modal th { color: #6b7280; font-weight: 600; }
-        #dz-modal code { background: #eef2ff; color: #4f46e5; padding: 1px 6px; border-radius: 5px; }
-        #dz-modal .dz-close { margin-top: 16px; background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
-        #dz-tp-editor input[type=text], #dz-tp-editor textarea { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; }
+        #dz-modal th { color: var(--color-gray-500, #6b7280); font-weight: 600; }
+        #dz-modal code { background: var(--color-indigo-50, #eef2ff); color: var(--color-indigo-600, #4f46e5); padding: 1px 6px; border-radius: 5px; }
+        #dz-modal .dz-close { margin-top: 16px; background: var(--color-indigo-600, #4f46e5); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+        #dz-tp-editor input[type=text], #dz-tp-editor textarea { border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; }
         #dz-tp-editor textarea { width: 100%; margin-top: 6px; resize: vertical; }
-        .dz-tp-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        .dz-tp-item { border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
         .dz-tp-head { display: flex; gap: 8px; align-items: center; }
         .dz-tp-name { flex: 1; }
-        .dz-tp-del { border: 1px solid #fecaca; color: #dc2626; background: #fff; border-radius: 6px; padding: 4px 9px; font-size: 18px; line-height: 1; cursor: pointer; }
-        .dz-tp-del:hover { background: #fef2f2; }
-        .dz-tp-count { font-size: 11px; color: #9ca3af; margin-top: 3px; }
-        .dz-tp-btn { border: 1px solid #d1d5db; color: #374151; background: #fff; border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
-        .dz-tp-btn:hover { background: #f9fafb; }
+        .dz-tp-del { border: 1px solid var(--color-red-200, #fecaca); color: var(--color-red-600, #dc2626); background: var(--color-white, #fff); border-radius: 6px; padding: 4px 9px; font-size: 18px; line-height: 1; cursor: pointer; }
+        .dz-tp-del:hover { background: var(--color-red-50, #fef2f2); }
+        .dz-tp-count { font-size: 11px; color: var(--color-gray-400, #9ca3af); margin-top: 3px; }
+        .dz-tp-btn { border: 1px solid var(--color-gray-300, #d1d5db); color: var(--color-gray-700, #374151); background: var(--color-white, #fff); border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+        .dz-tp-btn:hover { background: var(--color-gray-50, #f9fafb); }
         #dz-tp-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
     </style>
 
@@ -161,10 +161,10 @@
             <p>In einem <strong>„Statischer Text"</strong>-Feld kannst du Platzhalter in geschweiften Klammern verwenden – beim Erstellen des Zeugnisses werden sie automatisch mit den echten Daten des Schülers gefüllt.<br><br>Beispiel:<br><code>erhält für die Klasse {Klasse} im Schuljahr {Schuljahr} folgendes Zeugnis:</code></p>
             <table><thead><tr><th>Variable</th><th>Beispiel-Inhalt</th></tr></thead><tbody id="dz-vartable"></tbody></table>
             <p style="margin-top:16px;"><code>{Zeugnistext}</code> ist ein Sonderfall: Er steht für den kompletten Zeugnistext (Haupttext + Fachtexte) und wird <strong>nicht</strong> in ein Statischer-Text-Feld eingesetzt, sondern über die <strong>Zeugnistext-Felder</strong> ausgegeben. Dort verteilt er sich automatisch der Reihe nach über alle diese Felder – sortiert nach Seite und Position. Passt der Text nicht in alle Felder, wird eine Überlauf-Warnung angezeigt.</p>
-            <label style="display:block; margin-top:16px; font-size:14px; font-weight:600; color:#1f2937;">Beispieltext für die Vorschau
-                <select id="dz-textprobe" style="display:block; width:100%; margin-top:6px; border:1px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:14px; background:#fff;"></select>
+            <label style="display:block; margin-top:16px; font-size:14px; font-weight:600; color:var(--color-gray-800, #1f2937);">Beispieltext für die Vorschau
+                <select id="dz-textprobe" style="display:block; width:100%; margin-top:6px; border:1px solid var(--color-gray-300, #d1d5db); border-radius:8px; padding:8px 10px; font-size:14px; background:var(--color-white, #fff);"></select>
             </label>
-            <p style="margin-top:6px; font-size:12px; color:#9ca3af;">Steuert nur die Layout-Vorschau (Designer und Vorschau/PDF) – ändert das gespeicherte Zeugnis nicht.</p>
+            <p style="margin-top:6px; font-size:12px; color:var(--color-gray-400, #9ca3af);">Steuert nur die Layout-Vorschau (Designer und Vorschau/PDF) – ändert das gespeicherte Zeugnis nicht.</p>
 
             <button id="dz-tp-toggle" class="dz-tp-btn" type="button" style="margin-top:10px;">Beispieltexte bearbeiten …</button>
             <div id="dz-tp-editor" style="display:none; margin-top:12px; border-top:1px solid #eef2f7; padding-top:12px;">
@@ -175,7 +175,7 @@
                     <button id="dz-tp-reset" class="dz-tp-btn" type="button">Auf Standard zurücksetzen</button>
                     <span id="dz-tp-status"></span>
                 </div>
-                <p style="margin-top:8px; font-size:12px; color:#9ca3af;">Gilt modulweit für die Vorschau aller Formate. Die Wörterzahl wird automatisch aus dem Text ermittelt.</p>
+                <p style="margin-top:8px; font-size:12px; color:var(--color-gray-400, #9ca3af);">Gilt modulweit für die Vorschau aller Formate. Die Wörterzahl wird automatisch aus dem Text ermittelt.</p>
             </div>
 
             <button id="dz-modal-close" class="dz-close" type="button">Verstanden</button>
@@ -403,15 +403,15 @@
             if (el.typ === 'text') return esc(substVars(el.text || '(Text)'));
             if (el.typ === 'unterschrift') return '<div class="dz-sig">' + esc(el.text || DATEN['unterschrift'] || '') + '</div>';
             if (el.typ === 'feld') return esc(el.bindung in DATEN ? DATEN[el.bindung] : '{' + (el.bindung || '') + '}');
-            if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:#9ca3af;">Bild wählen …</span>';
-            if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm ' + (el.stil || 'solid') + ' #374151;"></div>';
+            if (el.typ === 'bild') return el.bild ? '<img src="' + BILD_BASE + esc(el.bild) + '">' : '<span style="font-size:11px;color:var(--color-gray-400, #9ca3af);">Bild wählen …</span>';
+            if (el.typ === 'linie') return '<div style="border-top:' + (el.staerke || 0.3) + 'mm ' + (el.stil || 'solid') + ' var(--color-gray-700, #374151);"></div>';
             if (el.typ === 'textbereich') {
                 const part = SPLIT[i];
-                if (!part) return '<span style="color:#9ca3af;">(Zeugnistext)</span>';
+                if (!part) return '<span style="color:var(--color-gray-400, #9ca3af);">(Zeugnistext)</span>';
                 const inhalt = part.lines.map(esc).join('<br>');
                 if (inhalt) return inhalt;
-                if (rolleVon(el.seite || 1) === 'folge') return '<span style="color:#cbd5e1;">(Fortsetzung des Zeugnistexts – füllt sich bei Überhang)</span>';
-                return '<span style="color:#cbd5e1;">' + (el.nurUeberhang ? '(nur bei Überhang)' : '(leer)') + '</span>';
+                if (rolleVon(el.seite || 1) === 'folge') return '<span style="color:var(--color-slate-300, #cbd5e1);">(Fortsetzung des Zeugnistexts – füllt sich bei Überhang)</span>';
+                return '<span style="color:var(--color-slate-300, #cbd5e1);">' + (el.nurUeberhang ? '(nur bei Überhang)' : '(leer)') + '</span>';
             }
             if (el.typ === 'block') {
                 if (el.bindung === 'fachtexte') {

@@ -14,14 +14,14 @@
 <style>
     .zt-fmt-bar { display: flex; gap: 0.25rem; align-items: center; margin-bottom: 0.25rem; }
     .zt-fmt-btn {
-        min-width: 1.9rem; padding: 0.15rem 0.45rem; border: 1px solid #d1d5db; border-radius: 0.5rem;
-        background: #fff; color: #374151; font-size: 0.8rem; line-height: 1.4; cursor: pointer;
+        min-width: 1.9rem; padding: 0.15rem 0.45rem; border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 0.5rem;
+        background: var(--color-white, #fff); color: var(--color-gray-700, #374151); font-size: 0.8rem; line-height: 1.4; cursor: pointer;
     }
-    .zt-fmt-btn:hover { background: #f9fafb; }
+    .zt-fmt-btn:hover { background: var(--color-gray-50, #f9fafb); }
     .zt-fmt-btn.zt-fmt-b { font-weight: 700; }
     .zt-fmt-btn.zt-fmt-i { font-style: italic; }
     .zt-fmt-btn.zt-fmt-u { text-decoration: underline; }
-    .zt-fmt-hinweis { margin-left: 0.5rem; font-size: 0.72rem; color: #9ca3af; }
+    .zt-fmt-hinweis { margin-left: 0.5rem; font-size: 0.72rem; color: var(--color-gray-400, #9ca3af); }
 </style>
 <script>
 (function () {

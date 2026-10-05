@@ -183,13 +183,13 @@
 
     <style>
         .fb-highlight {
-            outline: 3px solid #f59e0b;
+            outline: 3px solid var(--color-amber-500, #f59e0b);
             outline-offset: 4px;
-            background: #fffbeb;
+            background: var(--color-amber-50, #fffbeb);
             animation: fb-pulse 0.9s ease-in-out 3;
         }
         @keyframes fb-pulse {
-            0%, 100% { outline-color: #f59e0b; }
+            0%, 100% { outline-color: var(--color-amber-500, #f59e0b); }
             50%      { outline-color: rgba(245, 158, 11, .25); }
         }
     </style>
