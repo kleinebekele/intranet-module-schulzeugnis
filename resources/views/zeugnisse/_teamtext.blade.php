@@ -8,6 +8,8 @@
     $kannSelbst = $mein && ! $readonly;
 @endphp
 <input type="hidden" name="team_modus" value="{{ $team['modus'] }}">
+{{-- 1 = „Jetzt zusammenfassen & speichern": zustimmen, speichern, auf dieser Seite bleiben. --}}
+<input type="hidden" name="zusammenfassen_jetzt" value="0" class="zt-team-jetzt">
 
 <div class="zt-team rounded-lg border border-indigo-200 bg-indigo-50/40 p-3">
     <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600">
@@ -57,9 +59,17 @@
     @if ($wartenAufMich->isNotEmpty())
         <div class="zt-team-wartet mt-3 flex items-start gap-2 rounded-lg p-3 text-sm">
             <i class="bx bxs-bell-ring mt-0.5 text-lg"></i>
+            @php $letzteZustimmung = $team['andere']->every(fn ($t) => $t->zusammenfassen); @endphp
             <div>
                 <strong>{{ $wartenAufMich->implode(', ') }} {{ $wartenAufMich->count() === 1 ? 'möchte' : 'möchten' }} die Texte zusammenfassen.</strong>
-                <span class="block">Setzen Sie unten das Häkchen „Texte zusammenfassen“ und speichern Sie – dann entsteht ein gemeinsames Feld.</span>
+                <span class="block">
+                    {{ $letzteZustimmung
+                        ? 'Mit dem Knopf speichern Sie Ihren Text, stimmen zu und bleiben hier – die Texte stehen danach in einem gemeinsamen Feld.'
+                        : 'Mit dem Knopf speichern Sie Ihren Text und stimmen zu; zusammengefasst wird, sobald alle zugestimmt haben.' }}
+                </span>
+                <button type="button" class="zt-team-jetzt-knopf mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium">
+                    <i class="bx bx-merge"></i> {{ $letzteZustimmung ? 'Jetzt zusammenfassen & speichern' : 'Zustimmen & speichern' }}
+                </button>
             </div>
         </div>
     @endif
@@ -92,4 +102,24 @@
     }
     .zt-team-wartet i { color: var(--color-amber-500, #f59e0b); }
     .zt-team-wartet-feld { outline: 2px dashed var(--color-amber-400, #fbbf24); outline-offset: 2px; }
+    .zt-team-jetzt-knopf { background: var(--color-amber-500, #f59e0b); color: #fff; }
+    .zt-team-jetzt-knopf:hover { background: var(--color-amber-600, #d97706); }
 </style>
+<script>
+    (function () {
+        document.querySelectorAll('.zt-team-jetzt-knopf').forEach(function (knopf) {
+            if (knopf.dataset.gebunden) { return; }
+            knopf.dataset.gebunden = '1';
+            knopf.addEventListener('click', function () {
+                var form = knopf.closest('form');
+                if (!form) { return; }
+                form.querySelector('.zt-team-jetzt').value = '1';
+                var cb = form.querySelector('input[name="zusammenfassen"]');
+                if (cb) { cb.checked = true; }
+                // Nicht weiterblättern – das Ergebnis soll direkt hier zu sehen sein.
+                form.querySelectorAll('input[name="weiter"]').forEach(function (r) { r.checked = false; });
+                form.requestSubmit ? form.requestSubmit() : form.submit();
+            });
+        });
+    })();
+</script>

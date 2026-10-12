@@ -835,6 +835,11 @@ class ZeugnisController
             'team_modus'    => ['nullable', Rule::in(['getrennt', 'zusammen'])],
         ]);
 
+        // „Jetzt zusammenfassen & speichern": zustimmen und auf dieser Seite bleiben.
+        if ($request->boolean('zusammenfassen_jetzt')) {
+            $request->merge(['zusammenfassen' => '1', 'weiter' => null]);
+        }
+
         // Team-Teaching: hat jemand anderes inzwischen zusammengefasst bzw. getrennt, passt das
         // Formular nicht mehr – lieber neu laden, als einen Text an die falsche Stelle zu schreiben.
         $team = Teamtext::sicherstellen($abschnitt);
@@ -1440,6 +1445,11 @@ class ZeugnisController
             'teiltext'      => ['nullable', 'string'],
             'team_modus'    => ['nullable', Rule::in(['getrennt', 'zusammen'])],
         ]);
+
+        // „Jetzt zusammenfassen & speichern": zustimmen und auf dieser Seite bleiben.
+        if ($request->boolean('zusammenfassen_jetzt')) {
+            $request->merge(['zusammenfassen' => '1', 'weiter' => null]);
+        }
 
         // Team-Teaching: Formular passt nicht mehr zum Stand → neu laden statt falsch schreiben.
         $ktTeam = Teamtext::sicherstellenKlassentext($kt, $klasse);
