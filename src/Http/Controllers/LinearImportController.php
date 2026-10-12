@@ -116,21 +116,13 @@ class LinearImportController
             }
 
             [$kopf, $zeilen] = $quelle->daten($art, $wahl['zid']);
-            $analyse = $this->importer($art)->analysiere($kopf, $zeilen, ['schuljahr_id' => $schuljahr->id]);
+            $analyse = $this->importer($art)->analysiere($kopf, $zeilen, ['schuljahr_id' => $schuljahr->id, 'quelle_label' => 'Linear']);
         } catch (ImportFehler $e) {
             return $this->zurueck($art, $schuljahr)->with('error', $e->getMessage());
         } catch (\Throwable $e) {
             report($e);
 
             return $this->zurueck($art, $schuljahr)->with('error', 'Linear ist gerade nicht erreichbar: '.$e->getMessage());
-        }
-
-        if ($art === 'schueler' && ! empty($quelle->debug['ausgetreten'][$wahl['zid']])) {
-            $analyse['infos'][] = [
-                'label' => 'Schüler sind in Linear mit Austrittsdatum geführt – sie werden trotzdem übernommen (nur Hinweis, max. 50)',
-                'items' => $quelle->debug['ausgetreten'][$wahl['zid']],
-                'ton'   => 'amber',
-            ];
         }
 
         return view('schulzeugnis::linear.vorschau', [
@@ -172,6 +164,7 @@ class LinearImportController
             $ergebnis = $this->importer($art)->importiere($kopf, $zeilen, [
                 'schuljahr_id' => $schuljahr->id,
                 'nur_neu'      => $nurNeu,
+                'quelle_label' => 'Linear',
             ]);
         } catch (ImportFehler $e) {
             return $this->zurueck($art, $schuljahr)->with('error', $e->getMessage());

@@ -180,8 +180,9 @@ class LinearQuelle
     }
 
     /**
-     * Schüler des Jahres samt Personendaten. Zeilen mit AustrittKl werden
-     * MITimportiert (additiv, nie ausdünnen), aber im Debug gelistet.
+     * Schüler des Jahres samt Personendaten und Austrittsdatum (AustrittKl). Ausgetretene
+     * werden mitimportiert; ob sie ein Zeugnis bekommen, entscheidet der SchuelerImporter
+     * am Schuljahresende (früher ausgetreten → gesperrt).
      *
      * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
      */
@@ -211,10 +212,11 @@ class LinearQuelle
                 'geburtsdatum' => $this->datum($w['Geburtsdatum'] ?? ''),
                 'geburtsort'   => (string) ($w['Geburtsort'] ?? ''),
                 'geschlecht'   => $this->geschlecht($w),
+                'austritt'     => $this->datum($w['AustrittKl'] ?? ''),
             ];
 
-            $austritt = $this->datum($w['AustrittKl'] ?? '');
-            if ($austritt !== '' && count($ausgetreten) < 50) {
+            $austritt = $ergebnis[array_key_last($ergebnis)]['austritt'];
+            if ($austritt !== '') {
                 $ausgetreten[] = trim("{$vorname} {$nachname}").' ('.($w['Klasse'] ?? '?').', Austritt '.$austritt.')';
             }
         }
@@ -223,7 +225,7 @@ class LinearQuelle
             $this->debug['ausgetreten'][$zid] = $ausgetreten;
         }
 
-        return [['schuelerid', 'klasse', 'vorname', 'nachname', 'geburtsdatum', 'geburtsort', 'geschlecht'], $ergebnis];
+        return [['schuelerid', 'klasse', 'vorname', 'nachname', 'geburtsdatum', 'geburtsort', 'geschlecht', 'austritt'], $ergebnis];
     }
 
     /**

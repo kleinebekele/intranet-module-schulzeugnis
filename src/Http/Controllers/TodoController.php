@@ -86,7 +86,7 @@ class TodoController
         if ($relevanteKlassen->isNotEmpty()) {
             $eigene = Abschnitt::whereHas('zeugnis', fn ($q) => $q
                     ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
-                    ->whereHas('schueler', fn ($s) => $s->whereIn('klasse_id', $relevanteKlassen)))
+                    ->whereHas('schueler', fn ($s) => $s->whereIn('klasse_id', $relevanteKlassen)->zeugnisberechtigt()))
                 ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
                 ->get()
                 ->filter(function (Abschnitt $a) use ($klassenAlsKL, $faecherJeKlasse) {
@@ -107,7 +107,7 @@ class TodoController
             ->whereHas('korrektoren', fn ($q) => $q->whereIn('zeugnis_schuljahr_lehrer.id', $meineLehrerIds))
             ->whereHas('zeugnis', fn ($q) => $q
                 ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
-                ->whereHas('schueler.klasse', fn ($k) => $k->where('schuljahr_id', $schuljahr->id)))
+                ->whereHas('schueler', fn ($s) => $s->zeugnisberechtigt()->whereHas('klasse', fn ($k) => $k->where('schuljahr_id', $schuljahr->id))))
             ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
             ->get();
 

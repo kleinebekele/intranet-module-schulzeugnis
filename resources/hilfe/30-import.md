@@ -22,6 +22,10 @@ haben Sie die Wahl:
   Linear (z. B. Klassenwechsel, korrigierte Namen).
 - **Abbrechen** – es passiert nichts.
 
+Beim Schüler-Import zeigen zusätzlich **Ausgetreten** und **Für Zeugnis gesperrt** die Kinder
+mit Austrittsdatum – wer vor dem Schuljahresende austritt, wird für das Zeugnis gesperrt
+(siehe Schüler).
+
 Gelöscht wird auch hier nie. Was es hier gibt, in Linear aber nicht, steht in der Vorschau
 nur als Hinweis. Den Klassenlehrer übernimmt der Import nicht, weil Linear ihn nicht
 verlässlich führt – er bleibt Handpflege an der Klasse.

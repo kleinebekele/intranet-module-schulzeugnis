@@ -10,6 +10,20 @@ Die Schüler eines Schuljahres, jeder in genau einer Klasse.
 
 Über **Aus Linear importieren** kommen die Schüler des Schuljahres samt Klasse aus Linear – mit Vorschau, siehe Stammdaten-Import.
 
+## Ausgetretene Schüler
+
+Das Austrittsdatum kommt beim Linear-Import mit und lässt sich am Schüler auch von Hand
+eintragen. Entscheidend ist das **Schuljahresende** (gepflegt am Schuljahr, sonst der 31.07.):
+
+- Austritt **zum Schuljahresende oder später**: Das Kind bekommt sein Zeugnis ganz normal –
+  das Datum ist nur eine Info.
+- Austritt **vorher**: Das Kind ist **für das Zeugnis gesperrt**. Es steht nicht mehr in der
+  Zeugnisliste, nicht in den ToDos und nicht im Sammel-PDF; unter der Zeugnisliste wird es als
+  gesperrt genannt. Bereits geschriebene Texte bleiben erhalten.
+
+Die Sperre lässt sich unter **Bearbeiten** aufheben (oder von Hand setzen). Ein späterer
+Import ändert sie nur, wenn sich das Austrittsdatum in Linear ändert.
+
 ## Schüler haben kein Intranet-Konto
 
 Das ist eine bewusste Entscheidung: Ein Schüler ist hier ein Datensatz, kein Benutzer. Er

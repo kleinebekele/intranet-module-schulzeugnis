@@ -189,7 +189,7 @@ class LehrerImporter
             'zeilen'        => $ergebnis,
             'zaehl'         => $zaehl,
             'infos'         => [
-                ['label' => "Lehrer in {$schuljahr->name} stehen nicht in der Datei und bleiben unverändert", 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
+                ['label' => "Lehrer in {$schuljahr->name} stehen nicht in ".($kontext['quelle_label'] ?? 'der Datei').' und bleiben unverändert (es wird nichts gelöscht)', 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
                 ['label' => 'ohne passendes Intranet-Konto angelegt (Abgleich verknüpft automatisch, sobald das Konto existiert)', 'items' => $ohneKonto, 'ton' => 'amber'],
             ],
         ];

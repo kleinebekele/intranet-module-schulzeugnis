@@ -25,6 +25,9 @@ use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
  *   Geburtsdatum  (optional) TT.MM.JJJJ oder JJJJ-MM-TT
  *   Geburtsort    (optional)
  *   Geschlecht    (optional) m / w / d (auch „männlich/weiblich/divers")
+ *   Austritt      (optional) Austrittsdatum. Vor dem Schuljahresende → für das Zeugnis
+ *                 gesperrt; zum Schuljahresende oder später → nur Info. Die Sperre wird
+ *                 nur neu bestimmt, wenn sich das Datum ändert (von Hand aufgehoben bleibt aufgehoben).
  */
 class SchuelerImporter
 {
@@ -33,6 +36,7 @@ class SchuelerImporter
     private const GEBDAT_ALIASE = ['geburtsdatum', 'geburtstag', 'gebdatum', 'gebdat'];
     private const GEBORT_ALIASE = ['geburtsort', 'gebort'];
     private const GESCHL_ALIASE = ['geschlecht', 'sex'];
+    private const AUSTR_ALIASE  = ['austritt', 'austrittam', 'austrittsdatum', 'austrittkl'];
 
     /**
      * @param  array<int,string>                $kopf
@@ -55,6 +59,11 @@ class SchuelerImporter
         $gebDatKey = $this->spalte($kopf, self::GEBDAT_ALIASE);
         $gebOrtKey = $this->spalte($kopf, self::GEBORT_ALIASE);
         $geschlKey = $this->spalte($kopf, self::GESCHL_ALIASE);
+        $austrKey  = $this->spalte($kopf, self::AUSTR_ALIASE);
+        $ende      = $schuljahr->schuljahresende();
+        $endeText  = $ende?->format('d.m.Y');
+        $quelle    = (string) ($kontext['quelle_label'] ?? 'der Datei');
+        $marken    = ['austritt' => 0, 'gesperrt' => 0];
 
         // Register: bestehende Schüler (per quell_id + per Name|Geburtsdatum), Klassen per Name.
         $bestehende  = $schuljahr->schueler()->get();
@@ -84,7 +93,7 @@ class SchuelerImporter
             $ext      = $idKey ? trim($zeile[$idKey] ?? '') : '';
 
             if ($vorname === '' || $nachname === '') {
-                $ergebnis[] = $this->row($zeilenNr, 'fehler', [$ext ?: '—', '—', '—', '—', '—'],
+                $ergebnis[] = $this->row($zeilenNr, 'fehler', [$ext ?: '—', '—', '—', '—', '—', '—'],
                     'Vor- und Nachname sind Pflicht – Zeile übersprungen.');
                 $zaehl['fehler']++;
                 continue;
@@ -119,11 +128,34 @@ class SchuelerImporter
 
             $gebOrt = ($gebOrtKey !== null) ? trim($zeile[$gebOrtKey] ?? '') : '';
 
+            // Austritt: vor dem Schuljahresende → Sperre, sonst nur Info.
+            [$austritt, $austrZelle, $austrWarn] = $this->datumAufloesen($austrKey, $zeile, 'Austrittsdatum');
+            if ($austrWarn !== '') {
+                $warnungen[] = $austrWarn;
+            }
+            $gesperrt     = $austritt !== null && $ende !== null && $austritt < $ende->format('Y-m-d');
+            $zeilenMarken = [];
+            $austrHinweis = '';
+            if ($austritt !== null) {
+                $zeilenMarken[] = 'austritt';
+                $marken['austritt']++;
+                if ($gesperrt) {
+                    $zeilenMarken[] = 'gesperrt';
+                    $marken['gesperrt']++;
+                    $austrHinweis = "Austritt {$austrZelle} vor Schuljahresende ({$endeText}) → für das Zeugnis gesperrt";
+                    $austrZelle  .= ' (gesperrt)';
+                } elseif ($ende === null) {
+                    $austrHinweis = "Austritt {$austrZelle} – Schuljahresende unbekannt, daher keine Sperre";
+                } else {
+                    $austrHinweis = "Austritt {$austrZelle} zum Schuljahresende – bekommt sein Zeugnis (nur Info)";
+                }
+            }
+
             if ($warnungen !== []) {
                 $probleme[] = trim("$vorname $nachname") . ': ' . implode('; ', $warnungen);
             }
 
-            $zellen = [$ext ?: '—', trim("$vorname $nachname"), $klasseZelle, $gebDatZelle, $geschlZelle];
+            $zellen = [$ext ?: '—', trim("$vorname $nachname"), $klasseZelle, $gebDatZelle, $geschlZelle, $austrZelle];
 
             // Duplikat in der Datei.
             $dupKey = $ext !== '' ? 'e:' . $ext : 'n:' . $this->personKey($vorname, $nachname, $gebDat);
@@ -168,9 +200,20 @@ class SchuelerImporter
                 if ($geschlecht !== null && (string) $vorhanden->geschlecht !== $geschlecht) {
                     $aenderungen['geschlecht'] = [$vorhanden->geschlecht, $geschlecht];
                 }
+                // Sperre nur neu bestimmen, wenn sich das Austrittsdatum ändert – sonst bleibt
+                // eine von Hand aufgehobene (oder gesetzte) Sperre bestehen.
+                if ($austrKey !== null && $this->datumStr($vorhanden->austritt_am) !== $austritt) {
+                    $aenderungen['austritt_am'] = [$this->datumStr($vorhanden->austritt_am), $austritt];
+                    if ((bool) $vorhanden->zeugnis_gesperrt !== $gesperrt) {
+                        $aenderungen['zeugnis_gesperrt'] = [(bool) $vorhanden->zeugnis_gesperrt, $gesperrt];
+                    }
+                } elseif ($austritt !== null && (bool) $vorhanden->zeugnis_gesperrt !== $gesperrt) {
+                    $austrHinweis .= $vorhanden->zeugnis_gesperrt ? ' (hier von Hand gesperrt)' : ' (Sperre hier von Hand aufgehoben)';
+                }
 
                 $hinweis = implode('; ', array_filter([
                     $aenderungen === [] ? 'Bereits vorhanden, keine Änderung.' : $this->diffText($aenderungen),
+                    $austrHinweis,
                     ...$warnungen,
                 ]));
 
@@ -195,11 +238,14 @@ class SchuelerImporter
                     'geburtsdatum' => $gebDat,
                     'geburtsort'   => $gebOrt !== '' ? $gebOrt : null,
                     'geschlecht'   => $geschlecht,
+                    'austritt_am'      => $austritt,
+                    'zeugnis_gesperrt' => $gesperrt,
                 ];
-                $hinweis = implode('; ', array_filter(['Wird neu angelegt.', ...$warnungen]));
+                $hinweis = implode('; ', array_filter(['Wird neu angelegt.', $austrHinweis, ...$warnungen]));
                 $ergebnis[] = $this->row($zeilenNr, 'neu', $zellen, $hinweis, null, $apply);
                 $zaehl['neu']++;
             }
+            $ergebnis[array_key_last($ergebnis)]['marken'] = $zeilenMarken;
         }
 
         $fehlen = [];
@@ -210,11 +256,16 @@ class SchuelerImporter
         }
 
         return [
-            'spalten_titel' => ['SchülerID', 'Name', 'Klasse', 'Geburtsdatum', 'Geschl.'],
+            'spalten_titel' => ['SchülerID', 'Name', 'Klasse', 'Geburtsdatum', 'Geschl.', 'Austritt'],
             'zeilen'        => $ergebnis,
             'zaehl'         => $zaehl,
+            // Zusätzliche Filter in der Vorschau (quer zum Status).
+            'marken'        => [
+                'austritt' => ['label' => 'Ausgetreten', 'anzahl' => $marken['austritt']],
+                'gesperrt' => ['label' => 'Für Zeugnis gesperrt', 'anzahl' => $marken['gesperrt']],
+            ],
             'infos'         => [
-                ['label' => "Schüler in {$schuljahr->name} stehen nicht in der Datei und bleiben unverändert", 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
+                ['label' => "Schüler in {$schuljahr->name} stehen nicht in {$quelle} und bleiben unverändert (es wird nichts gelöscht)", 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
                 ['label' => 'Zeilen mit unbekannter Klasse / ungültigem Datum / Geschlecht (Feld bleibt leer, bitte prüfen)', 'items' => $probleme, 'ton' => 'amber'],
             ],
         ];
@@ -260,7 +311,7 @@ class SchuelerImporter
      *
      * @param  array<string,string>  $zeile
      */
-    private function datumAufloesen(?string $key, array $zeile): array
+    private function datumAufloesen(?string $key, array $zeile, string $bezeichnung = 'Geburtsdatum'): array
     {
         if ($key === null) {
             return [null, '—', ''];
@@ -278,7 +329,7 @@ class SchuelerImporter
             }
         }
 
-        return [null, "⚠ {$wert}?", "Geburtsdatum „{$wert}“ nicht lesbar (TT.MM.JJJJ)"];
+        return [null, "⚠ {$wert}?", "{$bezeichnung} „{$wert}“ nicht lesbar (TT.MM.JJJJ)"];
     }
 
     /**
@@ -363,6 +414,7 @@ class SchuelerImporter
             'vorname' => 'Vorname', 'nachname' => 'Nachname', 'quell_id' => 'ID',
             'klasse_id' => 'Klasse', 'geburtsdatum' => 'Geburtsdatum',
             'geburtsort' => 'Geburtsort', 'geschlecht' => 'Geschlecht',
+            'austritt_am' => 'Austritt', 'zeugnis_gesperrt' => 'Zeugnis-Sperre',
         ];
         $teile = [];
         foreach ($aenderungen as $feld => $_) {

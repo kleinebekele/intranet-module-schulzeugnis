@@ -54,10 +54,15 @@ class ZeugnisController
         $this->zeugnisseSicherstellen($klasse);
 
         $schueler = $klasse->schueler()
+            ->zeugnisberechtigt()
             ->with(['fachzeugnis.abschnitte', 'hauptzeugnis.abschnitte'])
             ->orderBy('nachname')
             ->orderBy('vorname')
             ->get();
+
+        // Vor Schuljahresende ausgetreten → kein Zeugnis; nur als Hinweis unter der Tabelle.
+        $gesperrte = $klasse->schueler()->where('zeugnis_gesperrt', true)
+            ->orderBy('nachname')->orderBy('vorname')->get();
 
         // „Meine Fächer": Fächer, in denen der eingeloggte Nutzer hier einen Lehrauftrag hat.
         $userId = auth()->id();
@@ -123,6 +128,7 @@ class ZeugnisController
             'klasse'           => $klasse,
             'faecher'          => $faecher,
             'schueler'         => $schueler,
+            'gesperrte'        => $gesperrte,
             'hatSpruch'        => (bool) $klasse->hat_zeugnisspruch,
             'spruchAbschnitte' => $spruchAbschnitte,
             'prevKlasse'       => $prevKlasse,
@@ -190,7 +196,7 @@ class ZeugnisController
         $typWert = $typ === 'haupt' ? Zeugnis::TYP_HAUPT : Zeugnis::TYP_FACH;
 
         return Zeugnis::where('typ', $typWert)
-            ->whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+            ->whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id)->zeugnisberechtigt())
             ->with(['schueler', 'format', 'abschnitte'])
             ->get()
             ->sortBy(fn ($z) => sprintf('%s|%s', $z->schueler?->nachname ?? '', $z->schueler?->vorname ?? ''))
@@ -244,6 +250,12 @@ class ZeugnisController
      */
     public function store(Klasse $klasse, Schueler $schueler)
     {
+        if ($schueler->zeugnis_gesperrt) {
+            return redirect()
+                ->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                ->with('error', "{$schueler->fullName()} ist für das Zeugnis gesperrt (ausgetreten).");
+        }
+
         $schueler->setRelation('klasse', $klasse);
         $klasse->loadMissing('klassenlehrer');
 
@@ -276,9 +288,9 @@ class ZeugnisController
         $klasse->loadMissing(['klassenlehrer', 'hauptbereiche']);
         $containerRel = $klasse->hat_fachzeugnis ? 'fachzeugnis' : 'hauptzeugnis';
 
-        $fehltFach   = $klasse->hat_fachzeugnis && $klasse->schueler()->whereDoesntHave('fachzeugnis')->exists();
-        $fehltHaupt  = $klasse->hat_hauptzeugnis && $klasse->schueler()->whereDoesntHave('hauptzeugnis')->exists();
-        $fehltSpruch = $klasse->hat_zeugnisspruch && $klasse->schueler()
+        $fehltFach   = $klasse->hat_fachzeugnis && $klasse->schueler()->zeugnisberechtigt()->whereDoesntHave('fachzeugnis')->exists();
+        $fehltHaupt  = $klasse->hat_hauptzeugnis && $klasse->schueler()->zeugnisberechtigt()->whereDoesntHave('hauptzeugnis')->exists();
+        $fehltSpruch = $klasse->hat_zeugnisspruch && $klasse->schueler()->zeugnisberechtigt()
             ->whereHas($containerRel, fn ($q) => $q->whereDoesntHave('abschnitte', fn ($a) => $a->where('typ', Abschnitt::TYP_SPRUCH)))
             ->exists();
 
@@ -288,19 +300,19 @@ class ZeugnisController
 
         DB::transaction(function () use ($klasse, $containerRel, $fehltFach, $fehltHaupt, $fehltSpruch): void {
             if ($fehltFach) {
-                foreach ($klasse->schueler()->whereDoesntHave('fachzeugnis')->get() as $ohne) {
+                foreach ($klasse->schueler()->zeugnisberechtigt()->whereDoesntHave('fachzeugnis')->get() as $ohne) {
                     $ohne->setRelation('klasse', $klasse);
                     $this->erzeugeFachzeugnis($klasse, $ohne);
                 }
             }
             if ($fehltHaupt) {
-                foreach ($klasse->schueler()->whereDoesntHave('hauptzeugnis')->get() as $ohne) {
+                foreach ($klasse->schueler()->zeugnisberechtigt()->whereDoesntHave('hauptzeugnis')->get() as $ohne) {
                     $ohne->setRelation('klasse', $klasse);
                     $this->erzeugeHauptzeugnis($klasse, $ohne);
                 }
             }
             if ($fehltSpruch) {
-                foreach ($klasse->schueler()->whereHas($containerRel)->with($containerRel)->get() as $s) {
+                foreach ($klasse->schueler()->zeugnisberechtigt()->whereHas($containerRel)->with($containerRel)->get() as $s) {
                     $this->spruchAbschnittAnlegen($s->getRelation($containerRel), $klasse);
                 }
             }
@@ -698,6 +710,7 @@ class ZeugnisController
 
         $istHaupt = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS;
         $kette = $klasse->schueler()
+            ->zeugnisberechtigt()
             ->with([$istHaupt ? 'hauptzeugnis.abschnitte' : 'fachzeugnis.abschnitte'])
             ->orderBy('nachname')
             ->orderBy('vorname')

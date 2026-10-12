@@ -33,6 +33,14 @@
             {{ $label }}: {{ $zaehl[$key] }}
         </button>
     @endforeach
+    {{-- Markierungen quer zum Status (z. B. Austritt/Sperre beim Schüler-Import). --}}
+    @foreach ($analyse['marken'] ?? [] as $mKey => $marke)
+        <button type="button" data-filter="marke:{{ $mKey }}" aria-pressed="false" @disabled($marke['anzahl'] === 0)
+                title="{{ $marke['anzahl'] === 0 ? 'Keine Zeilen' : 'Nur „'.$marke['label'].'" anzeigen' }}"
+                class="imp-filter-knopf inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ring-1 {{ $mKey === 'gesperrt' ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-indigo-50 text-indigo-700 ring-indigo-200' }}">
+            <i class="bx {{ $mKey === 'gesperrt' ? 'bx-lock-alt' : 'bx-log-out' }}"></i> {{ $marke['label'] }}: {{ $marke['anzahl'] }}
+        </button>
+    @endforeach
     <button type="button" data-filter="" class="imp-filter-alle text-sm text-gray-500 underline hover:text-gray-700" hidden>Alle zeigen</button>
 </div>
 
@@ -50,7 +58,7 @@
         </thead>
         <tbody>
             @foreach ($analyse['zeilen'] as $r)
-                <tr class="border-b border-gray-100 last:border-0" data-status="{{ $r['status'] }}">
+                <tr class="border-b border-gray-100 last:border-0" data-status="{{ $r['status'] }}" data-marken="{{ implode(' ', $r['marken'] ?? []) }}">
                     <td class="px-4 py-2 text-gray-400">{{ $r['zeile'] }}</td>
                     <td class="px-4 py-2">
                         <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $zeilenBadge[$r['status']] ?? 'bg-gray-100 text-gray-600' }}">
@@ -85,8 +93,11 @@
 
         function filtern(status) {
             var sichtbar = 0;
+            var marke = status && status.indexOf('marke:') === 0 ? status.slice(6) : null;
             zeilen.forEach(function (tr) {
-                var zeigen = !status || tr.dataset.status === status;
+                var zeigen = !status || (marke
+                    ? (' ' + (tr.dataset.marken || '') + ' ').indexOf(' ' + marke + ' ') !== -1
+                    : tr.dataset.status === status);
                 tr.hidden = !zeigen;
                 if (zeigen) { sichtbar++; }
             });

@@ -20,8 +20,16 @@ class Schueler extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'geburtsdatum' => 'date',
+        'geburtsdatum'     => 'date',
+        'austritt_am'      => 'date',
+        'zeugnis_gesperrt' => 'boolean',
     ];
+
+    /** Nur Schüler, die ein Zeugnis bekommen (nicht wegen Austritts gesperrt). */
+    public function scopeZeugnisberechtigt($query)
+    {
+        return $query->where('zeugnis_gesperrt', false);
+    }
 
     public function schuljahr(): BelongsTo
     {

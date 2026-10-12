@@ -124,7 +124,7 @@ class SchuelerController
     /** @return array<string,mixed> */
     private function validated(Request $request, Schuljahr $schuljahr): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'vorname'            => ['required', 'string', 'max:255'],
             'nachname'           => ['required', 'string', 'max:255'],
             'geburtsdatum'       => ['nullable', 'date'],
@@ -133,7 +133,12 @@ class SchuelerController
             'quell_id'           => ['nullable', 'string', 'max:255'],
             'klasse_id'          => ['nullable', 'integer', Rule::exists('zeugnis_klassen', 'id')->where('schuljahr_id', $schuljahr->id)],
             'format_override_id' => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
+            'austritt_am'        => ['nullable', 'date'],
         ]);
+        // Checkbox kommt nur angehakt mit.
+        $data['zeugnis_gesperrt'] = $request->boolean('zeugnis_gesperrt');
+
+        return $data;
     }
 
     private function klassenOptions(Schuljahr $schuljahr)

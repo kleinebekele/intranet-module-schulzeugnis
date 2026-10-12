@@ -434,6 +434,20 @@
                 </tbody>
             </table>
         </div>
+
+        @if ($gesperrte->isNotEmpty())
+            <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                <p class="flex items-center gap-1.5 font-medium">
+                    <i class="bx bx-lock-alt"></i> {{ $gesperrte->count() }} {{ $gesperrte->count() === 1 ? 'Schüler ist' : 'Schüler sind' }} für das Zeugnis gesperrt (vor Schuljahresende ausgetreten)
+                </p>
+                <p class="mt-1">
+                    @foreach ($gesperrte as $g)
+                        {{ $g->fullName() }}@if ($g->austritt_am) (Austritt {{ $g->austritt_am->format('d.m.Y') }})@endif{{ $loop->last ? '' : ' · ' }}
+                    @endforeach
+                </p>
+                <p class="mt-1 text-xs text-red-700">Aufheben lässt sich die Sperre am Schüler (Zeugnisverwaltung → Schüler → Bearbeiten).</p>
+            </div>
+        @endif
     </div>
 
     <script>

@@ -173,7 +173,7 @@ class KlasseImporter
             'zeilen'        => $ergebnis,
             'zaehl'         => $zaehl,
             'infos'         => [
-                ['label' => "Klassen in {$schuljahr->name} stehen nicht in der Datei und bleiben unverändert", 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
+                ['label' => "Klassen in {$schuljahr->name} stehen nicht in ".($kontext['quelle_label'] ?? 'der Datei').' und bleiben unverändert (es wird nichts gelöscht)', 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
                 ['label' => 'Zeilen mit unbekannter Zuordnung (Feld bleibt leer, bitte prüfen)', 'items' => $probleme, 'ton' => 'amber'],
             ],
         ];

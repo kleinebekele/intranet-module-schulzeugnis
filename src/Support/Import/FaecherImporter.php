@@ -146,7 +146,7 @@ class FaecherImporter
             'zeilen'        => $ergebnis,
             'zaehl'         => $zaehl,
             'infos'         => [
-                ['label' => 'vorhandene Fächer stehen nicht in der Datei und bleiben unverändert', 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
+                ['label' => 'vorhandene Fächer stehen nicht in '.($kontext['quelle_label'] ?? 'der Datei').' und bleiben unverändert (es wird nichts gelöscht)', 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
             ],
         ];
     }

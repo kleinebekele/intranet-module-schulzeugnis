@@ -80,6 +80,27 @@
                 </div>
             </div>
 
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="austritt_am" class="block text-sm font-medium text-gray-700">Austritt <span class="text-gray-400">(optional)</span></label>
+                    <input type="date" name="austritt_am" id="austritt_am"
+                           value="{{ old('austritt_am', $schueler->austritt_am?->format('Y-m-d')) }}"
+                           class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <p class="mt-1 text-xs text-gray-400">Kommt beim Linear-Import mit.</p>
+                    @error('austritt_am') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="sm:pt-6">
+                    <label class="flex items-start gap-2">
+                        <input type="checkbox" name="zeugnis_gesperrt" value="1" @checked(old('zeugnis_gesperrt', $schueler->zeugnis_gesperrt))
+                               class="mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        <span class="text-sm text-gray-700">
+                            <span class="font-medium">Für das Zeugnis gesperrt</span>
+                            <span class="block text-xs text-gray-400">Kein Zeugnis, nicht in Zeugnisliste, ToDos und Sammel-PDF. Der Import setzt das bei Austritt vor Schuljahresende – hier lässt es sich aufheben.</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
             <div>
                 <label for="klasse_id" class="block text-sm font-medium text-gray-700">Klasse</label>
                 <select name="klasse_id" id="klasse_id"

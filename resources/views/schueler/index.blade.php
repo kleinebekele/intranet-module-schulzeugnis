@@ -50,6 +50,7 @@
                             <th class="px-4 py-2 font-medium">Geburtsort</th>
                             <th class="px-4 py-2 text-center font-medium">Geschl.</th>
                             <th class="px-4 py-2 font-medium">Externe ID</th>
+                            <th class="px-4 py-2 font-medium">Austritt</th>
                             <th class="px-4 py-2 text-right font-medium">Aktionen</th>
                         </tr>
                     </thead>
@@ -72,6 +73,18 @@
                                 <td class="px-4 py-2 text-gray-600">{{ $s->geburtsort ?: '—' }}</td>
                                 <td class="px-4 py-2 text-center text-gray-600">{{ $s->geschlecht ?: '—' }}</td>
                                 <td class="px-4 py-2 text-gray-600">{{ $s->quell_id ?: '—' }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap">
+                                    @if ($s->zeugnis_gesperrt)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
+                                              title="Kein Zeugnis – aufheben unter „Bearbeiten“">
+                                            <i class="bx bx-lock-alt"></i> {{ $s->austritt_am?->format('d.m.Y') ?? 'gesperrt' }}
+                                        </span>
+                                    @elseif ($s->austritt_am)
+                                        <span class="text-gray-600" title="Austritt zum Schuljahresende – bekommt sein Zeugnis">{{ $s->austritt_am->format('d.m.Y') }}</span>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-2">
                                     <div class="flex items-center justify-end gap-2 whitespace-nowrap">
                                         <a href="{{ route('module.schulzeugnis.schueler.edit', $s) }}" class="text-indigo-600 hover:text-indigo-700">Bearbeiten</a>
