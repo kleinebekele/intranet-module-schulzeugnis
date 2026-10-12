@@ -39,11 +39,24 @@
                         </button>
 
                         <div class="todo-inhalt" hidden>
-                            @if ($kind['offen']->isEmpty() && $kind['erledigtAnzahl'] > 0)
+                            @if ($kind['offen']->isEmpty() && $kind['erledigtAnzahl'] > 0 && empty($kind['klassentext']))
                                 <p class="px-2 pb-1 text-xs text-gray-400">Keine offenen – nur erledigte.</p>
                             @endif
 
                             <ul class="space-y-0.5">
+                                @if (! empty($kind['klassentext']))
+                                    @php $ktm = $kind['klassentext']['status']; @endphp
+                                    <li>
+                                        <a href="{{ $kind['klassentext']['url'] }}"
+                                           class="todo-zeile flex items-center gap-2 rounded-lg px-2 py-1.5">
+                                            <i class="bx {{ $ktm['icon'] }} text-lg {{ $farbeKlasse[$ktm['farbe']] ?? 'text-gray-400' }}"
+                                               title="{{ $ktm['label'] }}"></i>
+                                            <span class="todo-name truncate text-sm font-medium text-gray-800">
+                                                <i class="bx bx-group text-sm text-indigo-500"></i> Klassenweiter Text
+                                            </span>
+                                        </a>
+                                    </li>
+                                @endif
                                 @foreach ($kind['offen'] as $a)
                                     @include('schulzeugnis::todo._zeile')
                                 @endforeach

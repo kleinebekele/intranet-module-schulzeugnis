@@ -17,6 +17,17 @@
             padding: 8px 4px 24px;
         }
         .kr-tuer { text-decoration: none; display: flex; flex-direction: column; align-items: center; }
+        /* Klassen mit eigenen Aufgaben: umrandet */
+        .kr-tuer { border-radius: 14px; padding: 10px 6px 8px; border: 3px solid transparent; }
+        .kr-tuer.kr-meine {
+            border-color: var(--color-indigo-500, #6366f1);
+            background: var(--color-indigo-50, #eef2ff);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, .15);
+        }
+        .kr-legende-meine {
+            display: inline-block; width: 14px; height: 12px; border-radius: 4px;
+            border: 2px solid var(--color-indigo-500, #6366f1); background: var(--color-indigo-50, #eef2ff);
+        }
 
         /* Rahmen + Türöffnung (der Rahmen trägt die 3D-Perspektive für das Türblatt) */
         .kr-rahmen {
@@ -118,7 +129,7 @@
             </div>
         @else
             @php $stufenLegende = $klassen->pluck('stufe')->filter()->unique('id')->sortBy('reihenfolge'); @endphp
-            @if ($stufenLegende->isNotEmpty())
+            @if ($stufenLegende->isNotEmpty() || ! empty($meineKlassenIds))
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 pb-1 text-xs text-gray-500">
                     @foreach ($stufenLegende as $stufe)
                         <span class="inline-flex items-center gap-1.5">
@@ -126,12 +137,17 @@
                             {{ $stufe->name }}
                         </span>
                     @endforeach
+                    @if (! empty($meineKlassenIds))
+                        <span class="inline-flex items-center gap-1.5 font-medium text-indigo-600">
+                            <span class="kr-legende-meine"></span> Hier hast du Aufgaben
+                        </span>
+                    @endif
                 </div>
             @endif
 
             <div class="kr-grid">
                 @foreach ($klassen as $klasse)
-                    <a class="kr-tuer" href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
+                    <a class="kr-tuer {{ in_array($klasse->id, $meineKlassenIds, true) ? 'kr-meine' : '' }}" href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse) }}"
                        title="Zeugnisliste der {{ $klasse->name }}{{ $klasse->stufe ? ' · '.$klasse->stufe->name : '' }}">
                         <div class="kr-rahmen">
                             <div class="kr-oeffnung"></div>

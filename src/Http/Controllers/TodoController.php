@@ -167,7 +167,7 @@ class TodoController
             'schuljahr'            => $schuljahr,
             'istAdmin'             => false,
             'modus'                => $modus,
-            'meineTexteGruppen'    => $this->gruppiere($meineAufgaben, $modus),
+            'meineTexteGruppen'    => $this->gruppiere($meineAufgaben, $modus, $this->klassentexteJeBlatt($relevanteKlassen)),
             'korrigierteGruppen'   => $this->gruppiere($korrigierte, $modus),
             'zuKorrigierenGruppen' => $this->gruppiere($korrektur, $modus),
             'inKorrekturGruppen'   => $this->gruppiere($inKorrektur, $modus),
@@ -193,7 +193,29 @@ class TodoController
      * @param  Collection<int,Abschnitt>  $abschnitte
      * @return array<int,array<string,mixed>>
      */
-    private function gruppiere(Collection $abschnitte, string $modus): array
+    /**
+     * Klassenweite Texte der relevanten Klassen, Schlüssel „klasseId|fachKey"
+     * (fachKey = Fach-ID | 'haupt' | 'spruch' wie in {@see gruppiere()}). Noch nicht
+     * angelegte Texte fehlen hier und erscheinen als „Unbearbeitet".
+     *
+     * @return array<string,Klassentext>
+     */
+    private function klassentexteJeBlatt(Collection $klassenIds): array
+    {
+        if ($klassenIds->isEmpty()) {
+            return [];
+        }
+
+        return Klassentext::whereIn('klasse_id', $klassenIds)->get()
+            ->keyBy(fn (Klassentext $kt) => $kt->klasse_id . '|' . ($kt->art === 'spruch' ? 'spruch' : ($kt->fach_id ?? 'haupt')))
+            ->all();
+    }
+
+    /**
+     * @param  array<string,Klassentext>|null  $klassentexte  wenn gesetzt: je Blatt eine
+     *         Zeile „Klassenweiter Text" (nur „Meine Aufgaben")
+     */
+    private function gruppiere(Collection $abschnitte, string $modus, ?array $klassentexte = null): array
     {
         if ($abschnitte->isEmpty()) {
             return [];
@@ -231,12 +253,12 @@ class TodoController
 
         return $abschnitte
             ->groupBy(fn (Abschnitt $a) => $primaer($a)['key'])
-            ->map(function (Collection $proPrim) use ($primaer, $sekundaer, $sekundaerNatural) {
+            ->map(function (Collection $proPrim) use ($primaer, $sekundaer, $sekundaerNatural, $klassentexte) {
                 $pm = $primaer($proPrim->first());
 
                 $kinder = $proPrim
                     ->groupBy(fn (Abschnitt $a) => $sekundaer($a)['key'])
-                    ->map(function (Collection $proSek) use ($sekundaer) {
+                    ->map(function (Collection $proSek) use ($sekundaer, $klassentexte) {
                         $sm = $sekundaer($proSek->first());
 
                         // Innerhalb eines Blattes offen vs. erledigt (Status „Vollständig") trennen.
@@ -251,7 +273,21 @@ class TodoController
                         $offen    = $sortiert($proSek->reject(fn (Abschnitt $a) => $a->status === 'vollstaendig'));
                         $erledigt = $sortiert($proSek->filter(fn (Abschnitt $a) => $a->status === 'vollstaendig'));
 
+                        // Klassenweiter Text desselben Fachs (bzw. Haupttext/Spruch) als erste Zeile.
+                        $ktZeile = null;
+                        if ($klassentexte !== null) {
+                            $a        = $proSek->first();
+                            $klasseId = $a->zeugnis->schueler->klasse_id;
+                            $fachKey  = $a->typ === Abschnitt::TYP_HAUPTTEXT ? 'haupt' : ($a->typ === Abschnitt::TYP_SPRUCH ? 'spruch' : (string) $a->fach_id);
+                            $kt       = $klassentexte[$klasseId . '|' . $fachKey] ?? null;
+                            $ktZeile  = [
+                                'url'    => route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasseId, 'fach' => $fachKey]),
+                                'status' => $kt ? $kt->statusMeta() : Abschnitt::STATI[Abschnitt::STATUS_STANDARD],
+                            ];
+                        }
+
                         return [
+                            'klassentext'    => $ktZeile,
                             'label'          => $sm['label'],
                             'farbe'          => $sm['farbe'],
                             'sub'            => $sm['sub'],
