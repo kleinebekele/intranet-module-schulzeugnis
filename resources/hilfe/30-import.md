@@ -22,7 +22,7 @@ haben Sie die Wahl:
   aus Linear (z. B. Klassenwechsel, korrigierte Namen).
 - **Abbrechen** – es passiert nichts.
 
-Beim Schüler-Import zeigen **Ausgetreten** und **Für Zeugnis gesperrt** die Kinder, die laut
+Beim Schüler-Import zeigt der Filter **Ausgetreten** die Kinder, die laut
 Linear vor dem regulären Klassenende gegangen sind – sie werden für das Zeugnis gesperrt
 (siehe Schüler). Der reguläre letzte Schultag gilt nicht als Austritt.
 

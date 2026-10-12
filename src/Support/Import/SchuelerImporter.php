@@ -262,7 +262,6 @@ class SchuelerImporter
             // Zusätzliche Filter in der Vorschau (quer zum Status).
             'marken'        => [
                 'austritt' => ['label' => 'Ausgetreten', 'anzahl' => $marken['austritt']],
-                'gesperrt' => ['label' => 'Für Zeugnis gesperrt', 'anzahl' => $marken['gesperrt']],
             ],
             'infos'         => [
                 ['label' => "Schüler in {$schuljahr->name} stehen nicht in {$quelle} und bleiben unverändert (es wird nichts gelöscht)", 'items' => $fehlen, 'ton' => 'grau', 'nur_ergebnis' => true],
