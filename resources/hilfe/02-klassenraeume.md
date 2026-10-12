@@ -16,6 +16,14 @@ Bedeutung – sie hilft nur, in einer langen Reihe schneller die richtige Tür z
 
 Sortiert wird natürlich, also 2 vor 10 und nicht 10 vor 2.
 
+## Warum manche Türen umrandet sind
+
+Umrandet sind die Klassen, in denen **Sie** etwas zu tun haben: Sie sind dort Klassenlehrer,
+haben einen Lehrauftrag oder wurden um eine Korrektur gebeten, die noch offen ist. Die
+Legende über den Türen nennt das „Hier hast du Aufgaben".
+
+Unter jeder Tür stehen die Klassenlehrer – bei mehreren alle.
+
 ## Ich sehe hier gar keine Klassen
 
 Zwei mögliche Gründe:

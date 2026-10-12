@@ -33,7 +33,8 @@ Drei Ebenen, die man auseinanderhalten sollte:
 Das ergibt sich aus den Stammdaten, nicht aus einer Rolle:
 
 - **Fachtexte**: die Lehrkraft mit dem Lehrauftrag in dieser Klasse und diesem Fach.
-- **Haupttext, Hauptzeugnis und Zeugnisspruch**: nur der Klassenlehrer.
+- **Haupttext, Hauptzeugnis und Zeugnisspruch**: die Klassenlehrer – eine Klasse kann
+  beliebig viele haben, jeder von ihnen darf.
 - **Korrektoren**: wer für genau diesen Abschnitt zur Korrektur eingetragen wurde – nur
   dafür, nicht für den Rest.
 - **Administratoren**: überall.

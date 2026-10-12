@@ -13,6 +13,9 @@ darin:
    Sie tatsächlich einen Lehrauftrag oder die Klassenleitung haben.
 2. **Texte zur Korrektur**, um die Sie gebeten wurden und die noch offen sind.
 
+Klappen Sie ein Fach auf, steht ganz oben der **klassenweite Text** dieses Fachs (beim
+Haupttext bzw. Spruch entsprechend) mit seinem Stand, darunter die Kinder.
+
 ## Wann ein Text als Korrektur-Aufgabe erscheint
 
 Nur solange er wirklich bei Ihnen liegt, also bei den Ständen *Frei zur Korrektur*,

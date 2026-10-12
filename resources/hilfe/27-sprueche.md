@@ -6,8 +6,8 @@ position: 27
 rollen: zeugnis_admin, admin
 ---
 
-Ein jahresübergreifender Katalog von Sprüchen, aus dem der Klassenlehrer je Kind einen
-auswählt.
+Ein jahresübergreifender Katalog von Sprüchen, aus dem die Klassenlehrer je Kind einen
+auswählen.
 
 ## Katalog und Kopie
 
@@ -20,7 +20,7 @@ Liste.
 
 ## Wer den Spruch setzt
 
-Nur der **Klassenlehrer**, wie beim Haupttext auch. Der Spruch ist ein eigener Baustein des
+Nur die **Klassenlehrer** der Klasse, wie beim Haupttext auch. Der Spruch ist ein eigener Baustein des
 Zeugnisses und hat einen eigenen Stand.
 
 Ob eine Klasse überhaupt Sprüche bekommt, wird im Klassen-Formular festgelegt.

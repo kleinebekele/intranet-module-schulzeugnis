@@ -23,11 +23,24 @@ Auszeichnung (`**fett**`, `*kursiv*`, `__unterstrichen__`), Stand, Korrektoren, 
 Änderungsverlauf funktionieren genauso wie beim Text eines einzelnen Kindes. Der Klassentext
 hat seinen **eigenen** Stand und seine eigenen Korrektoren – er ist eine Aufgabe für sich.
 
+## Danach weiter zu
+
+- **Nächstes** bzw. **vorheriges Fach** – der Klassentext Ihres nächsten Fachs in dieser
+  Klasse. Angeboten werden nur Fächer, für die Sie selbst eingetragen sind.
+- **Nächste Zeile: erster Schüler** – vom Klassentext direkt in den Text des ersten Kindes
+  im selben Fach.
+- **Zurück zur Zeugnis-Tabelle.**
+
+Auch hier setzt das Speichern den Stand selbst: Text geschrieben → **In Arbeit**, Text
+komplett geleert → **Unbearbeitet**.
+
 ## Wo er in der Übersicht steht
 
 In der Zeugnisliste der Klasse hat er eine eigene Zeile beziehungsweise Spalte je Fach, mit
 demselben Farbschema wie die Schülertexte. Ein roter Klassentext bedeutet: Hier hängt die
 ganze Klasse, nicht ein Kind.
+
+Unter **Meine ToDos** steht er beim Aufklappen eines Fachs als erste Zeile über den Kindern.
 
 ## Prüfen Sie die Wirkung in der Vorschau
 

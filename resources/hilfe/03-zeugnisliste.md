@@ -34,6 +34,10 @@ Die Stände sind eine **Verabredung**, keine Sperre: Das Modul erzwingt keine Re
 zwei Stände verlangen etwas – *Frei zur Korrektur* und *Korrektur nötig* gehen nur, wenn
 mindestens ein Korrektor ausgewählt ist. Sonst wüsste niemand, wer gemeint ist.
 
+Zwei Stände setzt das Modul beim Speichern selbst: Wer in einen *unbearbeiteten* Text
+schreibt, steht danach auf **In Arbeit**. Und ein komplett geleerter Text fällt auf
+**Unbearbeitet** zurück – gleich, welcher Stand vorher gewählt war.
+
 ## Die Spalte mit dem Klassentext
 
 Neben den Schülern steht je Fach der **Klassentext** – der gemeinsame Absatz, der bei allen

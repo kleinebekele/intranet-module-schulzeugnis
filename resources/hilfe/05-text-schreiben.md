@@ -29,6 +29,20 @@ Der Stand oben rechts sagt allen anderen, wie weit Sie sind. Zwei davon verlange
 mindestens ein **Korrektor** ausgewählt ist: *Frei zur Korrektur* und *Korrektur nötig*.
 Ohne Zuweisung wüsste niemand, dass er gefragt ist – und der Text läge still herum.
 
+Um zwei Stände müssen Sie sich nicht kümmern: Schreiben Sie in einen *unbearbeiteten* Text
+und speichern, steht er auf **In Arbeit**. Leeren Sie ihn komplett, steht er wieder auf
+**Unbearbeitet**.
+
+## Danach weiter zu
+
+Unter dem Text wählen Sie, wohin es nach dem Speichern geht:
+
+- **Nächster** bzw. **vorheriger Schüler** – derselbe Text (dasselbe Fach) beim nächsten Kind.
+  So schreiben Sie eine Klasse in einem Zug durch.
+- **Vorherige Zeile: Klassentext** – beim ersten Kind der Liste geht es eine Zeile hoch in
+  den klassenweiten Text desselben Fachs.
+- **Zurück** zur Zeugnisliste bzw. zu Ihren ToDos – je nachdem, woher Sie gekommen sind.
+
 ## Korrektoren
 
 Korrektoren werden **je Abschnitt** ausgewählt, nicht pauschal für ein Zeugnis. Wer als

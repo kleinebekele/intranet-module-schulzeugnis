@@ -32,6 +32,19 @@ alle noch offenen Fälle.
 
 Sie müssen also nichts nachtragen – nur warten oder das Konto anlegen.
 
+## Als Lehrkraft nutzen
+
+Mit **als …** in der Zeile einer Lehrkraft sehen Sie das Zeugnismodul genau so, wie diese
+Lehrkraft es sieht: ihre Klassenräume, ihre ToDos, ihre Rechte an den Texten, ihre
+Menüpunkte. Damit lässt sich prüfen, ob Lehraufträge und Klassenleitung richtig sitzen.
+
+- Der Knopf erscheint nur bei Lehrkräften mit verknüpftem Konto und nur für Administratoren
+  bzw. wer die Lehrer **verwalten** darf.
+- Solange es läuft, steht oben ein roter Balken. **Beenden – wieder ich selbst** führt zurück.
+- Es wirkt nur im Zeugnismodul. Außerhalb sind Sie wieder Sie selbst.
+- Jede Änderung in dieser Zeit fragt vorher nach und landet im Audit-Log – mit Ihnen als
+  Handelndem und der Lehrkraft als Betroffener.
+
 ## Wenn jemand nicht schreiben kann
 
 Die Reihenfolge zum Nachsehen:
@@ -40,4 +53,5 @@ Die Reihenfolge zum Nachsehen:
 2. Ist sie mit ihrem Konto verknüpft?
 3. Hat sie einen **Lehrauftrag** in der Klasse und dem Fach – oder ist sie Klassenlehrer?
 
-Fast immer liegt es an Punkt 3.
+Fast immer liegt es an Punkt 3. Am schnellsten prüfen Sie es mit **als …** – dann sehen Sie
+selbst, was die Lehrkraft sieht.

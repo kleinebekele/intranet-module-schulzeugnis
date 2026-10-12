@@ -11,7 +11,10 @@ zwei verschiedene Klassen mit eigenen Schülern, eigenen Lehraufträgen und eige
 
 ## Was eine Klasse festlegt
 
-- **Klassenlehrer** – nur er darf Haupttext, Hauptzeugnis und Zeugnisspruch schreiben.
+- **Klassenlehrer** – sie schreiben Haupttext, Hauptzeugnis und Zeugnisspruch. Eine Klasse
+  kann **beliebig viele** haben: Ist einer gewählt, erscheint „Weiteren Klassenlehrer wählen".
+  Das Feld ist eine Suche – Namen eintippen, mit Pfeiltasten und Enter auswählen. Der erste
+  in der Liste wird bei neu angelegten Texten als Autor eingetragen.
 - **Schulstufe** – bestimmt unter anderem die Türfarbe in den Klassenräumen.
 - **Standardformat** – das Zeugnisformat, das für alle Schüler dieser Klasse gilt, solange
   bei einem Kind nichts anderes hinterlegt ist.
