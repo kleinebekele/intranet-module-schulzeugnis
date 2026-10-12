@@ -46,6 +46,38 @@ class Abschnitt extends Model
         'vollstaendig'            => ['label' => 'Vollständig',             'icon' => 'bxs-check-circle',  'farbe' => 'green'],
     ];
 
+    /**
+     * Status-Automatik beim Speichern eines Textes: Wer in einen unbearbeiteten Text
+     * schreibt, ist „In Arbeit"; ein komplett geleerter Text ist wieder „Unbearbeitet"
+     * – gleich welcher Status gewählt war. Gilt auch für Klassentexte.
+     */
+    public static function statusNachInhalt(string $status, bool $hatInhalt): string
+    {
+        if (! $hatInhalt) {
+            return self::STATUS_STANDARD;
+        }
+
+        return $status === self::STATUS_STANDARD ? 'in_arbeit' : $status;
+    }
+
+    /** Steht im Text etwas außer Leerraum/Auszeichnung? */
+    public static function textGefuellt(?string $text): bool
+    {
+        $rein = html_entity_decode(strip_tags((string) $text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim(str_replace("\u{00A0}", ' ', $rein)) !== '';
+    }
+
+    /** Hat dieser Abschnitt Inhalt (Text, Note bzw. einen der Fachbereichstexte)? */
+    public function hatInhalt(): bool
+    {
+        if ($this->typ === self::TYP_HAUPTZEUGNIS) {
+            return $this->bereichtexte->contains(fn ($bt) => self::textGefuellt($bt->inhalt));
+        }
+
+        return self::textGefuellt($this->inhalt) || ($this->typ === self::TYP_NOTE && filled($this->note));
+    }
+
     protected $table = 'zeugnis_abschnitte';
 
     protected $guarded = [];

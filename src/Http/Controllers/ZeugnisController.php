@@ -848,6 +848,12 @@ class ZeugnisController
             $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
             $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
         }
+
+        // Status-Automatik: Text geschrieben → „In Arbeit", Text geleert → „Unbearbeitet".
+        $abschnitt->status = Abschnitt::statusNachInhalt($abschnitt->status, $abschnitt->hatInhalt());
+        if ($abschnitt->isDirty('status')) {
+            $abschnitt->save();
+        }
         $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
 
         if (filled($data['notiz_text'] ?? null)) {
@@ -1300,7 +1306,8 @@ class ZeugnisController
         $altText   = $kt->text;
         $altStatus = $kt->status;
         $kt->text = $data['text'] ?? null;
-        $kt->status = $data['status'];
+        // Status-Automatik wie beim Schülertext (siehe Abschnitt::statusNachInhalt).
+        $kt->status = Abschnitt::statusNachInhalt($data['status'], Abschnitt::textGefuellt($kt->text));
         $kt->save();
 
         $altKorrektoren = ($kt->relationLoaded('korrektoren')) ? $kt->korrektoren->pluck('id')->all() : [];
