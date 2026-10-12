@@ -149,7 +149,9 @@
                 // sie kehren zu ihren ToDos zurück.
                 $zurueckUrl   = $istVoll ? $indexUrl : route('module.schulzeugnis.todo.index');
                 $zurueckLabel = $istVoll ? 'Zurück zur Zeugnis-Tabelle' : 'Zurück zu meinen ToDos';
-                $vorauswahl = $istVoll ? ($navNext ? 'next' : ($navPrev ? 'prev' : 'index')) : 'index';
+                $navSchueler = $navSchueler ?? null;
+                $urlSchueler = $navSchueler ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $navSchueler['id']]) : '';
+                $vorauswahl = $istVoll ? ($navNext ? 'next' : ($navSchueler ? 'schueler' : ($navPrev ? 'prev' : 'index'))) : 'index';
             @endphp
             <div class="space-y-3 border-t border-gray-100 pt-4" id="zt-nav">
                 <p class="text-sm font-medium text-gray-700">Danach weiter zu:</p>
@@ -169,6 +171,16 @@
                             <i class="bx bx-left-arrow-alt text-lg text-indigo-500"></i>
                             <span>{{ $labelPrev }}</span>
                         </label>
+                        @if ($navSchueler)
+                            {{-- Eine Zeile runter: erster Schüler desselben Fachs. --}}
+                            <label class="flex items-center gap-2 text-gray-700">
+                                <input type="radio" name="weiter" value="schueler" data-url="{{ $urlSchueler }}"
+                                       @checked($vorauswahl === 'schueler')
+                                       class="text-indigo-600 focus:ring-indigo-500">
+                                <i class="bx bx-down-arrow-alt text-lg text-indigo-500"></i>
+                                <span>Nächste Zeile: {{ $navSchueler['name'] }}</span>
+                            </label>
+                        @endif
                     @endif
                     <label class="flex items-center gap-2 text-gray-700">
                         <input type="radio" name="weiter" value="index" data-url="{{ $zurueckUrl }}"

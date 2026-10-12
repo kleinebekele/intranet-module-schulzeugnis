@@ -1215,6 +1215,7 @@ class ZeugnisController
             : $this->klassentextNachbarn($klasse, $fachId);
 
         return view('schulzeugnis::klassen.klassentext', [
+            'navSchueler'    => $berechtigung === 'voll' ? $this->ersterSchuelerAbschnitt($klasse, $fachId, $art) : null,
             'klasse'         => $klasse,
             'fach'           => $fachModel,
             'fachParam'      => $fach,
@@ -1257,7 +1258,7 @@ class ZeugnisController
                 'text'       => ['nullable', 'string'],
                 'notiz_text' => ['nullable', 'string', 'max:2000'],
                 'status'     => ['required', Rule::in(self::KORREKTUR_STATI)],
-                'weiter'     => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
+                'weiter'     => ['nullable', Rule::in(['next', 'prev', 'index', 'schueler'])],
             ]);
 
             $altText   = $kt->text;
@@ -1274,7 +1275,7 @@ class ZeugnisController
             }
             $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
-            return $this->klassentextZiel($request, $klasse, $fachId, $label, $b);
+            return $this->klassentextZiel($request, $klasse, $fachId, $label, $b, $art);
         }
 
         // Voll berechtigt: Text, Notiz, Status, Korrektoren.
@@ -1284,12 +1285,12 @@ class ZeugnisController
             'status'        => ['required', Rule::in(array_keys(Abschnitt::STATI))],
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
-            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
+            'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'schueler'])],
         ]);
 
         // Korrektor-Pflicht nur beim reinen Speichern erzwingen (beim Blättern nicht blockieren).
         $korrektoren = $this->ohneEigeneLehrer($data['korrektoren'] ?? [], $klasse);
-        $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index'], true);
+        $blaettert   = in_array((string) $request->input('weiter'), ['next', 'prev', 'index', 'schueler'], true);
         if (! $blaettert && in_array($data['status'], self::BRAUCHT_KORREKTOREN, true) && empty($korrektoren)) {
             return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
                 ->withInput()
@@ -1318,7 +1319,7 @@ class ZeugnisController
 
         $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
-        return $this->klassentextZiel($request, $klasse, $fachId, $label, $b);
+        return $this->klassentextZiel($request, $klasse, $fachId, $label, $b, $art);
     }
 
     /** Einen früheren Textstand eines Klassentextes aus dem Verlauf wiederherstellen. */
@@ -1453,7 +1454,12 @@ class ZeugnisController
             return $leer;
         }
 
-        $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
+        // Lehrkräfte blättern nur durch ihre eigenen Fächer (Lehrauftrag in dieser Klasse),
+        // Admins durch alle.
+        $user    = auth()->user();
+        $fachIds = $klasse->lehrauftraege()
+            ->when(! $user?->is_admin, fn ($q) => $q->whereIn('lehrer_id', $this->meineLehrerIds($klasse)))
+            ->distinct()->pluck('fach_id');
         $kette   = Fach::whereIn('id', $fachIds)->orderBy('reihenfolge')->orderBy('name')->get()
             ->map(fn ($f) => ['param' => (string) $f->id, 'name' => $f->name])
             ->values();
@@ -1472,11 +1478,39 @@ class ZeugnisController
     }
 
     /**
+     * Erster Schüler (alphabetisch) mit einem Text zu diesem Klassentext – Ziel von
+     * „Nächste Zeile" im Klassentext-Editor (Gegenstück zu „Vorherige Zeile: Klassentext").
+     *
+     * @return array{id:int,name:string}|null
+     */
+    private function ersterSchuelerAbschnitt(Klasse $klasse, ?int $fachId, string $art): ?array
+    {
+        $q = Abschnitt::query()
+            ->join('zeugnisse', 'zeugnisse.id', '=', 'zeugnis_abschnitte.zeugnis_id')
+            ->join('zeugnis_schuljahr_schueler as s', 's.id', '=', 'zeugnisse.schueler_id')
+            ->where('s.klasse_id', $klasse->id);
+
+        if ($art === 'spruch') {
+            $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_SPRUCH);
+        } elseif ($fachId === null) {
+            $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_HAUPTTEXT);
+        } else {
+            $q->where('zeugnis_abschnitte.fach_id', $fachId)
+                ->whereNotIn('zeugnis_abschnitte.typ', [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH, Abschnitt::TYP_SPRUCH]);
+        }
+
+        $treffer = $q->orderBy('s.nachname')->orderBy('s.vorname')
+            ->first(['zeugnis_abschnitte.id', 's.vorname', 's.nachname']);
+
+        return $treffer ? ['id' => (int) $treffer->id, 'name' => trim($treffer->vorname . ' ' . $treffer->nachname)] : null;
+    }
+
+    /**
      * Redirect nach dem Speichern gemäß Auswahl „weiter" (nächstes/voriges Fach bzw.
      * Zeugnis-Tabelle). Korrektoren dürfen NICHT zu Nachbar-Fächern springen (dort sind
      * sie nicht zugewiesen → 403); sie landen wieder in ihren ToDos.
      */
-    private function klassentextZiel(Request $request, Klasse $klasse, ?int $fachId, string $label, string $berechtigung = 'voll')
+    private function klassentextZiel(Request $request, Klasse $klasse, ?int $fachId, string $label, string $berechtigung = 'voll', string $art = 'fach')
     {
         if ($berechtigung !== 'voll') {
             return redirect()->route('module.schulzeugnis.todo.index')
@@ -1499,6 +1533,10 @@ class ZeugnisController
         }
         if ($weiter === 'index') {
             return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
+                ->with('status', 'Klassentext (' . $label . ') gespeichert.');
+        }
+        if ($weiter === 'schueler' && ($erster = $this->ersterSchuelerAbschnitt($klasse, $fachId, $art))) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $erster['id']])
                 ->with('status', 'Klassentext (' . $label . ') gespeichert.');
         }
 
