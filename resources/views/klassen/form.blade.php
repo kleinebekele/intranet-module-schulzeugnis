@@ -67,24 +67,26 @@
 
             <div>
                 <span class="block text-sm font-medium text-gray-700">Klassenlehrer</span>
+                {{-- Suchauswahl je Zeile: Textfeld filtert die Lehrer, das versteckte Feld trägt die ID. --}}
                 <div id="kl-liste" class="mt-1 space-y-2">
                     @foreach ($klassenlehrerIds as $klId)
+                        @php $klLehrer = $klId ? $lehrer->firstWhere('id', (int) $klId) : null; @endphp
                         <div class="kl-zeile flex items-center gap-2">
-                            <select name="klassenlehrer_ids[]"
-                                    class="kl-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">— kein Klassenlehrer —</option>
-                                @foreach ($lehrer as $l)
-                                    <option value="{{ $l->id }}" @selected((int) $klId === $l->id)>{{ $l->fullName() }}</option>
-                                @endforeach
-                            </select>
-                            <button type="button" class="kl-remove shrink-0 rounded-lg border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 {{ $loop->count > 1 ? '' : 'hidden' }}" title="Klassenlehrer entfernen">
+                            <div class="kl-feld">
+                                <input type="hidden" name="klassenlehrer_ids[]" class="kl-wert" value="{{ $klLehrer?->id }}">
+                                <input type="text" class="kl-suche block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                       value="{{ $klLehrer?->fullName() }}" placeholder="Lehrer suchen – Namen eintippen …" autocomplete="off"
+                                       role="combobox" aria-expanded="false">
+                                <ul class="kl-treffer" role="listbox" hidden></ul>
+                            </div>
+                            <button type="button" class="kl-remove shrink-0 rounded-lg border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600" title="Klassenlehrer entfernen" @if ($loop->count < 2) hidden @endif>
                                 <i class="bx bx-x text-lg"></i>
                             </button>
                         </div>
                     @endforeach
                 </div>
-                <button type="button" id="kl-add"
-                        class="mt-2 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100 hidden">
+                <button type="button" id="kl-add" hidden
+                        class="mt-2 items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
                     <i class="bx bx-plus"></i> Weiteren Klassenlehrer wählen
                 </button>
                 @if ($lehrer->isEmpty())
@@ -209,6 +211,21 @@
             0%, 100% { outline-color: var(--color-amber-500, #f59e0b); }
             50%      { outline-color: rgba(245, 158, 11, .25); }
         }
+
+        /* Klassenlehrer-Suchauswahl */
+        #kl-add:not([hidden]) { display: inline-flex; }
+        .kl-remove[hidden], .kl-treffer[hidden] { display: none; }
+        .kl-feld { position: relative; flex: 1 1 auto; min-width: 0; }
+        .kl-treffer {
+            position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+            max-height: 16rem; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+            background: var(--color-white, #fff);
+            border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: .5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, .25);
+        }
+        .kl-treffer li { padding: .4rem .6rem; border-radius: .375rem; cursor: pointer; font-size: .875rem; color: var(--color-gray-800, #1f2937); }
+        .kl-treffer li.aktiv, .kl-treffer li:hover { background: var(--color-indigo-50, #eef2ff); color: var(--color-indigo-700, #4338ca); }
+        .kl-treffer li.leer { cursor: default; color: var(--color-gray-400, #9ca3af); background: none; }
     </style>
 
     <script>
@@ -222,24 +239,108 @@
             bind('hat_fachzeugnis', 'fach-details');
             bind('hat_hauptzeugnis', 'haupt-details');
 
-            // Klassenleitung: „Weiteren Klassenlehrer wählen" erscheint, sobald die letzte
-            // Auswahl belegt ist – beliebig viele Zeilen.
+            // Klassenleitung: Suchauswahl je Zeile; „Weiteren Klassenlehrer wählen" erscheint,
+            // sobald die letzte Zeile belegt ist – beliebig viele Zeilen.
             var klListe = document.getElementById('kl-liste'), klAdd = document.getElementById('kl-add');
+            var klLehrer = @js($lehrer->map(fn ($l) => ['id' => $l->id, 'name' => $l->fullName()])->values());
             if (klListe && klAdd) {
                 var klZeilen = function () { return klListe.querySelectorAll('.kl-zeile'); };
                 var klAktualisieren = function () {
                     var zeilen = klZeilen(), letzte = zeilen[zeilen.length - 1];
-                    klAdd.classList.toggle('hidden', !letzte || !letzte.querySelector('.kl-select').value);
-                    zeilen.forEach(function (z) { z.querySelector('.kl-remove').classList.toggle('hidden', zeilen.length < 2); });
+                    klAdd.hidden = !letzte || !letzte.querySelector('.kl-wert').value;
+                    zeilen.forEach(function (z) { z.querySelector('.kl-remove').hidden = zeilen.length < 2; });
                 };
+                var klNorm = function (s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); };
+
+                // Liste füllen: Treffer auf alle Wortteile, ohne die in anderen Zeilen gewählten.
+                var klZeigen = function (zeile) {
+                    var suche = zeile.querySelector('.kl-suche'), liste = zeile.querySelector('.kl-treffer');
+                    var belegt = Array.prototype.map.call(klZeilen(), function (z) { return z === zeile ? '' : z.querySelector('.kl-wert').value; });
+                    var teile = klNorm(suche.value.trim()).split(/\s+/).filter(Boolean);
+                    var treffer = klLehrer.filter(function (l) {
+                        var n = klNorm(l.name);
+                        return belegt.indexOf(String(l.id)) === -1 && teile.every(function (t) { return n.indexOf(t) !== -1; });
+                    });
+                    liste.innerHTML = '';
+                    treffer.forEach(function (l, i) {
+                        var li = document.createElement('li');
+                        li.textContent = l.name;
+                        li.dataset.id = l.id;
+                        li.setAttribute('role', 'option');
+                        if (i === 0) { li.classList.add('aktiv'); }
+                        liste.appendChild(li);
+                    });
+                    if (!treffer.length) {
+                        var leer = document.createElement('li');
+                        leer.className = 'leer';
+                        leer.textContent = 'Kein Lehrer gefunden';
+                        liste.appendChild(leer);
+                    }
+                    liste.hidden = false;
+                    suche.setAttribute('aria-expanded', 'true');
+                };
+                var klSchliessen = function (zeile) {
+                    var suche = zeile.querySelector('.kl-suche'), wert = zeile.querySelector('.kl-wert');
+                    zeile.querySelector('.kl-treffer').hidden = true;
+                    suche.setAttribute('aria-expanded', 'false');
+                    // Freitext ohne Auswahl zurück auf den gewählten Namen (leer = keiner).
+                    var gewaehlt = klLehrer.find(function (l) { return String(l.id) === wert.value; });
+                    if (suche.value.trim() === '') { wert.value = ''; }
+                    else { suche.value = gewaehlt ? gewaehlt.name : ''; if (!gewaehlt) { wert.value = ''; } }
+                    klAktualisieren();
+                };
+                var klWaehlen = function (zeile, li) {
+                    if (!li || !li.dataset.id) { return; }
+                    zeile.querySelector('.kl-wert').value = li.dataset.id;
+                    zeile.querySelector('.kl-suche').value = li.textContent;
+                    klSchliessen(zeile);
+                };
+
+                klListe.addEventListener('focusin', function (e) {
+                    if (e.target.classList.contains('kl-suche')) { e.target.select(); klZeigen(e.target.closest('.kl-zeile')); }
+                });
+                klListe.addEventListener('input', function (e) {
+                    if (e.target.classList.contains('kl-suche')) { klZeigen(e.target.closest('.kl-zeile')); }
+                });
+                klListe.addEventListener('focusout', function (e) {
+                    if (e.target.classList.contains('kl-suche')) {
+                        var zeile = e.target.closest('.kl-zeile');
+                        setTimeout(function () { if (!zeile.contains(document.activeElement)) { klSchliessen(zeile); } }, 150);
+                    }
+                });
+                klListe.addEventListener('keydown', function (e) {
+                    if (!e.target.classList.contains('kl-suche')) { return; }
+                    var zeile = e.target.closest('.kl-zeile'), liste = zeile.querySelector('.kl-treffer');
+                    var eintraege = Array.prototype.slice.call(liste.querySelectorAll('li[data-id]'));
+                    var pos = eintraege.findIndex(function (li) { return li.classList.contains('aktiv'); });
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (liste.hidden) { klZeigen(zeile); return; }
+                        if (!eintraege.length) { return; }
+                        var neu = e.key === 'ArrowDown' ? Math.min(pos + 1, eintraege.length - 1) : Math.max(pos - 1, 0);
+                        eintraege.forEach(function (li, i) { li.classList.toggle('aktiv', i === neu); });
+                        eintraege[neu].scrollIntoView({ block: 'nearest' });
+                    } else if (e.key === 'Enter') {
+                        if (!liste.hidden) { e.preventDefault(); klWaehlen(zeile, eintraege[pos]); }
+                    } else if (e.key === 'Escape') {
+                        klSchliessen(zeile);
+                    }
+                });
+                // mousedown statt click: läuft vor dem focusout des Textfelds.
+                klListe.addEventListener('mousedown', function (e) {
+                    var li = e.target.closest('.kl-treffer li');
+                    if (li) { e.preventDefault(); klWaehlen(li.closest('.kl-zeile'), li); }
+                });
+
                 klAdd.addEventListener('click', function () {
                     var zeilen = klZeilen(), neu = zeilen[zeilen.length - 1].cloneNode(true);
-                    neu.querySelector('.kl-select').value = '';
+                    neu.querySelector('.kl-wert').value = '';
+                    neu.querySelector('.kl-suche').value = '';
+                    neu.querySelector('.kl-treffer').hidden = true;
                     klListe.appendChild(neu);
                     klAktualisieren();
-                    neu.querySelector('.kl-select').focus();
+                    neu.querySelector('.kl-suche').focus();
                 });
-                klListe.addEventListener('change', klAktualisieren);
                 klListe.addEventListener('click', function (e) {
                     var btn = e.target.closest('.kl-remove');
                     if (btn && klZeilen().length > 1) { btn.closest('.kl-zeile').remove(); klAktualisieren(); }
