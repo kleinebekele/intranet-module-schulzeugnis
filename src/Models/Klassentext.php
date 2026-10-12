@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulzeugnis\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Klassenweiter Text je Fach – ein gemeinsamer Text pro (Klasse, Fach), der auf
@@ -16,6 +17,16 @@ class Klassentext extends Model
     protected $table = 'zeugnis_fach_klassentexte';
 
     protected $guarded = [];
+
+    protected $casts = [
+        'zusammengefasst' => 'boolean',
+    ];
+
+    /** Teiltexte je Fachlehrer (Team-Teaching), siehe Support\Teamtext. */
+    public function teiltexte(): HasMany
+    {
+        return $this->hasMany(KlassentextTeiltext::class, 'klassentext_id');
+    }
 
     public function klasse(): BelongsTo
     {

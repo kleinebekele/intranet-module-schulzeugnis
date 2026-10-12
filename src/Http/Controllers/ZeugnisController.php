@@ -629,15 +629,11 @@ class ZeugnisController
         // Team-Teaching: mehrere Fachlehrer → je Lehrkraft ein Teiltext, bis alle zusammenfassen.
         $team = null;
         if (! $zeugnis->istAbgeschlossen() && ($fachlehrer = Teamtext::sicherstellen($abschnitt))) {
-            $teile = Teamtext::teiltexte($abschnitt, $fachlehrer);
-            $meine = $this->meineLehrerIds($klasse);
-            $mein  = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
-            $team  = [
-                'modus'  => $abschnitt->zusammengefasst ? 'zusammen' : 'getrennt',
-                'mein'   => $mein,
-                'andere' => $teile->reject(fn ($t) => $mein && $t->id === $mein->id)->values(),
-            ];
+            $team = $this->teamAnsicht($abschnitt, $fachlehrer, $klasse);
         }
+        // Klassenweiter Text mit getrennten Teiltexten: hier nur ansehen, schreiben im Klassentext-Editor.
+        $ktTeamGetrennt = $klasse && $abschnitt->typ === Abschnitt::TYP_FACHTEXT && $abschnitt->fach_id
+            && Teamtext::klassentextGetrennt($this->klassentextFuer($klasse->id, $abschnitt->fach_id), $klasse);
 
         // Herkunft merken (?quelle=todo|zeugnisse) → passender „Zurück"-Button.
         // focus = zuletzt bearbeiteter Abschnitt → Zielseite scrollt/klappt ihn auf.
@@ -660,6 +656,7 @@ class ZeugnisController
             'quelle'         => $quelle,
             'zurueck'        => $zurueck,
             'team'           => $team,
+            'ktTeamGetrennt' => $ktTeamGetrennt,
             'abschnitt'      => $abschnitt,
             'zeugnis'        => $zeugnis,
             'schueler'       => $zeugnis->schueler,
@@ -913,7 +910,9 @@ class ZeugnisController
 
         // Klassenweiter Text – gilt für alle Schüler der Klasse (je Fach bzw. Fachbereich).
         $neu = $data['klassentext'] ?? null;
-        [$altKt, $klassentextGeaendert] = $this->klassentextSpeichern($abschnitt, $klasse, $neu);
+        $ktGetrennt = $klasse && $abschnitt->typ === Abschnitt::TYP_FACHTEXT && $abschnitt->fach_id
+            && Teamtext::klassentextGetrennt($this->klassentextFuer($klasse->id, $abschnitt->fach_id), $klasse);
+        [$altKt, $klassentextGeaendert] = $ktGetrennt ? [null, false] : $this->klassentextSpeichern($abschnitt, $klasse, $neu);
         if ($klassentextGeaendert) {
             $this->logFeld($abschnitt, 'Klassenweiter Text', $altKt, $neu, 'abschnitt_klassentext');
         }
@@ -994,6 +993,10 @@ class ZeugnisController
         // Klassenweiter Text: in den Klassentext (Klasse + Fach) zurückschreiben.
         if (in_array($eintrag->aktion, ['abschnitt_klassentext', 'abschnitt_klassentext_wiederhergestellt'], true)) {
             $klasse = $zeugnis->schueler?->klasse;
+            if ($klasse && Teamtext::klassentextGetrennt($this->klassentextFuer($klasse->id, $abschnitt->fach_id), $klasse)) {
+                return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
+                    ->with('error', 'Solange die Teiltexte des klassenweiten Texts getrennt sind, lässt sich kein früherer Stand wiederherstellen.');
+            }
             if ($klasse) {
                 $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
                 $alt = $kt->text;
@@ -1084,43 +1087,69 @@ class ZeugnisController
      * Feld; wer die Zustimmung zurücknimmt, trennt wieder (jeder Teiltext bekommt den
      * aktuellen gemeinsamen Text). Abschnitt.inhalt ist danach der Text fürs Zeugnis.
      */
-    private function teamSpeichern(Abschnitt $abschnitt, \Illuminate\Support\Collection $fachlehrer, Request $request, ?Klasse $klasse): void
+    private function teamSpeichern(\Illuminate\Database\Eloquent\Model $traeger, \Illuminate\Support\Collection $fachlehrer, Request $request, ?Klasse $klasse, string $feld = 'inhalt'): void
     {
         $meine     = $this->meineLehrerIds($klasse);
-        $teile     = Teamtext::teiltexte($abschnitt, $fachlehrer);
+        $teile     = Teamtext::teiltexte($traeger, $fachlehrer);
         $mein      = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
         $zustimmen = $request->boolean('zusammenfassen');
+        $log       = fn (string $text) => $traeger instanceof Klassentext
+            ? $this->logKlassentextTeam($traeger, $klasse, $text)
+            : $this->logTeam($traeger, $text);
 
-        if (! $abschnitt->zusammengefasst) {
+        if (! $traeger->zusammengefasst) {
             if ($mein) {
                 $mein->inhalt         = $request->input('teiltext');
                 $mein->zusammenfassen = $zustimmen;
                 $mein->save();
             }
             if (Teamtext::alleStimmenZu($teile, $fachlehrer)) {
-                $abschnitt->zusammengefasst = true;
-                $this->logTeam($abschnitt, 'Texte zusammengefasst – ab jetzt ein gemeinsames Feld');
+                $traeger->zusammengefasst = true;
+                $log('Texte zusammengefasst – ab jetzt ein gemeinsames Feld');
             }
-            $abschnitt->inhalt = Teamtext::verbinden($teile);
+            $traeger->{$feld} = Teamtext::verbinden($teile);
 
             return;
         }
 
-        if ($request->has('inhalt')) {
-            $abschnitt->inhalt = $request->input('inhalt');
+        if ($request->has($feld)) {
+            $traeger->{$feld} = $request->input($feld);
         }
         if ($mein && ! $zustimmen) {
             foreach ($teile as $t) {
-                $t->inhalt = $abschnitt->inhalt;
+                $t->inhalt = $traeger->{$feld};
                 if ($t->id === $mein->id) {
                     $t->zusammenfassen = false;
                 }
                 $t->save();
             }
-            $abschnitt->zusammengefasst = false;
-            $abschnitt->inhalt = Teamtext::verbinden($teile);
-            $this->logTeam($abschnitt, 'Zusammenfassen zurückgenommen ('.$mein->autor_name.') – jeder Teiltext enthält den bisherigen gemeinsamen Text');
+            $traeger->zusammengefasst = false;
+            $traeger->{$feld} = Teamtext::verbinden($teile);
+            $log('Zusammenfassen zurückgenommen ('.$mein->autor_name.') – jeder Teiltext enthält den bisherigen gemeinsamen Text');
         }
+    }
+
+    /** Team-Daten für den Editor (getrennt/zusammen, eigener und fremde Teiltexte). @param Abschnitt|Klassentext $traeger */
+    private function teamAnsicht(\Illuminate\Database\Eloquent\Model $traeger, \Illuminate\Support\Collection $fachlehrer, ?Klasse $klasse): array
+    {
+        $teile = Teamtext::teiltexte($traeger, $fachlehrer);
+        $meine = $this->meineLehrerIds($klasse);
+        $mein  = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
+
+        return [
+            'modus'  => $traeger->zusammengefasst ? 'zusammen' : 'getrennt',
+            'mein'   => $mein,
+            'andere' => $teile->reject(fn ($t) => $mein && $t->id === $mein->id)->values(),
+        ];
+    }
+
+    private function logKlassentextTeam(Klassentext $kt, ?Klasse $klasse, string $text): void
+    {
+        Protokoll::log('klassentext_team', [
+            'schuljahr_id'   => $klasse?->schuljahr_id,
+            'klassentext_id' => $kt->id,
+            'beschreibung'   => $text,
+        ]);
     }
 
     private function logTeam(Abschnitt $abschnitt, string $text): void
@@ -1340,6 +1369,7 @@ class ZeugnisController
             'bezeichnung'    => $art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($fachModel?->name ?? 'Haupttext'),
             'kannBereiche'   => $this->kannKlassenVerwalten(auth()->user()),
             'klassentext'    => $kt,
+            'team'           => ($ktLehrer = Teamtext::sicherstellenKlassentext($kt, $klasse)) ? $this->teamAnsicht($kt, $ktLehrer, $klasse) : null,
             'stati'          => Abschnitt::STATI,
             'korrekturStati' => self::KORREKTUR_STATI,
             'verlauf'        => $this->klassentextVerlauf($kt),
@@ -1381,7 +1411,10 @@ class ZeugnisController
 
             $altText   = $kt->text;
             $altStatus = $kt->status;
-            $kt->text = $data['text'] ?? null;
+            // Getrennte Teiltexte: Korrektur erst am gemeinsamen Text.
+            if (! Teamtext::klassentextGetrennt($kt, $klasse)) {
+                $kt->text = $data['text'] ?? null;
+            }
             $kt->status = $data['status'];
             $kt->save();
 
@@ -1404,7 +1437,18 @@ class ZeugnisController
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
             'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'schueler'])],
+            'teiltext'      => ['nullable', 'string'],
+            'team_modus'    => ['nullable', Rule::in(['getrennt', 'zusammen'])],
         ]);
+
+        // Team-Teaching: Formular passt nicht mehr zum Stand → neu laden statt falsch schreiben.
+        $ktTeam = Teamtext::sicherstellenKlassentext($kt, $klasse);
+        if ($ktTeam && $request->filled('team_modus')
+            && $request->input('team_modus') !== ($kt->zusammengefasst ? 'zusammen' : 'getrennt')) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->with('error', 'Inzwischen wurden die Texte '.($kt->zusammengefasst ? 'zusammengefasst' : 'wieder getrennt')
+                    .' – bitte die Änderung noch einmal eintragen.');
+        }
 
         // Korrektor-Pflicht nur beim reinen Speichern erzwingen (beim Blättern nicht blockieren).
         $korrektoren = $this->ohneEigeneLehrer($data['korrektoren'] ?? [], $klasse);
@@ -1417,7 +1461,11 @@ class ZeugnisController
 
         $altText   = $kt->text;
         $altStatus = $kt->status;
-        $kt->text = $data['text'] ?? null;
+        if ($ktTeam) {
+            $this->teamSpeichern($kt, $ktTeam, $request, $klasse, 'text');
+        } else {
+            $kt->text = $data['text'] ?? null;
+        }
         // Status-Automatik wie beim Schülertext (siehe Abschnitt::statusNachInhalt).
         $kt->status = Abschnitt::statusNachInhalt($data['status'], Abschnitt::textGefuellt($kt->text));
         $kt->save();
@@ -1454,6 +1502,11 @@ class ZeugnisController
         if ($this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user()) !== 'voll') {
             return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
                 ->with('error', 'Nur die verantwortliche Lehrkraft kann frühere Stände wiederherstellen.');
+        }
+
+        if (Teamtext::klassentextGetrennt($kt, $klasse)) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
+                ->with('error', 'Solange die Texte getrennt sind, lässt sich kein früherer Stand wiederherstellen – jede Lehrkraft bearbeitet ihren Teiltext.');
         }
 
         $eintrag = Protokoll::where('klassentext_id', $kt->id)
@@ -1738,13 +1791,13 @@ class ZeugnisController
         $hex = self::STATUS_FARBE_HEX;
 
         $eintraege = Protokoll::where('klassentext_id', $kt->id)
-            ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_notiz', 'klassentext_status', 'klassentext_wiederhergestellt', 'klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt'])
+            ->whereIn('aktion', ['klassentext_geaendert', 'klassentext_notiz', 'klassentext_status', 'klassentext_wiederhergestellt', 'klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt', 'klassentext_team'])
             ->orderByDesc('id')
             ->get()
             ->map(function (Protokoll $e) use ($hex) {
                 $istStatus  = $e->aktion === 'klassentext_status';
                 $istRestore = $e->aktion === 'klassentext_wiederhergestellt';
-                $istMeta    = in_array($e->aktion, ['klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt'], true);
+                $istMeta    = in_array($e->aktion, ['klassentext_korrektor_hinzugefuegt', 'klassentext_korrektor_entfernt', 'klassentext_team'], true);
                 $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim(Textauszeichnung::ohneMarker((string) $s))));
 
                 $status  = null;

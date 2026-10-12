@@ -76,11 +76,15 @@
             @method('PUT')
 
             <div>
+                @if (! empty($team))
+                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 10, 'feld' => 'text', 'gemeinsam' => $klassentext->text, 'readonly' => false])
+                @else
                 <label for="text" class="block text-sm font-medium text-gray-700">Klassenweiter Text</label>
                 {{-- Der Spruch dient als Vorlage und druckt nicht selbst – dort keine Formatierung. --}}
                 <textarea name="text" id="text" rows="12" @unless ($istSpruch) data-fmt @endunless
                           class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           placeholder="Text, der für alle Schüler dieser Klasse gilt …">{{ old('text', $klassentext->text) }}</textarea>
+                @endif
                 @error('text') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 

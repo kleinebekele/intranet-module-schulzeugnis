@@ -166,7 +166,7 @@
                     {{-- Tab 1: Schülertext (individuell) --}}
                     <div class="zt-txt-panel" data-txt="schueler">
                         @if (! empty($team))
-                            @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 12])
+                            @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 12, 'feld' => 'inhalt', 'gemeinsam' => $abschnitt->inhalt])
                         @else
                             <textarea name="inhalt" rows="16" data-fmt @disabled($readonly)
                                       class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -177,7 +177,13 @@
 
                     {{-- Tab 2: Klassenweiter Text (+ Umbruch-Option) --}}
                     <div class="zt-txt-panel" data-txt="klasse" hidden>
-                        <textarea name="klassentext" rows="16" data-fmt @disabled($readonly)
+                        @if (! empty($ktTeamGetrennt))
+                            <p class="mb-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                                Mehrere Fachlehrer schreiben den klassenweiten Text noch getrennt –
+                                <a href="{{ $klassentextZeileUrl }}" class="font-medium underline">im Klassentext-Editor bearbeiten</a>. Hier steht er zur Ansicht.
+                            </p>
+                        @endif
+                        <textarea name="klassentext" rows="16" data-fmt @disabled($readonly || ! empty($ktTeamGetrennt))
                                   class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Gemeinsamer Text für alle Schüler …">{{ old('klassentext', $klassentext->text) }}</textarea>
                         <p class="mt-1 text-xs text-gray-500">Gilt für <strong>alle Schüler</strong> der Klasse und steht auf dem Zeugnis <strong>vor</strong> dem individuellen Text.</p>
@@ -204,7 +210,7 @@
                     </div>
                 @endif
                 @if (! empty($team))
-                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 8])
+                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 8, 'feld' => 'inhalt', 'gemeinsam' => $abschnitt->inhalt])
                 @else
                 <label class="block text-sm font-medium text-gray-700">{{ $istSpruch ? 'Zeugnisspruch' : ($klassentext ? 'Schülertext' : 'Text') }}
                     {{-- Der Zeugnisspruch druckt escaped über {Zeugnisspruch} – dort keine Formatierung. --}}

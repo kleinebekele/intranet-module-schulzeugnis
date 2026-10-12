@@ -55,8 +55,13 @@ dahin nacheinander.
 - Nimmt jemand das Häkchen wieder heraus, wird der aktuelle gemeinsame Text in **alle**
   Teiltexte eingetragen, und jeder bearbeitet wieder nur seinen eigenen.
 
+Hat eine andere Lehrkraft schon zugestimmt, Sie aber noch nicht, steht über dem Häkchen ein
+gelber Hinweis.
+
 Solange die Texte getrennt sind, lässt sich kein früherer Stand wiederherstellen, und
-Korrektoren korrigieren erst den zusammengefassten Text.
+Korrektoren korrigieren erst den zusammengefassten Text. Das Gleiche gilt für den
+**klassenweiten Text** des Fachs: Er wird dann im Klassentext-Editor geschrieben, im
+Schülertext-Editor steht er nur zur Ansicht.
 
 ## Korrektoren
 
