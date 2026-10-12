@@ -117,8 +117,8 @@ class LinearImportController
 
             [$kopf, $zeilen] = $quelle->daten($art, $wahl['zid']);
             $analyse = $this->importer($art)->analysiere($kopf, $zeilen, ['schuljahr_id' => $schuljahr->id, 'quelle_label' => 'Linear']);
-            if ($art === 'schueler') {
-                $analyse['infos'][] = $this->fehlendeSchuelerInLinear($schuljahr, $zeilen, $quelle);
+            if (in_array($art, ['schueler', 'lehrer'], true)) {
+                $analyse['infos'][] = $this->fehlendeInLinear($art, $schuljahr, $zeilen, $quelle);
             }
             // Je Zeile ein Schlüssel auf den Linear-Datensatz – für „nur diese Zeile übernehmen".
             foreach ($analyse['zeilen'] as &$r) {
@@ -261,25 +261,27 @@ class LinearImportController
     }
 
     /**
-     * Schüler, die hier im Schuljahr stehen, im Linear-Zeitraum aber nicht: was sagt
-     * Linear über sie (Adresse-Kennzeichen, letzter Klasseneintrag)? Nur Anzeige.
+     * Schüler bzw. Lehrer, die hier im Schuljahr stehen, im Linear-Zeitraum aber nicht:
+     * was sagt Linear über sie (Adresse-Kennzeichen, letzter Eintrag)? Nur Anzeige.
      *
      * @param  array<int,array<string,string>>  $zeilen
      * @return array{label: string, items: array<int,string>, ton: string}
      */
-    private function fehlendeSchuelerInLinear(Schuljahr $schuljahr, array $zeilen, LinearQuelle $quelle): array
+    private function fehlendeInLinear(string $art, Schuljahr $schuljahr, array $zeilen, LinearQuelle $quelle): array
     {
-        $inLinear = array_flip(array_column($zeilen, 'schuelerid'));
-        $fehlende = $schuljahr->schueler()->orderBy('nachname')->orderBy('vorname')->get()
+        $inLinear = array_flip(array_column($zeilen, $art === 'lehrer' ? 'quellid' : 'schuelerid'));
+        $bestand  = $art === 'lehrer' ? $schuljahr->lehrer() : $schuljahr->schueler();
+        $fehlende = $bestand->orderBy('nachname')->orderBy('vorname')->get()
             ->reject(fn ($s) => filled($s->quell_id) && isset($inLinear[trim((string) $s->quell_id)]));
 
-        $info = ['label' => 'Schüler stehen hier, aber nicht im Linear-Zeitraum – was Linear über sie weiß', 'items' => [], 'ton' => 'amber'];
+        $wer  = $art === 'lehrer' ? 'Lehrer' : 'Schüler';
+        $info = ['label' => "{$wer} stehen hier, aber nicht im Linear-Zeitraum – was Linear über sie weiß", 'items' => [], 'ton' => 'amber'];
         if ($fehlende->isEmpty()) {
             return $info;
         }
 
         try {
-            $status = $quelle->personenStatus($fehlende->pluck('quell_id')->filter()->map(fn ($q) => trim((string) $q))->all());
+            $status = $quelle->personenStatus($fehlende->pluck('quell_id')->filter()->map(fn ($q) => trim((string) $q))->all(), $art);
         } catch (\Throwable $e) {
             report($e);
             $status = null;
@@ -299,9 +301,9 @@ class LinearImportController
                     $teile[] = $feld.'='.($wert === '' ? '–' : $wert);
                 }
                 if ($l = $status[$id]['letzter']) {
-                    $teile[] = "zuletzt {$l['klasse']} in {$l['zeitraum']}".($l['klassenende'] !== '' ? ' (Klassenende '.\Carbon\Carbon::parse($l['klassenende'])->format('d.m.Y').')' : '');
+                    $teile[] = 'zuletzt'.($l['klasse'] !== '' ? " {$l['klasse']}" : '')." in {$l['zeitraum']}".($l['klassenende'] !== '' ? ' (Klassenende '.\Carbon\Carbon::parse($l['klassenende'])->format('d.m.Y').')' : '');
                 } else {
-                    $teile[] = 'in keiner Klasse geführt';
+                    $teile[] = $art === 'lehrer' ? 'keiner Klasse und keinem Lehrauftrag zugeordnet' : 'in keiner Klasse geführt';
                 }
                 $text = "Linear-ID {$id}: ".implode(', ', $teile);
             }

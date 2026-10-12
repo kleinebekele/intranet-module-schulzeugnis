@@ -225,9 +225,10 @@ class LinearQuelle
     }
 
     /**
-     * Was Linear über Personen weiß, die im Zeitraum NICHT (mehr) als Schüler geführt
-     * werden: Kennzeichen aus `Adresse` (Schuler + alles, was nach ehemalig/Austritt/Abgang
-     * klingt) und der letzte Eintrag in `WD_Schl`.
+     * Was Linear über Personen weiß, die im Zeitraum NICHT (mehr) als Schüler bzw. Lehrer
+     * geführt werden: Kennzeichen aus `Adresse` (Schuler/Lehrer + alles, was nach
+     * ehemalig/Austritt/Abgang klingt) und der letzte Eintrag in `WD_Schl` bzw.
+     * `WD_Lehrer`/`WD_LehrFach`.
      *
      * Die Spalten kommen aus INFORMATION_SCHEMA statt `SELECT *` – lange Text-/LOB-Spalten
      * würden über PDO_ODBC die folgenden Werte zerstören; Datumswerte serverseitig als Text.
@@ -235,7 +236,7 @@ class LinearQuelle
      * @param  array<int,string>  $adrNrs
      * @return array<string,array{felder: array<string,string>, letzter: ?array<string,string>}>
      */
-    public function personenStatus(array $adrNrs): array
+    public function personenStatus(array $adrNrs, string $rolle = 'schueler'): array
     {
         $ids = array_values(array_unique(array_filter(array_map(fn ($a) => is_numeric($a) ? (int) $a : null, $adrNrs))));
         if ($ids === []) {
@@ -252,7 +253,7 @@ class LinearQuelle
             $name = trim((string) $sp->COLUMN_NAME);
             $typ  = strtolower(trim((string) $sp->DATA_TYPE));
             $len  = (int) $sp->LEN;
-            $passt = preg_match('/^schuler$|^schueler$|ehem|austr|abg|entl|abmeld|verlass|aktiv|status/i', $name);
+            $passt = preg_match('/^schuler$|^schueler$|^lehrer$|mitarb|ehem|austr|abg|entl|abmeld|verlass|aktiv|status/i', $name);
             $kurz  = ! in_array($typ, ['text', 'ntext', 'image', 'xml', 'varbinary', 'binary'], true) && $len !== -1 && $len <= 255;
             if ($passt && $kurz && preg_match('/^[A-Za-z0-9_]+$/', $name)) {
                 $auswahl[$name] = in_array($typ, ['datetime', 'datetime2', 'date', 'smalldatetime'], true)
@@ -276,6 +277,10 @@ class LinearQuelle
             }
         }
 
+        if ($rolle === 'lehrer') {
+            return $this->letzterLehrerEintrag($ergebnis, $ids, $platz);
+        }
+
         // Letzter Eintrag je Person in WD_Schl (höchste Zeitraum-ID).
         $letzte = $this->db()->select(
             "SELECT s.AdrNr, s.ID, s.Klasse, CONVERT(varchar(10), s.AustrittKl, 120) AS AustrittKl, z.Bezeichnung
@@ -293,6 +298,52 @@ class LinearQuelle
                 'klasse'    => (string) ($w['Klasse'] ?? ''),
                 'klassenende' => $this->datum($w['AustrittKl'] ?? ''),
             ];
+        }
+
+        foreach ($ids as $id) {
+            $ergebnis[(string) $id] = ($ergebnis[(string) $id] ?? []) + ['felder' => [], 'letzter' => null];
+        }
+
+        return $ergebnis;
+    }
+
+    /**
+     * Letzter Zeitraum, in dem eine Lehrkraft einer Klasse zugeordnet war oder einen
+     * Lehrauftrag hatte – samt der Klassen dieses Zeitraums.
+     *
+     * @param  array<string,array<string,mixed>>  $ergebnis
+     * @param  array<int,int>  $ids
+     * @return array<string,array{felder: array<string,string>, letzter: ?array<string,string>}>
+     */
+    private function letzterLehrerEintrag(array $ergebnis, array $ids, string $platz): array
+    {
+        $alle = "(SELECT AdrNr, ID, Klasse FROM WD_Lehrer UNION ALL SELECT AdrNr, ID, Klasse FROM WD_LehrFach)";
+        $zeilen = $this->db()->select(
+            "SELECT x.AdrNr, x.ID, x.Klasse, z.Bezeichnung
+               FROM {$alle} x
+               JOIN WD_Zeitraum z ON z.ID = x.ID
+              WHERE x.AdrNr IN ({$platz})
+                AND x.ID = (SELECT MAX(y.ID) FROM {$alle} y WHERE y.AdrNr = x.AdrNr)",
+            $ids,
+        );
+
+        $klassen = [];
+        foreach ($zeilen as $z) {
+            $w  = $this->normalisiere($z);
+            $id = (string) (int) $w['AdrNr'];
+            $ergebnis[$id]['letzter'] = [
+                'zeitraum'    => (string) ($w['Bezeichnung'] ?? '') ?: 'Zeitraum '.$w['ID'],
+                'klasse'      => '',
+                'klassenende' => '',
+            ];
+            if (($w['Klasse'] ?? '') !== '') {
+                $klassen[$id][(string) $w['Klasse']] = true;
+            }
+        }
+        foreach ($klassen as $id => $liste) {
+            $namen = array_keys($liste);
+            natcasesort($namen);
+            $ergebnis[$id]['letzter']['klasse'] = 'Klassen '.implode(', ', $namen);
         }
 
         foreach ($ids as $id) {
