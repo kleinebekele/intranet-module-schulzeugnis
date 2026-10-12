@@ -8,6 +8,8 @@ rollen: zeugnis_admin, admin
 
 Die Schüler eines Schuljahres, jeder in genau einer Klasse.
 
+Über **Aus Linear importieren** kommen die Schüler des Schuljahres samt Klasse aus Linear – mit Vorschau, siehe Stammdaten-Import.
+
 ## Schüler haben kein Intranet-Konto
 
 Das ist eine bewusste Entscheidung: Ein Schüler ist hier ein Datensatz, kein Benutzer. Er

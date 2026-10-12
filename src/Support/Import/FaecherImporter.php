@@ -164,11 +164,11 @@ class FaecherImporter
     {
         $analyse = $this->analysiere($kopf, $zeilen, $kontext);
 
-        DB::transaction(function () use ($analyse): void {
+        DB::transaction(function () use ($analyse, $kontext): void {
             foreach ($analyse['zeilen'] as $r) {
                 if ($r['status'] === 'neu') {
                     Fach::create($r['apply']);
-                } elseif ($r['status'] === 'aktualisiert' && $r['ziel_id'] !== null) {
+                } elseif ($r['status'] === 'aktualisiert' && $r['ziel_id'] !== null && empty($kontext['nur_neu'])) {
                     Fach::whereKey($r['ziel_id'])->update($r['apply']);
                 }
             }

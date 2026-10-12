@@ -189,11 +189,11 @@ class KlasseImporter
     {
         $analyse = $this->analysiere($kopf, $zeilen, $kontext);
 
-        DB::transaction(function () use ($analyse): void {
+        DB::transaction(function () use ($analyse, $kontext): void {
             foreach ($analyse['zeilen'] as $r) {
                 if ($r['status'] === 'neu') {
                     $klasse = Klasse::create($r['apply']);
-                } elseif ($r['status'] === 'aktualisiert' && $r['ziel_id'] !== null) {
+                } elseif ($r['status'] === 'aktualisiert' && $r['ziel_id'] !== null && empty($kontext['nur_neu'])) {
                     $klasse = Klasse::find($r['ziel_id']);
                     $klasse?->update($r['apply']);
                 } else {

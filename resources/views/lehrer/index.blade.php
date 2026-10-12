@@ -8,10 +8,19 @@
                     <p class="text-sm text-gray-500">Schuljahr {{ $schuljahr->name }}</p>
                 </div>
             </div>
-            <a href="{{ route('module.schulzeugnis.lehrer.create', $schuljahr) }}"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                + Neuer Lehrer
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                @darfRoute('module.schulzeugnis.lehrer.linear.vorschau')
+                    <a href="{{ route('module.schulzeugnis.lehrer.linear.vorschau', $schuljahr) }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                       title="Lehrer dieses Schuljahres aus Linear lesen – mit Vorschau">
+                        <i class="bx bx-import text-base"></i> Aus Linear importieren
+                    </a>
+                @enddarfRoute
+                <a href="{{ route('module.schulzeugnis.lehrer.create', $schuljahr) }}"
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    + Neuer Lehrer
+                </a>
+            </div>
         </div>
     </x-slot>
 

@@ -12,6 +12,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\KlasseController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\KlassenraumController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrauftragController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\LehrerController;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\LinearImportController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuelerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SchuljahrController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\SpruchController;
@@ -113,6 +114,11 @@ Route::middleware(['web', 'auth', AlsLehrer::class])
         Route::get('schuljahre/{schuljahr}/klassen', [KlasseController::class, 'index'])->name('klassen.jahr');
         Route::get('schuljahre/{schuljahr}/klassen/neu', [KlasseController::class, 'create'])->name('klassen.create');
         Route::post('schuljahre/{schuljahr}/klassen', [KlasseController::class, 'store'])->name('klassen.store');
+        // „Aus Linear importieren" (Vorschau → Ausführen) – unter dem Namen der jeweiligen Seite.
+        Route::get('schuljahre/{schuljahr}/klassen/linear', [LinearImportController::class, 'klassenVorschau'])->name('klassen.linear.vorschau');
+        Route::post('schuljahre/{schuljahr}/klassen/linear', [LinearImportController::class, 'klassenAusfuehren'])->name('klassen.linear.ausfuehren');
+        Route::get('schuljahre/{schuljahr}/lehrauftraege/linear', [LinearImportController::class, 'lehrauftraegeVorschau'])->name('klassen.lehrauftraege.linear.vorschau');
+        Route::post('schuljahre/{schuljahr}/lehrauftraege/linear', [LinearImportController::class, 'lehrauftraegeAusfuehren'])->name('klassen.lehrauftraege.linear.ausfuehren');
         Route::get('klassen/{klasse}/bearbeiten', [KlasseController::class, 'edit'])->name('klassen.edit');
         Route::put('klassen/{klasse}', [KlasseController::class, 'update'])->name('klassen.update');
         Route::delete('klassen/{klasse}', [KlasseController::class, 'destroy'])->name('klassen.destroy');
@@ -129,6 +135,8 @@ Route::middleware(['web', 'auth', AlsLehrer::class])
         Route::get('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'index'])->name('schueler.jahr');
         Route::get('schuljahre/{schuljahr}/schueler/neu', [SchuelerController::class, 'create'])->name('schueler.create');
         Route::post('schuljahre/{schuljahr}/schueler', [SchuelerController::class, 'store'])->name('schueler.store');
+        Route::get('schuljahre/{schuljahr}/schueler/linear', [LinearImportController::class, 'schuelerVorschau'])->name('schueler.linear.vorschau');
+        Route::post('schuljahre/{schuljahr}/schueler/linear', [LinearImportController::class, 'schuelerAusfuehren'])->name('schueler.linear.ausfuehren');
         Route::get('schueler/{schueler}/bearbeiten', [SchuelerController::class, 'edit'])->name('schueler.edit');
         Route::put('schueler/{schueler}', [SchuelerController::class, 'update'])->name('schueler.update');
         Route::delete('schueler/{schueler}', [SchuelerController::class, 'destroy'])->name('schueler.destroy');
@@ -137,6 +145,8 @@ Route::middleware(['web', 'auth', AlsLehrer::class])
         Route::get('faecher', [FachController::class, 'index'])->name('faecher.index');
         Route::get('faecher/neu', [FachController::class, 'create'])->name('faecher.create');
         Route::post('faecher', [FachController::class, 'store'])->name('faecher.store');
+        Route::get('faecher/linear', [LinearImportController::class, 'faecherVorschau'])->name('faecher.linear.vorschau');
+        Route::post('faecher/linear', [LinearImportController::class, 'faecherAusfuehren'])->name('faecher.linear.ausfuehren');
         Route::get('faecher/{fach}/bearbeiten', [FachController::class, 'edit'])->name('faecher.edit');
         Route::put('faecher/{fach}', [FachController::class, 'update'])->name('faecher.update');
         Route::post('faecher/{fach}/archivieren', [FachController::class, 'toggle'])->name('faecher.toggle');
@@ -185,6 +195,8 @@ Route::middleware(['web', 'auth', AlsLehrer::class])
         Route::get('schuljahre/{schuljahr}/lehrer', [LehrerController::class, 'index'])->name('lehrer.jahr');
         Route::get('schuljahre/{schuljahr}/lehrer/neu', [LehrerController::class, 'create'])->name('lehrer.create');
         Route::post('schuljahre/{schuljahr}/lehrer', [LehrerController::class, 'store'])->name('lehrer.store');
+        Route::get('schuljahre/{schuljahr}/lehrer/linear', [LinearImportController::class, 'lehrerVorschau'])->name('lehrer.linear.vorschau');
+        Route::post('schuljahre/{schuljahr}/lehrer/linear', [LinearImportController::class, 'lehrerAusfuehren'])->name('lehrer.linear.ausfuehren');
         Route::get('lehrer/{lehrer}/bearbeiten', [LehrerController::class, 'edit'])->name('lehrer.edit');
         Route::put('lehrer/{lehrer}', [LehrerController::class, 'update'])->name('lehrer.update');
         Route::delete('lehrer/{lehrer}', [LehrerController::class, 'destroy'])->name('lehrer.destroy');

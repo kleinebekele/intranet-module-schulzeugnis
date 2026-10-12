@@ -9,6 +9,27 @@ rollen: zeugnis_admin, admin
 Klassen, Lehrer, Schüler, Fächer und Lehraufträge aus dem Schulverwaltungsprogramm
 übernehmen, statt sie abzutippen. Fünf Import-Arten, jede mit eigenen Spalten.
 
+## Direkt aus Linear
+
+Ohne Datei geht es über die Knöpfe **Aus Linear importieren** auf den Seiten Fächer, Lehrer,
+Klassen (dort auch **Lehraufträge aus Linear**) und Schüler. Das Modul liest den
+Linear-Zeitraum des Schuljahres und zeigt dieselbe Vorschau wie beim Datei-Import. Danach
+haben Sie die Wahl:
+
+- **Neue übernehmen** – legt nur an, was hier noch fehlt. Abweichende Angaben bleiben, wie sie
+  hier gepflegt sind.
+- **Neue + Änderungen übernehmen** – ersetzt zusätzlich die abweichenden Angaben durch die aus
+  Linear (z. B. Klassenwechsel, korrigierte Namen).
+- **Abbrechen** – es passiert nichts.
+
+Gelöscht wird auch hier nie. Was es hier gibt, in Linear aber nicht, steht in der Vorschau
+nur als Hinweis. Den Klassenlehrer übernimmt der Import nicht, weil Linear ihn nicht
+verlässlich führt – er bleibt Handpflege an der Klasse.
+
+Ist ein Schuljahr noch nicht mit Linear verknüpft, sucht das Modul den Zeitraum mit
+demselben Namen. Gibt es keinen, wählen Sie ihn aus. Die Verknüpfung wird beim ersten Import
+gespeichert. Fächer lesen den Zeitraum des aktiven Schuljahres.
+
 ## Immer erst der Trockenlauf
 
 Der Ablauf ist bei jeder Art derselbe:

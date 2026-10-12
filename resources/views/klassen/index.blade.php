@@ -8,10 +8,26 @@
                     <p class="text-sm text-gray-500">Schuljahr {{ $schuljahr->name }}</p>
                 </div>
             </div>
-            <a href="{{ route('module.schulzeugnis.klassen.create', $schuljahr) }}"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                + Neue Klasse
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                @darfRoute('module.schulzeugnis.klassen.linear.vorschau')
+                    <a href="{{ route('module.schulzeugnis.klassen.linear.vorschau', $schuljahr) }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                       title="Klassen dieses Schuljahres aus Linear lesen – mit Vorschau">
+                        <i class="bx bx-import text-base"></i> Klassen aus Linear
+                    </a>
+                @enddarfRoute
+                @darfRoute('module.schulzeugnis.klassen.lehrauftraege.linear.vorschau')
+                    <a href="{{ route('module.schulzeugnis.klassen.lehrauftraege.linear.vorschau', $schuljahr) }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                       title="Lehraufträge (Fach × Lehrer je Klasse) aus Linear lesen – mit Vorschau">
+                        <i class="bx bx-import text-base"></i> Lehraufträge aus Linear
+                    </a>
+                @enddarfRoute
+                <a href="{{ route('module.schulzeugnis.klassen.create', $schuljahr) }}"
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    + Neue Klasse
+                </a>
+            </div>
         </div>
     </x-slot>
 

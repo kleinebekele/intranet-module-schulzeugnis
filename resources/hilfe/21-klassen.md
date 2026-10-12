@@ -9,6 +9,8 @@ rollen: zeugnis_admin, admin
 Klassen gehören zu **genau einem** Schuljahr. Die 5a von 2026/27 und die 5a von 2027/28 sind
 zwei verschiedene Klassen mit eigenen Schülern, eigenen Lehraufträgen und eigenen Zeugnissen.
 
+Klassen und Lehraufträge lassen sich über **Klassen aus Linear** bzw. **Lehraufträge aus Linear** übernehmen – mit Vorschau, siehe Stammdaten-Import.
+
 ## Was eine Klasse festlegt
 
 - **Klassenlehrer** – sie schreiben Haupttext, Hauptzeugnis und Zeugnisspruch. Eine Klasse

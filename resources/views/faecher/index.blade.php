@@ -5,10 +5,19 @@
                 <x-module-icon name="list" class="text-2xl text-indigo-600" />
                 <h1 class="text-xl font-semibold text-gray-800">Fächer</h1>
             </div>
-            <a href="{{ route('module.schulzeugnis.faecher.create') }}"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                + Neues Fach
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                @darfRoute('module.schulzeugnis.faecher.linear.vorschau')
+                    <a href="{{ route('module.schulzeugnis.faecher.linear.vorschau') }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                       title="Fächer des aktiven Schuljahres aus Linear lesen – mit Vorschau">
+                        <i class="bx bx-import text-base"></i> Fächer aus Linear
+                    </a>
+                @enddarfRoute
+                <a href="{{ route('module.schulzeugnis.faecher.create') }}"
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    + Neues Fach
+                </a>
+            </div>
         </div>
     </x-slot>
 

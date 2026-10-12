@@ -9,6 +9,8 @@ rollen: zeugnis_admin, admin
 Der Fächerkatalog – **jahresübergreifend**. Anders als Klassen, Lehrer und Schüler werden
 Fächer nur einmal gepflegt und in jedem Schuljahr weiterverwendet.
 
+Über **Fächer aus Linear** kommen die Fächer, die im aktiven Schuljahr in Linear vorkommen – mit Vorschau, siehe Stammdaten-Import.
+
 ## Kürzel und Reihenfolge
 
 Das **Kürzel** ist der Wiedererkennungs-Schlüssel beim Import: Ein Fach mit demselben Kürzel

@@ -15,6 +15,7 @@ use Intranet\Modules\Schulzeugnis\Support\Import\LehrauftragImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\LehrerImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\SchuelerImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\SchuljahrImporter;
+use Intranet\Modules\Schulzeugnis\Support\Linear\LinearQuelle;
 
 /**
  * Überträgt die Schuljahres-Stammdaten aus Linear ins Zeugnis-Modul.
@@ -117,6 +118,9 @@ class ZeugnisImport extends EkkonTask
     /** Akteur-Schnappschuss für das Zeugnis-Protokoll (Cron hat keinen auth()-User). */
     private const AKTEUR = 'System (Linear-Abgleich)';
 
+    /** Gemeinsame Linear-Leser (auch für die Import-Knöpfe der Verwaltungsseiten). */
+    private ?LinearQuelle $quelle = null;
+
     public function schedule(): string
     {
         return '0 4 * * *'; // nach Linear/BenutzerImport (03:30), s. Klassen-Docblock
@@ -147,7 +151,7 @@ class ZeugnisImport extends EkkonTask
             $this->msg('PROBELAUF – es wird nichts geschrieben. Zum Scharfschalten das Häkchen oben unter „Einstellungen" entfernen.');
         }
 
-        $zeitraeume = $this->zeitraeumeAusLinear();
+        $zeitraeume = $this->quelle()->zeitraeume();
         $this->debug['zeitraeume'] = $zeitraeume;
 
         $kandidaten = $this->kandidaten($zeitraeume);
@@ -207,7 +211,7 @@ class ZeugnisImport extends EkkonTask
                 ?? Schuljahr::where('name', $name)->first();
 
             if (! $sj) {
-                $roh = $this->rohzahlen($z['id']);
+                $roh = $this->quelle()->rohzahlen($z['id']);
                 $this->msg("„{$name}“ würde neu angelegt (inaktiv) – Rohdaten aus Linear: "
                     ."{$roh['faecher']} Fächer, {$roh['lehrer']} Lehrer, {$roh['klassen']} Klassen, "
                     ."{$roh['schueler']} Schüler, {$roh['lehrauftraege']} Lehraufträge. "
@@ -270,6 +274,9 @@ class ZeugnisImport extends EkkonTask
             }
         }
 
+        // Auffälligkeiten der Leser (Ausgetretene, unlesbare Daten …) in die Lauf-Historie.
+        $this->debug = array_replace($this->debug, $this->quelle()->debug);
+
         return [
             'probelauf'          => $probelauf,
             'zeitraeume_gelesen' => count($zeitraeume),
@@ -278,35 +285,6 @@ class ZeugnisImport extends EkkonTask
             'gesamt'             => $gesamt,
             'je_schuljahr'       => $jeSchuljahr,
         ];
-    }
-
-    /**
-     * Alle Zeiträume aus Linear, mit Schülerzahl als Relevanz-Signal.
-     *
-     * @return array<int,array<string,mixed>>
-     */
-    private function zeitraeumeAusLinear(): array
-    {
-        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-            'SELECT z.ID, z.Bezeichnung, z.Art, z.Von, z.Bis, z.Jahrgang,
-                    (SELECT COUNT(*) FROM WD_Schl s WHERE s.ID = z.ID) AS SchuelerZahl
-               FROM WD_Zeitraum z
-              ORDER BY z.ID'
-        );
-
-        return array_map(function (object $zeile): array {
-            $w = $this->normalisiere($zeile);
-
-            return [
-                'id'            => (int) $w['ID'],
-                'bezeichnung'   => (string) ($w['Bezeichnung'] ?? ''),
-                'art'           => (string) ($w['Art'] ?? ''),
-                'von'           => $this->datum($w['Von'] ?? ''),
-                'bis'           => $this->datum($w['Bis'] ?? ''),
-                'jahrgang'      => (string) ($w['Jahrgang'] ?? ''),
-                'schueler_zahl' => (int) ($w['SchuelerZahl'] ?? 0),
-            ];
-        }, $zeilen);
     }
 
     /**
@@ -341,8 +319,7 @@ class ZeugnisImport extends EkkonTask
     /** @param array<string,mixed> $z */
     private function schuljahrName(array $z): string
     {
-        return $z['bezeichnung'] !== '' ? $z['bezeichnung']
-            : ($z['jahrgang'] !== '' ? $z['jahrgang'] : 'Zeitraum '.$z['id']);
+        return LinearQuelle::zeitraumName($z);
     }
 
     /**
@@ -353,11 +330,11 @@ class ZeugnisImport extends EkkonTask
     private function stammdatenAbgleichen(Schuljahr $sj, int $zid, bool $probelauf): array
     {
         $daten = [
-            'faecher'       => $this->faecherAusLinear($zid),
-            'lehrer'        => $this->lehrerAusLinear($zid),
-            'klassen'       => $this->klassenAusLinear($zid),
-            'schueler'      => $this->schuelerAusLinear($zid),
-            'lehrauftraege' => $this->lehrauftraegeAusLinear($zid),
+            'faecher'       => $this->quelle()->faecher($zid),
+            'lehrer'        => $this->quelle()->lehrer($zid),
+            'klassen'       => $this->quelle()->klassen($zid),
+            'schueler'      => $this->quelle()->schueler($zid),
+            'lehrauftraege' => $this->quelle()->lehrauftraege($zid),
         ];
 
         $kontext = ['schuljahr_id' => $sj->id, 'akteur_name' => self::AKTEUR];
@@ -379,293 +356,8 @@ class ZeugnisImport extends EkkonTask
         return $zaehl;
     }
 
-    /**
-     * Nur die im Jahr tatsächlich referenzierten Fächer – WD_Fach komplett zu
-     * importieren würde den gepflegten Fächerkatalog mit Altlast fluten.
-     * Bewusst ohne Kürzel: Der FaecherImporter matcht bevorzugt über das Kürzel,
-     * ein numerischer Linear-Schlüssel würde gepflegte Kürzel („Ma") überschreiben.
-     * Der Name ist zugleich der Schlüssel, über den der LehrauftragImporter das
-     * Fach auflöst – die Kette bleibt in sich konsistent.
-     *
-     * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
-     */
-    private function faecherAusLinear(int $zid): array
+    private function quelle(): LinearQuelle
     {
-        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-            'SELECT f.Fach, f.Bezeichnung
-               FROM WD_Fach f
-              WHERE f.Fach IN (SELECT kf.Fach FROM WD_KlFach kf WHERE kf.ID = ?)
-                 OR f.Fach IN (SELECT lf.Fach FROM WD_LehrFach lf WHERE lf.ID = ?)',
-            [$zid, $zid],
-        );
-
-        $ergebnis = [];
-        $gesehen  = [];
-        foreach ($zeilen as $zeile) {
-            $w    = $this->normalisiere($zeile);
-            $name = (string) ($w['Bezeichnung'] ?? '');
-            // Ohne Bezeichnung unbrauchbar; zwei Fach-Nummern mit gleichem Namen
-            // wären für den Importer ein Datei-Duplikat – vorab zusammenziehen.
-            if ($name === '' || isset($gesehen[mb_strtolower($name)])) {
-                continue;
-            }
-            $gesehen[mb_strtolower($name)] = true;
-            $ergebnis[] = ['name' => $name];
-        }
-
-        return [['name'], $ergebnis];
-    }
-
-    /**
-     * Alle im Jahr vorkommenden Lehrkräfte (Klassenzuordnung ∪ Lehraufträge).
-     * AdrNr wird quell_id – dieselbe ID, die der BenutzerImport als
-     * users.externe_id setzt; darüber löst der LehrerImporter das Konto auf.
-     *
-     * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
-     */
-    private function lehrerAusLinear(int $zid): array
-    {
-        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-            'SELECT a.AdrNr, a.Vorname, a.Nachname
-               FROM Adresse a
-              WHERE a.AdrNr IN (SELECT l.AdrNr FROM WD_Lehrer l WHERE l.ID = ?)
-                 OR a.AdrNr IN (SELECT lf.AdrNr FROM WD_LehrFach lf WHERE lf.ID = ?)',
-            [$zid, $zid],
-        );
-
-        $ergebnis = [];
-        foreach ($zeilen as $zeile) {
-            $w = $this->normalisiere($zeile);
-            // Zeilen ohne Namen laufen durch und zählen im Importer als Fehler –
-            // solche Adressen sollen auffallen, nicht verschwinden.
-            $ergebnis[] = [
-                'quellid'  => (string) (int) $w['AdrNr'],
-                'vorname'  => (string) ($w['Vorname'] ?? ''),
-                'nachname' => (string) ($w['Nachname'] ?? ''),
-            ];
-        }
-
-        return [['quellid', 'vorname', 'nachname'], $ergebnis];
-    }
-
-    /**
-     * Klassen = Schülerbestand des Jahres (WD_Schl gruppiert); Stufe aus WD_Schl.
-     * Bewusst ohne Format- und Klassenlehrer-Spalte: Fehlt eine Spalte, lässt
-     * der KlasseImporter das Feld unangetastet – genau das gewünschte „nie
-     * leeren". Der Klassenlehrer bleibt Handpflege im Zeugnis-Modul, weil
-     * WD_Lehrer.Funktion in Linear nicht gepflegt ist.
-     *
-     * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
-     */
-    private function klassenAusLinear(int $zid): array
-    {
-        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-            'SELECT s.Klasse, MIN(s.Stufe) AS Stufe, COUNT(*) AS SchuelerZahl
-               FROM WD_Schl s
-              WHERE s.ID = ?
-              GROUP BY s.Klasse',
-            [$zid],
-        );
-
-        $ergebnis = [];
-        foreach ($zeilen as $zeile) {
-            $w      = $this->normalisiere($zeile);
-            $klasse = (string) ($w['Klasse'] ?? '');
-            if ($klasse === '') {
-                continue;
-            }
-            $ergebnis[] = [
-                'klasse' => $klasse,
-                'stufe'  => (string) ($w['Stufe'] ?? ''),
-            ];
-        }
-
-        return [['klasse', 'stufe'], $ergebnis];
-    }
-
-    /**
-     * Schüler des Jahres samt Personendaten. Zeilen mit AustrittKl werden
-     * MITimportiert (additiv, nie ausdünnen), aber im Debug gelistet – ob
-     * Ausgetretene stören, entscheidet sich nach dem ersten Probelauf.
-     *
-     * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
-     */
-    private function schuelerAusLinear(int $zid): array
-    {
-        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-            'SELECT s.Klasse, s.AdrNr, s.AustrittKl,
-                    a.Vorname, a.Nachname, a.Geburtsdatum, a.Geburtsort, a.Geschlecht, a.MW
-               FROM WD_Schl s
-               JOIN Adresse a ON a.AdrNr = s.AdrNr
-              WHERE s.ID = ?',
-            [$zid],
-        );
-
-        $ergebnis    = [];
-        $ausgetreten = [];
-        foreach ($zeilen as $zeile) {
-            $w        = $this->normalisiere($zeile);
-            $vorname  = (string) ($w['Vorname'] ?? '');
-            $nachname = (string) ($w['Nachname'] ?? '');
-
-            $ergebnis[] = [
-                'schuelerid'   => (string) (int) $w['AdrNr'],
-                'klasse'       => (string) ($w['Klasse'] ?? ''),
-                'vorname'      => $vorname,
-                'nachname'     => $nachname,
-                'geburtsdatum' => $this->datum($w['Geburtsdatum'] ?? ''),
-                'geburtsort'   => (string) ($w['Geburtsort'] ?? ''),
-                'geschlecht'   => $this->geschlecht($w),
-            ];
-
-            $austritt = $this->datum($w['AustrittKl'] ?? '');
-            if ($austritt !== '' && count($ausgetreten) < 50) {
-                $ausgetreten[] = trim("{$vorname} {$nachname}").' ('.($w['Klasse'] ?? '?').', Austritt '.$austritt.')';
-            }
-        }
-
-        if ($ausgetreten !== []) {
-            $this->debug['ausgetreten'][$zid] = $ausgetreten;
-        }
-
-        return [['schuelerid', 'klasse', 'vorname', 'nachname', 'geburtsdatum', 'geburtsort', 'geschlecht'], $ergebnis];
-    }
-
-    /**
-     * Lehraufträge des Jahres. Fach über die Bezeichnung (konsistent zum
-     * Fächer-Import ohne Kürzel), Lehrer über die AdrNr (= quell_id).
-     *
-     * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
-     */
-    private function lehrauftraegeAusLinear(int $zid): array
-    {
-        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-            'SELECT lf.Klasse, lf.AdrNr, f.Bezeichnung
-               FROM WD_LehrFach lf
-               JOIN WD_Fach f ON f.Fach = lf.Fach
-              WHERE lf.ID = ?',
-            [$zid],
-        );
-
-        $ergebnis = [];
-        foreach ($zeilen as $zeile) {
-            $w = $this->normalisiere($zeile);
-            $ergebnis[] = [
-                'klasse'   => (string) ($w['Klasse'] ?? ''),
-                'fach'     => (string) ($w['Bezeichnung'] ?? ''),
-                'lehrerid' => (string) (int) $w['AdrNr'],
-            ];
-        }
-
-        return [['klasse', 'fach', 'lehrerid'], $ergebnis];
-    }
-
-    /**
-     * Rohzahlen für ein Jahr, das erst noch angelegt würde (Probelauf).
-     *
-     * @return array<string,int>
-     */
-    private function rohzahlen(int $zid): array
-    {
-        $db   = DB::connection(Ekkon::mssqlConnection());
-        $eins = fn (string $sql, array $bindings): int => (int) ($db->select($sql, $bindings)[0]->n ?? 0);
-
-        return [
-            'faecher' => $eins(
-                'SELECT COUNT(DISTINCT f.Bezeichnung) AS n FROM WD_Fach f
-                  WHERE f.Fach IN (SELECT kf.Fach FROM WD_KlFach kf WHERE kf.ID = ?)
-                     OR f.Fach IN (SELECT lf.Fach FROM WD_LehrFach lf WHERE lf.ID = ?)',
-                [$zid, $zid],
-            ),
-            'lehrer' => $eins(
-                'SELECT COUNT(*) AS n FROM Adresse a
-                  WHERE a.AdrNr IN (SELECT l.AdrNr FROM WD_Lehrer l WHERE l.ID = ?)
-                     OR a.AdrNr IN (SELECT lf.AdrNr FROM WD_LehrFach lf WHERE lf.ID = ?)',
-                [$zid, $zid],
-            ),
-            'klassen'       => $eins('SELECT COUNT(DISTINCT s.Klasse) AS n FROM WD_Schl s WHERE s.ID = ?', [$zid]),
-            'schueler'      => $eins('SELECT COUNT(*) AS n FROM WD_Schl s WHERE s.ID = ?', [$zid]),
-            'lehrauftraege' => $eins('SELECT COUNT(*) AS n FROM WD_LehrFach lf WHERE lf.ID = ?', [$zid]),
-        ];
-    }
-
-    /**
-     * Rohzeile in saubere Werte übersetzen.
-     *
-     * ODBC liefert SQL-NULL als leeren String, Zahlen als String und char(n)-
-     * Spalten Blank-gepolstert – deshalb wird hier einmal an der Grenze
-     * aufgeräumt, statt später überall zu raten.
-     *
-     * @return array<string,mixed>
-     */
-    private function normalisiere(object $zeile): array
-    {
-        return array_map(
-            fn ($wert) => is_string($wert) ? trim($wert) : $wert,
-            (array) $zeile,
-        );
-    }
-
-    /**
-     * Datetime-Rohwert (z. B. "2025-08-01 00:00:00.000") → "Y-m-d" oder ''.
-     * Unlesbares wird gezählt statt geraten – ein Falschdatum wäre schlimmer
-     * als ein leeres Feld.
-     */
-    private function datum(mixed $roh): string
-    {
-        if ($roh instanceof \DateTimeInterface) {
-            return $roh->format('Y-m-d');
-        }
-
-        $roh = is_string($roh) ? trim($roh) : '';
-        if ($roh === '') {
-            return '';
-        }
-
-        $kurz = substr($roh, 0, 10);
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $kurz)) {
-            return $kurz;
-        }
-
-        try {
-            return (new \DateTimeImmutable($roh))->format('Y-m-d');
-        } catch (\Exception) {
-            $this->debug['datum_unlesbar'][$roh] = ($this->debug['datum_unlesbar'][$roh] ?? 0) + 1;
-
-            return '';
-        }
-    }
-
-    /**
-     * Geschlecht aus den zwei konkurrierenden Linear-Spalten (Geschlecht, MW).
-     * Der erste mappbare Wert gewinnt; Unmappbares bleibt leer (kein Warnungs-
-     * Rauschen im Importer) und wird im Debug gezählt – die Semantik der beiden
-     * Spalten lernt man aus dem ersten Probelauf.
-     *
-     * @param array<string,mixed> $werte
-     */
-    private function geschlecht(array $werte): string
-    {
-        foreach (['Geschlecht', 'MW'] as $spalte) {
-            $roh = mb_strtolower((string) ($werte[$spalte] ?? ''));
-            if ($roh === '') {
-                continue;
-            }
-
-            $wert = match ($roh) {
-                'm', 'männlich', 'maennlich', 'male', 'junge' => 'm',
-                'w', 'f', 'weiblich', 'female', 'mädchen', 'maedchen' => 'w',
-                'd', 'divers', 'diverse', 'x' => 'd',
-                default => null,
-            };
-            if ($wert !== null) {
-                return $wert;
-            }
-
-            $key = "{$spalte}={$roh}";
-            $this->debug['geschlecht_unbekannt'][$key] = ($this->debug['geschlecht_unbekannt'][$key] ?? 0) + 1;
-        }
-
-        return '';
+        return $this->quelle ??= new LinearQuelle();
     }
 }

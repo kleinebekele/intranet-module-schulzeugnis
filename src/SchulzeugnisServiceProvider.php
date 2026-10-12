@@ -123,6 +123,13 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             // (MODULES.md im Core, „Zugriffsstufen").
             ->lesend('import.vorschau', 'altumwandeln.zeugnisse', 'altumwandeln.fachzeugnisse') // prüfen/umwandeln ohne Speichern
             ->stufe(Zugriffsstufe::Verwalten, 'import.ausfuehren', 'formate.duplicate', 'lehrer.als') // legen an / als Lehrkraft
-            ->stufe(Zugriffsstufe::Bearbeiten, 'beispieltexte.reset');                           // setzt nur zurück
+            ->stufe(Zugriffsstufe::Bearbeiten, 'beispieltexte.reset')                            // setzt nur zurück
+            // „Aus Linear importieren": schon die Vorschau liest Linear – nur für Verwaltende.
+            ->stufe(Zugriffsstufe::Verwalten,
+                'faecher.linear.vorschau', 'faecher.linear.ausfuehren',
+                'lehrer.linear.vorschau', 'lehrer.linear.ausfuehren',
+                'klassen.linear.vorschau', 'klassen.linear.ausfuehren',
+                'klassen.lehrauftraege.linear.vorschau', 'klassen.lehrauftraege.linear.ausfuehren',
+                'schueler.linear.vorschau', 'schueler.linear.ausfuehren');
     }
 }

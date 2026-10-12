@@ -9,6 +9,8 @@ rollen: zeugnis_admin, admin
 Die Lehrkräfte eines Schuljahres. Sie sind mit ihrem Intranet-Konto verknüpft – aber nur
 **lose**.
 
+Über **Aus Linear importieren** kommen die Lehrkräfte des Schuljahres aus Linear – mit Vorschau, siehe Stammdaten-Import.
+
 ## Was „lose verknüpft" heißt
 
 Der Lehrer-Datensatz merkt sich die Benutzer-ID, mehr nicht. Es gibt keinen Fremdschlüssel
