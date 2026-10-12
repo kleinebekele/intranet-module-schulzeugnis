@@ -12,8 +12,10 @@ Die Schüler eines Schuljahres, jeder in genau einer Klasse.
 
 ## Ausgetretene Schüler
 
-Das Austrittsdatum kommt beim Linear-Import mit und lässt sich am Schüler auch von Hand
-eintragen. Entscheidend ist das **Schuljahresende** (gepflegt am Schuljahr, sonst der 31.07.):
+Linear führt bei jedem Kind ein Ende der Klassenzugehörigkeit – fast immer den regulären
+letzten Schultag. Als **Austritt** übernimmt der Linear-Import nur ein Datum **davor**, also
+Kinder, die unterm Jahr gegangen sind. Von Hand (oder per CSV-Spalte „Austritt") lässt sich
+das Datum ebenfalls eintragen. Entscheidend ist das **Schuljahresende** (gepflegt am Schuljahr, sonst der 31.07.):
 
 - Austritt **zum Schuljahresende oder später**: Das Kind bekommt sein Zeugnis ganz normal –
   das Datum ist nur eine Info.
@@ -22,7 +24,7 @@ eintragen. Entscheidend ist das **Schuljahresende** (gepflegt am Schuljahr, sons
   gesperrt genannt. Bereits geschriebene Texte bleiben erhalten.
 
 Die Sperre lässt sich unter **Bearbeiten** aufheben (oder von Hand setzen). Ein späterer
-Import ändert sie nur, wenn sich das Austrittsdatum in Linear ändert.
+Import ändert sie nur, wenn sich das Austrittsdatum ändert.
 
 ## Schüler haben kein Intranet-Konto
 

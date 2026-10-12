@@ -86,7 +86,7 @@
                     <input type="date" name="austritt_am" id="austritt_am"
                            value="{{ old('austritt_am', $schueler->austritt_am?->format('Y-m-d')) }}"
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <p class="mt-1 text-xs text-gray-400">Kommt beim Linear-Import mit.</p>
+                    <p class="mt-1 text-xs text-gray-400">Linear liefert es nur bei Austritt vor dem regulären Klassenende.</p>
                     @error('austritt_am') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
                 <div class="sm:pt-6">

@@ -180,16 +180,19 @@ class LinearQuelle
     }
 
     /**
-     * Schüler des Jahres samt Personendaten und Austrittsdatum (AustrittKl). Ausgetretene
-     * werden mitimportiert; ob sie ein Zeugnis bekommen, entscheidet der SchuelerImporter
-     * am Schuljahresende (früher ausgetreten → gesperrt).
+     * Schüler des Jahres samt Personendaten und – nur wenn es eins gibt – Austritt.
+     *
+     * `WD_Schl.AustrittKl` ist das Ende der Klassenzugehörigkeit im Zeitraum: Bei fast
+     * jedem Kind steht dort der reguläre letzte Schultag (Fehlgriff v1.6.0: alle galten
+     * als ausgetreten). Als Austritt zählt deshalb nur ein Datum VOR diesem regulären
+     * Klassenende – das häufigste AustrittKl des Zeitraums. Alles andere bleibt leer.
      *
      * @return array{0: array<int,string>, 1: array<int,array<string,string>>}
      */
     public function schueler(int $zid): array
     {
         $zeilen = $this->db()->select(
-            'SELECT s.Klasse, s.AdrNr, s.AustrittKl,
+            'SELECT s.Klasse, s.AdrNr, CONVERT(varchar(10), s.AustrittKl, 120) AS AustrittKl,
                     a.Vorname, a.Nachname, a.Geburtsdatum, a.Geburtsort, a.Geschlecht, a.MW
                FROM WD_Schl s
                JOIN Adresse a ON a.AdrNr = s.AdrNr
@@ -197,12 +200,12 @@ class LinearQuelle
             [$zid],
         );
 
-        $ergebnis    = [];
-        $ausgetreten = [];
+        $ergebnis = [];
         foreach ($zeilen as $zeile) {
             $w        = $this->normalisiere($zeile);
             $vorname  = (string) ($w['Vorname'] ?? '');
             $nachname = (string) ($w['Nachname'] ?? '');
+            $ende     = $this->datum($w['AustrittKl'] ?? '');
 
             $ergebnis[] = [
                 'schuelerid'   => (string) (int) $w['AdrNr'],
@@ -212,20 +215,35 @@ class LinearQuelle
                 'geburtsdatum' => $this->datum($w['Geburtsdatum'] ?? ''),
                 'geburtsort'   => (string) ($w['Geburtsort'] ?? ''),
                 'geschlecht'   => $this->geschlecht($w),
-                'austritt'     => $this->datum($w['AustrittKl'] ?? ''),
+                'austritt'     => $ende, // unten auf echte Austritte reduziert
             ];
-
-            $austritt = $ergebnis[array_key_last($ergebnis)]['austritt'];
-            if ($austritt !== '') {
-                $ausgetreten[] = trim("{$vorname} {$nachname}").' ('.($w['Klasse'] ?? '?').', Austritt '.$austritt.')';
-            }
         }
 
-        if ($ausgetreten !== []) {
-            $this->debug['ausgetreten'][$zid] = $ausgetreten;
-        }
+        [$ergebnis, $this->debug['klassenende'][$zid]] = self::nurEchteAustritte($ergebnis);
 
         return [['schuelerid', 'klasse', 'vorname', 'nachname', 'geburtsdatum', 'geburtsort', 'geschlecht', 'austritt'], $ergebnis];
+    }
+
+    /**
+     * Reguläres Klassenende = häufigstes AustrittKl; nur frühere Daten bleiben als Austritt.
+     *
+     * @param  array<int,array<string,string>>  $zeilen
+     * @return array{0: array<int,array<string,string>>, 1: ?string}  [Zeilen, reguläres Ende]
+     */
+    public static function nurEchteAustritte(array $zeilen): array
+    {
+        $haeufigkeit = array_count_values(array_filter(array_column($zeilen, 'austritt'), fn ($d) => $d !== ''));
+        arsort($haeufigkeit);
+        $regulaer = array_key_first($haeufigkeit);
+
+        foreach ($zeilen as &$r) {
+            if ($r['austritt'] !== '' && $regulaer !== null && $r['austritt'] >= $regulaer) {
+                $r['austritt'] = '';
+            }
+        }
+        unset($r);
+
+        return [$zeilen, $regulaer === null ? null : (string) $regulaer];
     }
 
     /**
