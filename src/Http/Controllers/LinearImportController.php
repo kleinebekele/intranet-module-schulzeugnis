@@ -120,6 +120,12 @@ class LinearImportController
             if ($art === 'schueler') {
                 $analyse['infos'][] = $this->fehlendeSchuelerInLinear($schuljahr, $zeilen, $quelle);
             }
+            // Je Zeile ein Schlüssel auf den Linear-Datensatz – für „nur diese Zeile übernehmen".
+            foreach ($analyse['zeilen'] as &$r) {
+                $roh = $zeilen[$r['zeile'] - 2] ?? null;
+                $r['schluessel'] = $roh !== null ? $this->schluessel($roh) : null;
+            }
+            unset($r);
         } catch (ImportFehler $e) {
             return $this->zurueck($art, $schuljahr)->with('error', $e->getMessage());
         } catch (\Throwable $e) {
@@ -151,10 +157,10 @@ class LinearImportController
 
         $data = $request->validate([
             'zeitraum' => ['required', 'integer', 'min:1'],
-            'modus'    => ['required', 'in:neu,alles'],
+            'nur'      => ['nullable', 'string', 'size:32'], // Schlüssel EINER Zeile; leer = alle
         ]);
-        $zid    = (int) $data['zeitraum'];
-        $nurNeu = $data['modus'] === 'neu';
+        $zid = (int) $data['zeitraum'];
+        $nur = $data['nur'] ?? null;
 
         // Ein verknüpftes Schuljahr importiert nur aus seinem eigenen Zeitraum.
         if ($schuljahr->quell_id !== null && $schuljahr->quell_id !== '' && (int) $schuljahr->quell_id !== $zid) {
@@ -164,9 +170,15 @@ class LinearImportController
         try {
             $quelle = app(LinearQuelle::class);
             [$kopf, $zeilen] = $quelle->daten($art, $zid);
+            if ($nur !== null) {
+                $zeilen = array_values(array_filter($zeilen, fn (array $z) => $this->schluessel($z) === $nur));
+                if ($zeilen === []) {
+                    return redirect()->to($this->url($art, 'vorschau', $schuljahr, $zid))
+                        ->with('error', 'Dieser Datensatz hat sich in Linear inzwischen geändert – die Vorschau ist neu geladen.');
+                }
+            }
             $ergebnis = $this->importer($art)->importiere($kopf, $zeilen, [
                 'schuljahr_id' => $schuljahr->id,
-                'nur_neu'      => $nurNeu,
                 'quelle_label' => 'Linear',
             ]);
         } catch (ImportFehler $e) {
@@ -183,15 +195,30 @@ class LinearImportController
             $schuljahr->update(['quell_id' => (string) $zid]);
         }
 
-        if ($nurNeu) {
-            $ergebnis = $this->aenderungenAlsNichtUebernommen($ergebnis);
+        // Einzelne Zeile: zurück in die (neu geladene) Vorschau, mit Rückmeldung.
+        if ($nur !== null) {
+            $r = $ergebnis['zeilen'][0] ?? null;
+            $z   = $r['zellen'] ?? [];
+            $was = match ($art) {
+                'schueler'      => $z[1] ?? '',
+                'lehrer'        => trim(($z[1] ?? '').' '.($z[2] ?? '')),
+                'lehrauftraege' => implode(' · ', array_slice($z, 0, 3)),
+                default         => $z[0] ?? '',
+            };
+            $wie = match ($r['status'] ?? '') {
+                'neu'          => 'angelegt',
+                'aktualisiert' => 'aktualisiert',
+                default        => 'unverändert (nichts zu tun)',
+            };
+
+            return redirect()->to($this->url($art, 'vorschau', $schuljahr))
+                ->with('status', trim("{$was} {$wie}."));
         }
 
         return view('schulzeugnis::linear.ergebnis', [
             'meta'       => $meta,
             'schuljahr'  => $schuljahr,
             'ergebnis'   => $ergebnis,
-            'nurNeu'     => $nurNeu,
             'zurueckUrl' => $this->zurueckUrl($art, $schuljahr),
         ]);
     }
@@ -292,22 +319,10 @@ class LinearImportController
             : Schuljahr::where('is_active', true)->first();
     }
 
-    /** Bei „nur neue": nicht übernommene Änderungen im Ergebnis als unverändert zeigen. */
-    private function aenderungenAlsNichtUebernommen(array $ergebnis): array
+    /** Stabiler Schlüssel eines Linear-Datensatzes (Vorschau ↔ Ausführen). @param array<string,string> $zeile */
+    private function schluessel(array $zeile): string
     {
-        $anzahl = 0;
-        foreach ($ergebnis['zeilen'] as &$r) {
-            if ($r['status'] === 'aktualisiert') {
-                $r['status']  = 'unveraendert';
-                $r['hinweis'] = 'Änderung nicht übernommen: '.$r['hinweis'];
-                $anzahl++;
-            }
-        }
-        unset($r);
-        $ergebnis['zaehl']['aktualisiert'] -= $anzahl;
-        $ergebnis['zaehl']['unveraendert'] += $anzahl;
-
-        return $ergebnis;
+        return md5(json_encode($zeile, JSON_UNESCAPED_UNICODE));
     }
 
     private function importer(string $art): object
@@ -317,13 +332,14 @@ class LinearImportController
         return new $klasse();
     }
 
-    private function url(string $art, string $schritt, ?Schuljahr $schuljahr): string
+    private function url(string $art, string $schritt, ?Schuljahr $schuljahr, ?int $zeitraum = null): string
     {
-        $name = 'module.schulzeugnis.'.self::ARTEN[$art]['route'].'.linear.'.$schritt;
+        $name  = 'module.schulzeugnis.'.self::ARTEN[$art]['route'].'.linear.'.$schritt;
+        $extra = $zeitraum ? ['zeitraum' => $zeitraum] : [];
 
         return $art === 'faecher'
-            ? route($name, $schuljahr ? ['schuljahr' => $schuljahr->id] : [])
-            : route($name, $schuljahr);
+            ? route($name, ($schuljahr ? ['schuljahr' => $schuljahr->id] : []) + $extra)
+            : route($name, ['schuljahr' => $schuljahr] + $extra);
     }
 
     private function zurueckUrl(string $art, ?Schuljahr $schuljahr): string

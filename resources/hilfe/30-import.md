@@ -16,10 +16,10 @@ Klassen (dort auch **Lehraufträge aus Linear**) und Schüler. Das Modul liest d
 Linear-Zeitraum des Schuljahres und zeigt dieselbe Vorschau wie beim Datei-Import. Danach
 haben Sie die Wahl:
 
-- **Neue übernehmen** – legt nur an, was hier noch fehlt. Abweichende Angaben bleiben, wie sie
-  hier gepflegt sind.
-- **Neue + Änderungen übernehmen** – ersetzt zusätzlich die abweichenden Angaben durch die aus
-  Linear (z. B. Klassenwechsel, korrigierte Namen).
+- **Anlegen** bzw. **Übernehmen** in einer Zeile – nur dieser eine Datensatz. Danach steht die
+  Vorschau neu geladen wieder da.
+- **Alle Änderungen übernehmen** – legt alles Neue an und ersetzt abweichende Angaben durch die
+  aus Linear (z. B. Klassenwechsel, korrigierte Namen).
 - **Abbrechen** – es passiert nichts.
 
 Beim Schüler-Import zeigen **Ausgetreten** und **Für Zeugnis gesperrt** die Kinder, die laut

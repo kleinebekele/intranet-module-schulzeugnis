@@ -14,7 +14,7 @@
     <div class="space-y-4">
         <div class="rounded-xl border border-green-300 bg-green-50 p-4 text-sm text-green-900">
             ✓ <strong>Fertig.</strong> {{ $zaehl['neu'] }} neu angelegt, {{ $zaehl['aktualisiert'] }} aktualisiert,
-            {{ $zaehl['unveraendert'] }} unverändert{{ $nurNeu ? ' (Änderungen bewusst nicht übernommen)' : '' }}.
+            {{ $zaehl['unveraendert'] }} unverändert.
             @if ($zaehl['warnung'] > 0 || $zaehl['fehler'] > 0)
                 <span class="text-amber-800">{{ $zaehl['warnung'] }} übersprungen, {{ $zaehl['fehler'] }} mit Fehler.</span>
             @endif

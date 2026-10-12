@@ -54,6 +54,9 @@
                     <th class="px-4 py-2 font-medium">{{ $titel }}</th>
                 @endforeach
                 <th class="px-4 py-2 font-medium">Hinweis</th>
+                @if (! empty($zeilenAktion))
+                    <th class="px-4 py-2 font-medium"></th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -69,6 +72,21 @@
                         <td class="px-4 py-2 {{ $i === 0 ? 'font-medium text-gray-800' : 'text-gray-600' }}">{{ $zelle }}</td>
                     @endforeach
                     <td class="px-4 py-2 text-gray-600">{{ $r['hinweis'] }}</td>
+                    @if (! empty($zeilenAktion))
+                        <td class="whitespace-nowrap px-4 py-2 text-right">
+                            @if (in_array($r['status'], ['neu', 'aktualisiert'], true) && ! empty($r['schluessel']))
+                                <form method="POST" action="{{ $zeilenAktion['url'] }}" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="zeitraum" value="{{ $zeilenAktion['zeitraum'] }}">
+                                    <input type="hidden" name="nur" value="{{ $r['schluessel'] }}">
+                                    <button type="submit"
+                                            class="rounded-md border px-2 py-1 text-xs font-medium {{ $r['status'] === 'neu' ? 'border-green-300 bg-green-50 text-green-800 hover:bg-green-100' : 'border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100' }}">
+                                        {{ $r['status'] === 'neu' ? 'Anlegen' : 'Übernehmen' }}
+                                    </button>
+                                </form>
+                            @endif
+                        </td>
+                    @endif
                 </tr>
             @endforeach
         </tbody>
