@@ -24,15 +24,19 @@
     $spalten = $analyse['spalten_titel'] ?? [];
 @endphp
 
-<div class="flex flex-wrap gap-2">
+{{-- Die Zähler sind zugleich Filter: Klick zeigt nur Zeilen dieses Status, erneuter Klick alle. --}}
+<div class="imp-filter flex flex-wrap items-center gap-2">
     @foreach ($badges as $key => [$label, $klasse])
-        <span class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ring-1 {{ $klasse }}">
+        <button type="button" data-filter="{{ $key }}" aria-pressed="false" @disabled($zaehl[$key] === 0)
+                title="{{ $zaehl[$key] === 0 ? 'Keine Zeilen' : 'Nur „'.$label.'" anzeigen' }}"
+                class="imp-filter-knopf inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ring-1 {{ $klasse }}">
             {{ $label }}: {{ $zaehl[$key] }}
-        </span>
+        </button>
     @endforeach
+    <button type="button" data-filter="" class="imp-filter-alle text-sm text-gray-500 underline hover:text-gray-700" hidden>Alle zeigen</button>
 </div>
 
-<div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+<div class="imp-tabelle overflow-x-auto rounded-xl border border-gray-200 bg-white">
     <table class="w-full text-sm">
         <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
@@ -46,7 +50,7 @@
         </thead>
         <tbody>
             @foreach ($analyse['zeilen'] as $r)
-                <tr class="border-b border-gray-100 last:border-0">
+                <tr class="border-b border-gray-100 last:border-0" data-status="{{ $r['status'] }}">
                     <td class="px-4 py-2 text-gray-400">{{ $r['zeile'] }}</td>
                     <td class="px-4 py-2">
                         <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $zeilenBadge[$r['status']] ?? 'bg-gray-100 text-gray-600' }}">
@@ -61,7 +65,47 @@
             @endforeach
         </tbody>
     </table>
+    <p class="imp-leer px-4 py-3 text-sm text-gray-400" hidden>Keine Zeilen mit diesem Status.</p>
 </div>
+
+<style>
+    .imp-filter-knopf { cursor: pointer; transition: opacity .15s, box-shadow .15s; }
+    .imp-filter-knopf:disabled { cursor: default; opacity: .45; }
+    .imp-filter.gefiltert .imp-filter-knopf[aria-pressed="false"] { opacity: .45; }
+    .imp-filter-knopf[aria-pressed="true"] { box-shadow: 0 0 0 2px currentColor; }
+    .imp-filter-alle[hidden], .imp-leer[hidden] { display: none; }
+</style>
+<script>
+    (function () {
+        var leiste = document.currentScript.previousElementSibling;
+        while (leiste && !leiste.classList.contains('imp-filter')) { leiste = leiste.previousElementSibling; }
+        if (!leiste) { return; }
+        var tabelle = leiste.nextElementSibling, alle = leiste.querySelector('.imp-filter-alle');
+        var zeilen = tabelle.querySelectorAll('tbody tr[data-status]'), leer = tabelle.querySelector('.imp-leer');
+
+        function filtern(status) {
+            var sichtbar = 0;
+            zeilen.forEach(function (tr) {
+                var zeigen = !status || tr.dataset.status === status;
+                tr.hidden = !zeigen;
+                if (zeigen) { sichtbar++; }
+            });
+            leiste.querySelectorAll('.imp-filter-knopf').forEach(function (k) {
+                k.setAttribute('aria-pressed', String(!!status && k.dataset.filter === status));
+            });
+            leiste.classList.toggle('gefiltert', !!status);
+            alle.hidden = !status;
+            leer.hidden = sichtbar > 0;
+        }
+
+        leiste.addEventListener('click', function (e) {
+            var k = e.target.closest('button[data-filter]');
+            if (!k || k.disabled) { return; }
+            var aktiv = k.getAttribute('aria-pressed') === 'true';
+            filtern(aktiv ? '' : k.dataset.filter);
+        });
+    })();
+</script>
 
 @foreach ($analyse['infos'] ?? [] as $info)
     @php $verstecken = ($nurImportierte ?? false) && ($info['nur_ergebnis'] ?? false); @endphp
