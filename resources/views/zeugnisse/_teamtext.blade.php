@@ -31,7 +31,7 @@
         <label class="mt-2 block text-sm font-medium text-gray-700">{{ $inGruppe ? 'Gemeinsamer Text' : 'Mein Text' }}
             <textarea name="teiltext" rows="{{ $rows }}" data-fmt @disabled(! $kannSelbst)
                       class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                      placeholder="{{ $inGruppe ? 'Gemeinsamer Text …' : 'Ihr Teil des Textes …' }}">{{ old('teiltext', $mein->inhalt) }}</textarea>
+                      placeholder="{{ $inGruppe ? 'Gemeinsamer Text …' : 'Dein Teil des Textes …' }}">{{ old('teiltext', $mein->inhalt) }}</textarea>
         </label>
     @else
         <p class="mt-2 text-sm text-gray-600">Jede Lehrkraft schreibt ihren eigenen Teil bzw. den gemeinsamen Text ihrer Gruppe. Bearbeiten lässt er sich nur von den Fachlehrern selbst.</p>
@@ -69,7 +69,7 @@
                     {{ $namen($wartende) }}
                     {{ $fremdeGruppe->isNotEmpty() ? 'haben ihre Texte zusammengefasst.' : ($wartende->count() === 1 ? 'möchte' : 'möchten').' die Texte zusammenfassen.' }}
                 </strong>
-                <span class="block">Mit dem Knopf speichern Sie Ihren Text, fassen zusammen und bleiben hier – danach schreiben Sie im gemeinsamen Text mit.</span>
+                <span class="block">Mit dem Knopf speicherst du deinen Text, fasst zusammen und bleibst hier – danach schreibst du im gemeinsamen Text mit.</span>
                 <button type="button" class="zt-team-jetzt-knopf mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium">
                     <i class="bx bx-merge"></i> {{ $fremdeGruppe->isNotEmpty() ? 'Meinen Text dazunehmen & speichern' : 'Jetzt zusammenfassen & speichern' }}
                 </button>
@@ -83,10 +83,12 @@
         @php $bleiben = $team['mitglieder']->count() >= 2; @endphp
         <div class="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" class="zt-team-trennen-knopf inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium"
-                    data-frage="Ihren Text aus der Zusammenfassung lösen? Sie behalten den bisherigen gemeinsamen Text als eigenen Text{{ $bleiben ? ' – '.$namen($team['mitglieder']).' bleiben zusammengefasst' : '' }}.">
+                    data-frage="Deinen Text aus der Zusammenfassung lösen? Du behältst den bisherigen gemeinsamen Text als eigenen Text{{ $bleiben ? ' – '.$namen($team['mitglieder']).' bleiben zusammengefasst' : '' }}.">
                 <i class="bx bx-unlink"></i> Meinen Text herauslösen &amp; speichern
             </button>
-            <span class="text-xs text-gray-500">Betrifft nur Sie{{ $bleiben ? ' – die anderen bleiben zusammengefasst' : '' }}.</span>
+            @if ($bleiben)
+                <span class="text-xs text-gray-500">Betrifft nur dich – {{ $namen($team['mitglieder']) }} bleiben zusammengefasst.</span>
+            @endif
         </div>
     @elseif ($kannSelbst && $wartende->isEmpty())
         {{-- Allein, niemand wartet auf mich: Zustimmung vormerken. --}}
@@ -137,7 +139,7 @@
             knopf.addEventListener('click', function () {
                 var form = knopf.closest('form');
                 if (!form) { return; }
-                var frage = knopf.dataset.frage || 'Ihren Text aus der Zusammenfassung lösen?';
+                var frage = knopf.dataset.frage || 'Deinen Text aus der Zusammenfassung lösen?';
                 var frag = window.bestaetige
                     ? window.bestaetige(frage, { titel: 'Text herauslösen', knopf: 'Herauslösen & speichern' })
                     : Promise.resolve(window.confirm(frage));
