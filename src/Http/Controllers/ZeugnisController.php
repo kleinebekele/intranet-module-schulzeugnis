@@ -832,22 +832,25 @@ class ZeugnisController
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
             'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
             'teiltext'      => ['nullable', 'string'],
-            'team_modus'    => ['nullable', Rule::in(['getrennt', 'zusammen'])],
+            'team_modus'    => ['nullable', Rule::in(['allein', 'gruppe', 'ansicht'])],
         ]);
 
         // „Jetzt zusammenfassen & speichern": zustimmen und auf dieser Seite bleiben.
         if ($request->boolean('zusammenfassen_jetzt')) {
             $request->merge(['zusammenfassen' => '1', 'weiter' => null]);
         }
+        // „Zusammenfassung aufheben & speichern": trennen und auf dieser Seite bleiben.
+        if ($request->boolean('trennen_jetzt')) {
+            $request->merge(['zusammenfassen' => '0', 'weiter' => null]);
+        }
 
         // Team-Teaching: hat jemand anderes inzwischen zusammengefasst bzw. getrennt, passt das
         // Formular nicht mehr – lieber neu laden, als einen Text an die falsche Stelle zu schreiben.
         $team = Teamtext::sicherstellen($abschnitt);
         if ($team && $request->filled('team_modus')
-            && $request->input('team_modus') !== ($abschnitt->zusammengefasst ? 'zusammen' : 'getrennt')) {
+            && $request->input('team_modus') !== $this->teamAnsicht($abschnitt, $team, $klasse)['modus']) {
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
-                ->with('error', 'Inzwischen wurden die Texte '.($abschnitt->zusammengefasst ? 'zusammengefasst' : 'wieder getrennt')
-                    .' – bitte die Änderung noch einmal eintragen.');
+                ->with('error', 'Inzwischen hat sich die Zusammenfassung geändert – bitte die Änderung noch einmal eintragen.');
         }
 
         // Korrektor-Pflicht nur beim normalen Speichern erzwingen. Beim Blättern
@@ -1092,6 +1095,16 @@ class ZeugnisController
      * Feld; wer die Zustimmung zurücknimmt, trennt wieder (jeder Teiltext bekommt den
      * aktuellen gemeinsamen Text). Abschnitt.inhalt ist danach der Text fürs Zeugnis.
      */
+    /**
+     * Speichern im Team-Modus (siehe Support\Teamtext). Wer zustimmt, gehört zur Gruppe;
+     * eine Gruppe ab zwei Lehrkräften teilt einen Text (in jedem ihrer Teiltexte gleich).
+     *  - in der Gruppe: Text gilt für alle Mitglieder; ohne Zustimmung löst man NUR sich
+     *    selbst heraus (behält den bisherigen gemeinsamen Text als eigenen).
+     *  - allein: eigener Text; mit Zustimmung tritt man der Gruppe bei bzw. bildet sie,
+     *    der Gruppentext wird dann aus den Texten der Mitglieder verbunden.
+     * Danach: Träger-Text = alle Teiltexte nacheinander (gleiche einmal), `zusammengefasst`
+     * = alle Fachlehrer in einer Gruppe.
+     */
     private function teamSpeichern(\Illuminate\Database\Eloquent\Model $traeger, \Illuminate\Support\Collection $fachlehrer, Request $request, ?Klasse $klasse, string $feld = 'inhalt'): void
     {
         $meine     = $this->meineLehrerIds($klasse);
@@ -1102,49 +1115,67 @@ class ZeugnisController
             ? $this->logKlassentextTeam($traeger, $klasse, $text)
             : $this->logTeam($traeger, $text);
 
-        if (! $traeger->zusammengefasst) {
-            if ($mein) {
-                $mein->inhalt         = $request->input('teiltext');
-                $mein->zusammenfassen = $zustimmen;
-                $mein->save();
-            }
-            if (Teamtext::alleStimmenZu($teile, $fachlehrer)) {
-                $traeger->zusammengefasst = true;
-                $log('Texte zusammengefasst – ab jetzt ein gemeinsames Feld');
-            }
-            $traeger->{$feld} = Teamtext::verbinden($teile);
+        if ($mein) {
+            $text   = $request->input('teiltext');
+            $gruppe = Teamtext::gruppe($teile);
 
-            return;
-        }
-
-        if ($request->has($feld)) {
-            $traeger->{$feld} = $request->input($feld);
-        }
-        if ($mein && ! $zustimmen) {
-            foreach ($teile as $t) {
-                $t->inhalt = $traeger->{$feld};
-                if ($t->id === $mein->id) {
-                    $t->zusammenfassen = false;
+            if ($gruppe->contains('id', $mein->id)) {
+                // Gemeinsamer Text der Gruppe – gilt für alle ihre Mitglieder.
+                foreach ($gruppe as $t) {
+                    $t->inhalt = $text;
                 }
-                $t->save();
+                if (! $zustimmen) {
+                    $mein->zusammenfassen = false;
+                    $rest = $gruppe->count() - 1;
+                    $log("{$mein->autor_name} hat den eigenen Text aus der Zusammenfassung gelöst"
+                        .($rest >= 2 ? " – die übrigen {$rest} bleiben zusammengefasst" : ''));
+                }
+            } else {
+                $mein->inhalt = $text;
+                $mein->zusammenfassen = $zustimmen;
+                $neueGruppe = Teamtext::gruppe($teile);
+                if ($zustimmen && $neueGruppe->contains('id', $mein->id)) {
+                    $gemeinsam = Teamtext::verbinden($neueGruppe);
+                    foreach ($neueGruppe as $t) {
+                        $t->inhalt = $gemeinsam;
+                    }
+                    $log("{$mein->autor_name} hat zusammengefasst – gemeinsamer Text mit "
+                        .$neueGruppe->reject(fn ($t) => $t->id === $mein->id)->pluck('autor_name')->implode(', '));
+                }
             }
-            $traeger->zusammengefasst = false;
-            $traeger->{$feld} = Teamtext::verbinden($teile);
-            $log('Zusammenfassen zurückgenommen ('.$mein->autor_name.') – jeder Teiltext enthält den bisherigen gemeinsamen Text');
+
+            foreach ($teile as $t) {
+                if ($t->isDirty()) {
+                    $t->save();
+                }
+            }
         }
+
+        $traeger->{$feld} = Teamtext::verbinden($teile);
+        $traeger->zusammengefasst = Teamtext::alleStimmenZu($teile, $fachlehrer);
     }
 
-    /** Team-Daten für den Editor (getrennt/zusammen, eigener und fremde Teiltexte). @param Abschnitt|Klassentext $traeger */
+    /**
+     * Team-Daten für den Editor aus Sicht der eingeloggten Lehrkraft.
+     * modus: gruppe (ich schreibe im gemeinsamen Text) | allein (eigener Text) | ansicht (kein Fachlehrer).
+     *
+     * @param Abschnitt|Klassentext $traeger
+     */
     private function teamAnsicht(\Illuminate\Database\Eloquent\Model $traeger, \Illuminate\Support\Collection $fachlehrer, ?Klasse $klasse): array
     {
-        $teile = Teamtext::teiltexte($traeger, $fachlehrer);
-        $meine = $this->meineLehrerIds($klasse);
-        $mein  = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
+        $teile  = Teamtext::teiltexte($traeger, $fachlehrer);
+        $meine  = $this->meineLehrerIds($klasse);
+        $mein   = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
+        $gruppe = Teamtext::gruppe($teile);
+        $inGruppe = $mein && $gruppe->contains('id', $mein->id);
 
         return [
-            'modus'  => $traeger->zusammengefasst ? 'zusammen' : 'getrennt',
-            'mein'   => $mein,
-            'andere' => $teile->reject(fn ($t) => $mein && $t->id === $mein->id)->values(),
+            'modus'     => ! $mein ? 'ansicht' : ($inGruppe ? 'gruppe' : 'allein'),
+            'mein'      => $mein,
+            // Mitglieder meiner Gruppe (ohne mich) und alle übrigen
+            'mitglieder'=> $inGruppe ? $gruppe->reject(fn ($t) => $t->id === $mein->id)->values() : collect(),
+            'andere'    => $teile->reject(fn ($t) => ($mein && $t->id === $mein->id) || ($inGruppe && $gruppe->contains('id', $t->id)))->values(),
+            'gruppe'    => $gruppe,
         ];
     }
 
@@ -1443,21 +1474,24 @@ class ZeugnisController
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
             'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'schueler'])],
             'teiltext'      => ['nullable', 'string'],
-            'team_modus'    => ['nullable', Rule::in(['getrennt', 'zusammen'])],
+            'team_modus'    => ['nullable', Rule::in(['allein', 'gruppe', 'ansicht'])],
         ]);
 
         // „Jetzt zusammenfassen & speichern": zustimmen und auf dieser Seite bleiben.
         if ($request->boolean('zusammenfassen_jetzt')) {
             $request->merge(['zusammenfassen' => '1', 'weiter' => null]);
         }
+        // „Zusammenfassung aufheben & speichern": trennen und auf dieser Seite bleiben.
+        if ($request->boolean('trennen_jetzt')) {
+            $request->merge(['zusammenfassen' => '0', 'weiter' => null]);
+        }
 
         // Team-Teaching: Formular passt nicht mehr zum Stand → neu laden statt falsch schreiben.
         $ktTeam = Teamtext::sicherstellenKlassentext($kt, $klasse);
         if ($ktTeam && $request->filled('team_modus')
-            && $request->input('team_modus') !== ($kt->zusammengefasst ? 'zusammen' : 'getrennt')) {
+            && $request->input('team_modus') !== $this->teamAnsicht($kt, $ktTeam, $klasse)['modus']) {
             return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
-                ->with('error', 'Inzwischen wurden die Texte '.($kt->zusammengefasst ? 'zusammengefasst' : 'wieder getrennt')
-                    .' – bitte die Änderung noch einmal eintragen.');
+                ->with('error', 'Inzwischen hat sich die Zusammenfassung geändert – bitte die Änderung noch einmal eintragen.');
         }
 
         // Korrektor-Pflicht nur beim reinen Speichern erzwingen (beim Blättern nicht blockieren).

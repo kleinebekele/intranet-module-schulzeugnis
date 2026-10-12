@@ -1,94 +1,102 @@
 {{-- Team-Teaching (mehrere Fachlehrer, siehe Support\Teamtext).
-     Erwartet: $team (modus getrennt|zusammen, mein, andere), $readonly, $rows,
-     $feld (Name des gemeinsamen Feldes: inhalt | text) und $gemeinsam (dessen Wert). --}}
+     Erwartet: $team (modus gruppe|allein|ansicht, mein, mitglieder, andere, gruppe), $readonly, $rows.
+     Geschrieben wird immer der eigene Teiltext (name="teiltext") – in der Gruppe ist das der
+     gemeinsame Text, den der Server an alle Mitglieder verteilt. --}}
 @php
-    $feld     = $feld ?? 'inhalt';
-    $getrennt = $team['modus'] === 'getrennt';
-    $mein     = $team['mein'];
+    $modus      = $team['modus'];
+    $mein       = $team['mein'];
     $kannSelbst = $mein && ! $readonly;
+    $inGruppe   = $modus === 'gruppe';
+    $namen      = fn ($c) => $c->pluck('autor_name')->filter()->implode(', ');
+    // Gruppe, der ich nicht angehöre (mind. zwei andere) bzw. einzelne Zustimmende
+    $fremdeGruppe = $inGruppe ? collect() : $team['gruppe'];
+    $einzelne     = $team['andere']->reject(fn ($t) => $fremdeGruppe->contains('id', $t->id))->values();
+    $wartende     = $kannSelbst && ! $inGruppe
+        ? ($fremdeGruppe->isNotEmpty() ? $fremdeGruppe : $einzelne->filter(fn ($t) => $t->zusammenfassen))
+        : collect();
 @endphp
-<input type="hidden" name="team_modus" value="{{ $team['modus'] }}">
-{{-- 1 = „Jetzt zusammenfassen & speichern": zustimmen, speichern, auf dieser Seite bleiben. --}}
+<input type="hidden" name="team_modus" value="{{ $modus }}">
+{{-- 1 = zustimmen/beitreten, speichern, auf dieser Seite bleiben. --}}
 <input type="hidden" name="zusammenfassen_jetzt" value="0" class="zt-team-jetzt">
+{{-- 1 = nur mich aus der Zusammenfassung lösen, speichern, auf dieser Seite bleiben. --}}
+<input type="hidden" name="trennen_jetzt" value="0" class="zt-team-trennen">
 
 <div class="zt-team rounded-lg border border-indigo-200 bg-indigo-50/40 p-3">
     <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600">
         <i class="bx bx-group text-sm"></i>
-        {{ $getrennt ? 'Mehrere Fachlehrer – jeder schreibt zunächst seinen Teil' : 'Gemeinsamer Text aller Fachlehrer' }}
+        {{ $inGruppe ? 'Gemeinsamer Text mit '.$namen($team['mitglieder']) : 'Mehrere Fachlehrer – jeder schreibt zunächst seinen Teil' }}
     </p>
 
-    @if ($getrennt)
-        @if ($mein)
-            <label class="mt-2 block text-sm font-medium text-gray-700">Mein Text
-                <textarea name="teiltext" rows="{{ $rows }}" data-fmt @disabled(! $kannSelbst)
-                          class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          placeholder="Ihr Teil des Textes …">{{ old('teiltext', $mein->inhalt) }}</textarea>
-            </label>
-        @else
-            <p class="mt-2 text-sm text-gray-600">Jede Lehrkraft schreibt ihren eigenen Teil. Bearbeiten lässt sich ein Teiltext nur von seiner Lehrkraft.</p>
-        @endif
-
-        @foreach ($team['andere'] as $t)
-            <div class="zt-team-fremd mt-3 rounded-lg border border-gray-200 p-3">
-                <p class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                    <span class="font-medium text-gray-600">Text von {{ $t->autor_name ?: 'Lehrkraft' }}</span>
-                    @if ($t->zusammenfassen)
-                        <span class="rounded-full bg-green-100 px-2 py-0.5 text-green-800">möchte zusammenfassen</span>
-                    @else
-                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">noch nicht zusammenfassen</span>
-                    @endif
-                </p>
-                <div class="zt-team-text mt-1 text-sm">{{ trim((string) $t->inhalt) !== '' ? $t->inhalt : '— noch kein Text —' }}</div>
-            </div>
-        @endforeach
-    @else
-        <label class="mt-2 block text-sm font-medium text-gray-700">Gemeinsamer Text
-            <textarea name="{{ $feld }}" rows="{{ $rows }}" data-fmt @disabled($readonly)
+    @if ($mein)
+        <label class="mt-2 block text-sm font-medium text-gray-700">{{ $inGruppe ? 'Gemeinsamer Text' : 'Mein Text' }}
+            <textarea name="teiltext" rows="{{ $rows }}" data-fmt @disabled(! $kannSelbst)
                       class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                      placeholder="Gemeinsamer Text …">{{ old($feld, $gemeinsam) }}</textarea>
+                      placeholder="{{ $inGruppe ? 'Gemeinsamer Text …' : 'Ihr Teil des Textes …' }}">{{ old('teiltext', $mein->inhalt) }}</textarea>
         </label>
-        <p class="mt-1 text-xs text-gray-500">Beteiligt: {{ collect([$mein])->filter()->concat($team['andere'])->pluck('autor_name')->filter()->implode(', ') }}</p>
+    @else
+        <p class="mt-2 text-sm text-gray-600">Jede Lehrkraft schreibt ihren eigenen Teil bzw. den gemeinsamen Text ihrer Gruppe. Bearbeiten lässt er sich nur von den Fachlehrern selbst.</p>
     @endif
 
-    @php
-        // Andere haben schon zugestimmt, ich noch nicht → deutlich darauf hinweisen.
-        $wartenAufMich = $getrennt && $kannSelbst && ! $mein->zusammenfassen
-            ? $team['andere']->filter(fn ($t) => $t->zusammenfassen)->pluck('autor_name')->filter()
-            : collect();
-    @endphp
-    @if ($wartenAufMich->isNotEmpty())
+    @if ($fremdeGruppe->isNotEmpty())
+        <div class="zt-team-fremd mt-3 rounded-lg border border-gray-200 p-3">
+            <p class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span class="font-medium text-gray-600">Gemeinsamer Text von {{ $namen($fremdeGruppe) }}</span>
+                <span class="rounded-full bg-green-100 px-2 py-0.5 text-green-800">zusammengefasst</span>
+            </p>
+            <div class="zt-team-text mt-1 text-sm">{{ trim((string) $fremdeGruppe->first()->inhalt) !== '' ? $fremdeGruppe->first()->inhalt : '— noch kein Text —' }}</div>
+        </div>
+    @endif
+    @foreach ($einzelne as $t)
+        <div class="zt-team-fremd mt-3 rounded-lg border border-gray-200 p-3">
+            <p class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span class="font-medium text-gray-600">Text von {{ $t->autor_name ?: 'Lehrkraft' }}</span>
+                @if ($t->zusammenfassen)
+                    <span class="rounded-full bg-green-100 px-2 py-0.5 text-green-800">möchte zusammenfassen</span>
+                @else
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">schreibt eigenen Text</span>
+                @endif
+            </p>
+            <div class="zt-team-text mt-1 text-sm">{{ trim((string) $t->inhalt) !== '' ? $t->inhalt : '— noch kein Text —' }}</div>
+        </div>
+    @endforeach
+
+    @if ($wartende->isNotEmpty())
+        {{-- Andere wollen (schon) zusammenfassen, ich noch nicht → deutlicher Hinweis + Knopf. --}}
         <div class="zt-team-wartet mt-3 flex items-start gap-2 rounded-lg p-3 text-sm">
             <i class="bx bxs-bell-ring mt-0.5 text-lg"></i>
-            @php $letzteZustimmung = $team['andere']->every(fn ($t) => $t->zusammenfassen); @endphp
             <div>
-                <strong>{{ $wartenAufMich->implode(', ') }} {{ $wartenAufMich->count() === 1 ? 'möchte' : 'möchten' }} die Texte zusammenfassen.</strong>
-                <span class="block">
-                    {{ $letzteZustimmung
-                        ? 'Mit dem Knopf speichern Sie Ihren Text, stimmen zu und bleiben hier – die Texte stehen danach in einem gemeinsamen Feld.'
-                        : 'Mit dem Knopf speichern Sie Ihren Text und stimmen zu; zusammengefasst wird, sobald alle zugestimmt haben.' }}
-                </span>
+                <strong>
+                    {{ $namen($wartende) }}
+                    {{ $fremdeGruppe->isNotEmpty() ? 'haben ihre Texte zusammengefasst.' : ($wartende->count() === 1 ? 'möchte' : 'möchten').' die Texte zusammenfassen.' }}
+                </strong>
+                <span class="block">Mit dem Knopf speichern Sie Ihren Text, fassen zusammen und bleiben hier – danach schreiben Sie im gemeinsamen Text mit.</span>
                 <button type="button" class="zt-team-jetzt-knopf mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium">
-                    <i class="bx bx-merge"></i> {{ $letzteZustimmung ? 'Jetzt zusammenfassen & speichern' : 'Zustimmen & speichern' }}
+                    <i class="bx bx-merge"></i> {{ $fremdeGruppe->isNotEmpty() ? 'Meinen Text dazunehmen & speichern' : 'Jetzt zusammenfassen & speichern' }}
                 </button>
             </div>
         </div>
     @endif
 
-    {{-- Wartet nur noch meine Zustimmung, erledigt das der Knopf im Hinweis – dann kein zweites Häkchen. --}}
-    @if ($kannSelbst && $wartenAufMich->isEmpty())
+    @if ($kannSelbst && $inGruppe)
+        {{-- In der Gruppe: Zustimmung bleibt; herauslösen nur über den eigenen Knopf (mit Rückfrage), betrifft nur mich. --}}
+        <input type="hidden" name="zusammenfassen" value="1">
+        @php $bleiben = $team['mitglieder']->count() >= 2; @endphp
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" class="zt-team-trennen-knopf inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium"
+                    data-frage="Ihren Text aus der Zusammenfassung lösen? Sie behalten den bisherigen gemeinsamen Text als eigenen Text{{ $bleiben ? ' – '.$namen($team['mitglieder']).' bleiben zusammengefasst' : '' }}.">
+                <i class="bx bx-unlink"></i> Meinen Text herauslösen &amp; speichern
+            </button>
+            <span class="text-xs text-gray-500">Betrifft nur Sie{{ $bleiben ? ' – die anderen bleiben zusammengefasst' : '' }}.</span>
+        </div>
+    @elseif ($kannSelbst && $wartende->isEmpty())
+        {{-- Allein, niemand wartet auf mich: Zustimmung vormerken. --}}
         <label class="mt-3 flex items-start gap-2">
             <input type="checkbox" name="zusammenfassen" value="1"
-                   @checked(old('zusammenfassen', $getrennt ? $mein->zusammenfassen : true))
+                   @checked(old('zusammenfassen', $mein->zusammenfassen))
                    class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
             <span class="text-sm text-gray-700">
                 <span class="font-medium">Texte zusammenfassen</span>
-                <span class="block text-xs text-gray-500">
-                    @if ($getrennt)
-                        Sobald alle Fachlehrer zustimmen, werden die Texte in einem gemeinsamen Feld zusammengeführt. Bis dahin stehen sie auf dem Zeugnis nacheinander.
-                    @else
-                        Häkchen entfernen trennt die Texte wieder – jeder Teiltext bekommt den aktuellen gemeinsamen Text als Ausgangspunkt.
-                    @endif
-                </span>
+                <span class="block text-xs text-gray-500">Sobald eine weitere Lehrkraft zustimmt, entsteht ein gemeinsamer Text. Bis dahin stehen die Texte auf dem Zeugnis nacheinander.</span>
             </span>
         </label>
     @endif
@@ -104,6 +112,8 @@
     .zt-team-wartet i { color: var(--color-amber-500, #f59e0b); }
     .zt-team-jetzt-knopf { background: var(--color-amber-500, #f59e0b); color: #fff; }
     .zt-team-jetzt-knopf:hover { background: var(--color-amber-600, #d97706); }
+    .zt-team-trennen-knopf { border-color: var(--color-gray-300, #d1d5db); color: var(--color-gray-700, #374151); background: var(--color-white, #fff); }
+    .zt-team-trennen-knopf:hover { background: var(--color-red-50, #fef2f2); color: var(--color-red-700, #b91c1c); }
 </style>
 <script>
     (function () {
@@ -119,6 +129,24 @@
                 // Nicht weiterblättern – das Ergebnis soll direkt hier zu sehen sein.
                 form.querySelectorAll('input[name="weiter"]').forEach(function (r) { r.checked = false; });
                 form.requestSubmit ? form.requestSubmit() : form.submit();
+            });
+        });
+        document.querySelectorAll('.zt-team-trennen-knopf').forEach(function (knopf) {
+            if (knopf.dataset.gebunden) { return; }
+            knopf.dataset.gebunden = '1';
+            knopf.addEventListener('click', function () {
+                var form = knopf.closest('form');
+                if (!form) { return; }
+                var frage = knopf.dataset.frage || 'Ihren Text aus der Zusammenfassung lösen?';
+                var frag = window.bestaetige
+                    ? window.bestaetige(frage, { titel: 'Text herauslösen', knopf: 'Herauslösen & speichern' })
+                    : Promise.resolve(window.confirm(frage));
+                frag.then(function (ja) {
+                    if (!ja) { return; }
+                    form.querySelector('.zt-team-trennen').value = '1';
+                    form.querySelectorAll('input[name="weiter"]').forEach(function (r) { r.checked = false; });
+                    form.requestSubmit ? form.requestSubmit() : form.submit();
+                });
             });
         });
     })();

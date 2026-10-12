@@ -47,21 +47,24 @@ Unter dem Text wählen Sie, wohin es nach dem Speichern geht:
 
 Haben mehrere Lehrkräfte einen Lehrauftrag im selben Fach der Klasse, schreibt zunächst
 jede ihren **eigenen Text**. Die Texte der anderen stehen ausgegraut darunter, mit Namen und
-mit dem Hinweis, ob sie schon zusammenfassen möchten. Auf dem Zeugnis stehen die Texte bis
-dahin nacheinander.
+dem Hinweis, ob sie zusammenfassen möchten. Auf dem Zeugnis stehen die Texte nacheinander.
 
-- Mit **Texte zusammenfassen** stimmen Sie zu. Erst wenn **alle** zugestimmt haben, werden die
-  Texte in **einem gemeinsamen Feld** zusammengeführt, das alle bearbeiten.
-- Nimmt jemand das Häkchen wieder heraus, wird der aktuelle gemeinsame Text in **alle**
-  Teiltexte eingetragen, und jeder bearbeitet wieder nur seinen eigenen.
+- **Texte zusammenfassen** merkt Ihre Zustimmung vor. Möchte eine andere Lehrkraft schon
+  zusammenfassen, erscheint stattdessen ein gelber Hinweis mit dem Knopf **Jetzt
+  zusammenfassen & speichern** – danach schreiben Sie gemeinsam in **einem** Text und bleiben
+  auf derselben Seite.
+- Sind schon zwei oder mehr zusammengefasst, nehmen Sie Ihren Text mit **Meinen Text
+  dazunehmen & speichern** in deren gemeinsamen Text auf.
+- **Meinen Text herauslösen & speichern** betrifft **nur Sie**: Sie behalten den bisherigen
+  gemeinsamen Text als eigenen und schreiben wieder für sich. Die übrigen bleiben
+  zusammengefasst, solange es mindestens zwei sind.
 
-Hat eine andere Lehrkraft schon zugestimmt, Sie aber noch nicht, steht über dem Häkchen ein
-gelber Hinweis.
+Die Zusammenfassung gilt je Schüler – bei jedem Kind entscheiden die Fachlehrer neu.
 
-Solange die Texte getrennt sind, lässt sich kein früherer Stand wiederherstellen, und
-Korrektoren korrigieren erst den zusammengefassten Text. Das Gleiche gilt für den
-**klassenweiten Text** des Fachs: Er wird dann im Klassentext-Editor geschrieben, im
-Schülertext-Editor steht er nur zur Ansicht.
+Solange nicht **alle** Fachlehrer in einem gemeinsamen Text schreiben, lässt sich kein
+früherer Stand wiederherstellen, und Korrektoren korrigieren erst den vollständig
+zusammengefassten Text. Das Gleiche gilt für den **klassenweiten Text** des Fachs: Er wird dann
+im Klassentext-Editor geschrieben, im Schülertext-Editor steht er nur zur Ansicht.
 
 ## Korrektoren
 

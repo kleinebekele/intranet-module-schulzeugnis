@@ -15,12 +15,13 @@ use Intranet\Modules\Schulzeugnis\Models\Lehrer;
  * Klasse, schreibt zunächst jede ihren eigenen Teiltext – am Schülertext (Abschnitt,
  * Feld `inhalt`) wie am klassenweiten Text des Fachs (Klassentext, Feld `text`).
  *
- *  - getrennt: jeder bearbeitet nur seinen Teiltext; der Text fürs Zeugnis (Träger-Feld)
- *    sind die Teiltexte nacheinander, gleiche nur einmal.
- *  - Stimmen ALLE dem Zusammenfassen zu, wird der verbundene Text zum gemeinsamen Feld
- *    (`zusammengefasst` am Träger), das alle bearbeiten.
- *  - Nimmt eine Lehrkraft die Zustimmung zurück, bekommt jeder Teiltext den aktuellen
- *    gemeinsamen Text, und es ist wieder getrennt.
+ *  - Jeder schreibt seinen Teiltext; wer zustimmt, gehört zur Gruppe. Ab zwei Mitgliedern
+ *    teilt die Gruppe EINEN Text (in jedem ihrer Teiltexte gleich gespeichert).
+ *  - Wer sich herauslöst, betrifft nur sich: Er behält den bisherigen gemeinsamen Text als
+ *    eigenen, die übrigen bleiben (ab zwei) zusammengefasst.
+ *  - Text fürs Zeugnis (Träger-Feld) = alle Teiltexte nacheinander, gleiche nur einmal.
+ *    `zusammengefasst` am Träger = ALLE Fachlehrer in einer Gruppe (erst dann arbeiten
+ *    Korrektoren/Wiederherstellen am Träger-Text; das übernimmt sicherstellen() zurück).
  *
  * Bereits geschriebene Texte (vor Einführung) gelten als zusammengefasst – so geht nichts
  * verloren und niemandem wird ein fremder Text als eigener untergeschoben.
@@ -105,6 +106,13 @@ class Teamtext
                 ]);
             }
         }
+        // Alle in einer Gruppe: der Träger-Text ist der gemeinsame Text – Änderungen von
+        // außen (Korrektor, Wiederherstellen, Gesamt-Bearbeitung) in die Teiltexte ziehen.
+        if ($traeger->zusammengefasst) {
+            $traeger->teiltexte()->whereIn('lehrer_id', $lehrer->pluck('id'))
+                ->where(fn ($q) => $q->whereNull('inhalt')->orWhere('inhalt', '!=', (string) $traeger->{$feld}))
+                ->update(['inhalt' => $traeger->{$feld}]);
+        }
         $traeger->unsetRelation('teiltexte');
 
         return $lehrer;
@@ -130,6 +138,17 @@ class Teamtext
         }
 
         return $texte === [] ? null : implode("\n\n", $texte);
+    }
+
+    /**
+     * Die Gruppe: alle Teiltexte mit Zustimmung – aber erst ab zwei Lehrkräften (eine
+     * allein Zustimmende schreibt noch für sich).
+     */
+    public static function gruppe(Collection $teiltexte): Collection
+    {
+        $g = $teiltexte->filter(fn ($t) => $t->zusammenfassen)->values();
+
+        return $g->count() >= 2 ? $g : collect();
     }
 
     /** Stimmen alle Fachlehrer dem Zusammenfassen zu? */
