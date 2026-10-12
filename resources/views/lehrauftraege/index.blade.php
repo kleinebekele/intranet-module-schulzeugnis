@@ -23,8 +23,8 @@
 
         <div class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
             Klassenlehrer:
-            @if ($klasse->klassenlehrer)
-                <strong class="text-gray-800">{{ $klasse->klassenlehrer->fullName() }}</strong>
+            @if ($klasse->klassenleitung->isNotEmpty())
+                <strong class="text-gray-800">{{ $klasse->klassenleitungNamen() }}</strong>
             @else
                 <span class="italic text-gray-400">nicht gesetzt</span>
             @endif

@@ -38,7 +38,7 @@ class ZeugnisController
 
     public function index(Klasse $klasse)
     {
-        $klasse->load(['schuljahr', 'klassenlehrer']);
+        $klasse->load(['schuljahr', 'klassenlehrer', 'klassenleitung']);
 
         // Spalten der Tabelle: alle Fächer, die in dieser Klasse einen Lehrauftrag haben.
         $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
@@ -64,7 +64,7 @@ class ZeugnisController
         $meineFachIds = $klasse->lehrauftraege()
             ->whereHas('lehrer', fn ($q) => $q->where('core_user_id', $userId))
             ->pluck('fach_id')->unique()->values()->all();
-        $binKlassenlehrer = $klasse->klassenlehrer && (int) $klasse->klassenlehrer->core_user_id === (int) $userId;
+        $binKlassenlehrer = $klasse->klassenleitung->contains(fn ($l) => (int) $l->core_user_id === (int) $userId);
 
         // Nachbar-Klassen (natürliche Sortierung wie die Klassenliste) für die Navigation.
         $geschwister = $klasse->schuljahr->klassen()->get(['id', 'name', 'schuljahr_id'])
@@ -1062,7 +1062,7 @@ class ZeugnisController
 
         if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_SPRUCH], true)) {
             // Haupttext / Hauptzeugnis / Zeugnisspruch: nur der Klassenlehrer ist voll berechtigt.
-            if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
+            if ($klasse->hatKlassenlehrer($meineLehrerIds)) {
                 return 'voll';
             }
         } else {
@@ -1418,7 +1418,7 @@ class ZeugnisController
             ->pluck('id');
 
         if ($fachId === null) {
-            if ($klasse->klassenlehrer_id && $meineLehrerIds->contains($klasse->klassenlehrer_id)) {
+            if ($klasse->hatKlassenlehrer($meineLehrerIds)) {
                 return 'voll';
             }
         } else {

@@ -146,8 +146,8 @@
                             </div>
                         </div>
                         <div class="kr-label">{{ $klasse->name }}</div>
-                        @if ($klasse->klassenlehrer)
-                            <div class="kr-sub">{{ $klasse->klassenlehrer->fullName() }}</div>
+                        @if ($klasse->klassenleitung->isNotEmpty())
+                            <div class="kr-sub">{{ $klasse->klassenleitungNamen() }}</div>
                         @endif
                     </a>
                 @endforeach

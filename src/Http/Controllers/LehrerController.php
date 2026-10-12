@@ -82,6 +82,7 @@ class LehrerController
     {
         // Schutz: als Klassenlehrer, in Lehraufträgen oder als Autor verwendet → nicht löschen.
         $verwendet = DB::table('zeugnis_klassen')->where('klassenlehrer_id', $lehrer->id)->exists()
+            || DB::table('zeugnis_klasse_klassenlehrer')->where('lehrer_id', $lehrer->id)->exists()
             || DB::table('zeugnis_lehrauftraege')->where('lehrer_id', $lehrer->id)->exists()
             || DB::table('zeugnis_abschnitte')->where('autor_lehrer_id', $lehrer->id)->exists();
 

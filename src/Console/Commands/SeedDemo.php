@@ -90,6 +90,7 @@ class SeedDemo extends Command
                     'standard_format_id' => $format?->id,
                     'klassenlehrer_id'   => $lehrer[$lehrerIdx % count($lehrer)]->id,
                 ]);
+                $klasse->setzeKlassenleitung([$klasse->klassenlehrer_id]);
                 $lehrerIdx++;
 
                 // Lehraufträge: jedes Fach bekommt 1–2 Lehrer (Team-Teaching bei jedem 4.).

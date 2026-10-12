@@ -10,6 +10,7 @@ use App\Modules\Support\Zugriffsstufe;
 use Illuminate\Console\Scheduling\Schedule;
 use Intranet\Modules\Schulzeugnis\Console\Commands\LehrerKontenVerknuepfen;
 use Intranet\Modules\Schulzeugnis\Console\Commands\SeedDemo;
+use Intranet\Modules\Schulzeugnis\Http\Middleware\AlsLehrer;
 use Intranet\Modules\Schulzeugnis\Support\LehrerKontenAbgleich;
 
 /**
@@ -63,6 +64,21 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             });
         }
 
+        // „Als Lehrer nutzen": roter Balken unter der Kopfleiste, solange aktiv – nur auf Zeugnisseiten.
+        \App\Support\Kopfleiste::registrieren('schulzeugnis-als-lehrer', function (User $user) {
+            if (! request()->routeIs('module.schulzeugnis.*')) {
+                return null;
+            }
+            $person = AlsLehrer::person();
+
+            return $person ? view('schulzeugnis::als-lehrer-banner', ['person' => $person]) : null;
+        });
+        \App\Support\Audit::benennen([
+            'schulzeugnis.als_lehrer_start' => 'Zeugnis: als Lehrkraft nutzen – Beginn',
+            'schulzeugnis.als_lehrer_ende' => 'Zeugnis: als Lehrkraft nutzen – Ende',
+            'schulzeugnis.als_lehrer_aenderung' => 'Zeugnis: Änderung als andere Lehrkraft',
+        ]);
+
         // Sofort-Verknüpfung (Insel-konform, kein Core-Eingriff): wird ein Intranet-
         // Benutzer angelegt oder seine externe ID gesetzt, verknüpfen wir passende
         // importierte Lehrer ohne Konto direkt – ohne auf den täglichen Abgleich zu
@@ -106,7 +122,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
             ->lesend('import.vorschau', 'altumwandeln.zeugnisse', 'altumwandeln.fachzeugnisse') // prüfen/umwandeln ohne Speichern
-            ->stufe(Zugriffsstufe::Verwalten, 'import.ausfuehren', 'formate.duplicate')          // legen an
+            ->stufe(Zugriffsstufe::Verwalten, 'import.ausfuehren', 'formate.duplicate', 'lehrer.als') // legen an / als Lehrkraft
             ->stufe(Zugriffsstufe::Bearbeiten, 'beispieltexte.reset');                           // setzt nur zurück
     }
 }

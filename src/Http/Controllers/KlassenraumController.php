@@ -23,7 +23,7 @@ class KlassenraumController
 
         // Natürliche Sortierung, damit 2 vor 10 kommt (Namen sind Strings wie "1".."13").
         $klassen = $schuljahr->klassen()
-            ->with(['klassenlehrer', 'stufe'])
+            ->with(['klassenleitung', 'stufe'])
             ->get()
             ->sortBy('name', SORT_NATURAL)
             ->values();

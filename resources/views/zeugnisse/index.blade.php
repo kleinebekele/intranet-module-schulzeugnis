@@ -33,8 +33,8 @@
                     <i class="bx bxs-user-circle zi-kopf-icon text-3xl"></i>
                     <div class="leading-tight">
                         <div class="zi-kopf-boxlabel text-xs font-semibold uppercase tracking-wide">Klassenlehrer</div>
-                        @if ($klasse->klassenlehrer)
-                            <div class="zi-kopf-titel text-sm font-semibold">{{ $klasse->klassenlehrer->fullName() }}</div>
+                        @if ($klasse->klassenleitung->isNotEmpty())
+                            <div class="zi-kopf-titel text-sm font-semibold">{{ $klasse->klassenleitungNamen() }}</div>
                         @elseif ($kannKlassenlehrer)
                             <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}"
                                class="zi-kopf-titel inline-flex items-center gap-1 text-sm font-semibold underline hover:no-underline">
@@ -202,7 +202,7 @@
                             <th class="zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);"
                                 data-fach="Hauptzeugnis" data-rolle="Klassenlehrer"
-                                data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
+                                data-lehrer="{{ $klasse->klassenleitungNamen() }}"
                                 data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
                                 title="Hauptzeugnis">HAU</th>
                             <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);" title="Warnhinweis Hauptzeugnis">⚠</th>
@@ -221,7 +221,7 @@
                             <th class="zt-kopf border-b border-l border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: var(--color-gray-50, #f9fafb);"
                                 data-fach="Zeugnisspruch" data-rolle="Klassenlehrer"
-                                data-lehrer="{{ $klasse->klassenlehrer?->fullName() }}"
+                                data-lehrer="{{ $klasse->klassenleitungNamen() }}"
                                 title="Zeugnisspruch">ZEU</th>
                         @endif
                         <th class="zt-mini border-b border-l border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: var(--color-gray-50, #f9fafb);" title="Warnhinweis Textlänge">⚠</th>

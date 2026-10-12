@@ -72,8 +72,8 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-2 text-gray-700">
-                                    @if ($klasse->klassenlehrer)
-                                        {{ $klasse->klassenlehrer->fullName() }}
+                                    @if ($klasse->klassenleitung->isNotEmpty())
+                                        {{ $klasse->klassenleitungNamen() }}
                                     @else
                                         <span class="text-gray-400">nicht gesetzt</span>
                                     @endif

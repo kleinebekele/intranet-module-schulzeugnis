@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Intranet\Modules\Schulzeugnis\Http\Controllers\AlsLehrerController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltFachzeugnisController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltUmwandelnController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\AltZeugnisController;
@@ -17,6 +18,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\SpruchController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\StufeController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\TodoController;
 use Intranet\Modules\Schulzeugnis\Http\Controllers\ZeugnisController;
+use Intranet\Modules\Schulzeugnis\Http\Middleware\AlsLehrer;
 
 /*
  | Routen des Schulzeugnis-Moduls.
@@ -26,7 +28,7 @@ use Intranet\Modules\Schulzeugnis\Http\Controllers\ZeugnisController;
  |  - Namen:       module.schulzeugnis.*
  |  - Middleware:  'web' + 'auth'   (Session, CSRF, nur eingeloggt)
 */
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', AlsLehrer::class])
     ->prefix('modules/schulzeugnis')
     ->name('module.schulzeugnis.')
     ->group(function () {
@@ -186,4 +188,7 @@ Route::middleware(['web', 'auth'])
         Route::get('lehrer/{lehrer}/bearbeiten', [LehrerController::class, 'edit'])->name('lehrer.edit');
         Route::put('lehrer/{lehrer}', [LehrerController::class, 'update'])->name('lehrer.update');
         Route::delete('lehrer/{lehrer}', [LehrerController::class, 'destroy'])->name('lehrer.destroy');
+        // „Als Lehrer nutzen" – Zeugnis-Modul aus Sicht einer Lehrkraft (Middleware AlsLehrer).
+        Route::post('lehrer/{lehrer}/als', [AlsLehrerController::class, 'start'])->name('lehrer.als');
+        Route::post('lehrer-als/ende', [AlsLehrerController::class, 'ende'])->name('lehrer.als.ende');
     });

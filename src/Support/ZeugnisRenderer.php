@@ -124,7 +124,7 @@ class ZeugnisRenderer
      */
     public function daten(Zeugnis $zeugnis): array
     {
-        $zeugnis->loadMissing(['schueler.klasse.schuljahr', 'schueler.klasse.klassenlehrer', 'abschnitte.fach', 'abschnitte.bereichtexte.bereich']);
+        $zeugnis->loadMissing(['schueler.klasse.schuljahr', 'schueler.klasse.klassenleitung', 'abschnitte.fach', 'abschnitte.bereichtexte.bereich']);
         $schueler = $zeugnis->schueler;
         $klasse   = $schueler?->klasse;
         $schuljahr = $klasse?->schuljahr;
@@ -224,7 +224,7 @@ class ZeugnisRenderer
             'zeugnistext'           => $zeugnistext,
             'zeugnisspruch'         => $zeugnisspruch,
             'ausgabe.zeile'         => $ausgabe,
-            'unterschrift'          => $klasse?->klassenlehrer?->fullName() ?: 'Klassenlehrer/in',
+            'unterschrift'          => $klasse?->klassenleitungNamen() ?: 'Klassenlehrer/in',
         ];
     }
 

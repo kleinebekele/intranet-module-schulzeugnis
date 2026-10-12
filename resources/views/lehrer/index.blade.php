@@ -62,6 +62,17 @@
                                 <td class="px-4 py-2 text-gray-600">{{ $l->quell_id ?: '—' }}</td>
                                 <td class="px-4 py-2">
                                     <div class="flex items-center justify-end gap-2 whitespace-nowrap">
+                                        @darfRoute('module.schulzeugnis.lehrer.als')
+                                        @if ($konto && ! $konto->is(auth()->user()))
+                                            <form method="POST" action="{{ route('module.schulzeugnis.lehrer.als', $l) }}" class="inline"
+                                                  data-bestaetigen="Als {{ $konto->name }} nutzen? Bis du es beendest, siehst und änderst du im Zeugnis-Modul genau das, was diese Lehrkraft sieht."
+                                                  data-titel="Als Lehrkraft nutzen" data-knopf="Als {{ $konto->name }} nutzen">
+                                                @csrf
+                                                <button type="submit" title="Als {{ $konto->name }} nutzen" class="text-gray-500 hover:text-red-700">als …</button>
+                                            </form>
+                                            <span class="text-gray-300">·</span>
+                                        @endif
+                                        @enddarfRoute
                                         <a href="{{ route('module.schulzeugnis.lehrer.edit', $l) }}" class="text-indigo-600 hover:text-indigo-700">Bearbeiten</a>
                                         <span class="text-gray-300">·</span>
                                         <form method="POST" action="{{ route('module.schulzeugnis.lehrer.destroy', $l) }}"

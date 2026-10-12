@@ -69,7 +69,7 @@ class TodoController
 
         // Verantwortungsbereich: Klassen mit Klassenleitung + je Lehrauftrag (Klasse × Fach).
         $klassenAlsKL = Klasse::where('schuljahr_id', $schuljahr->id)
-            ->whereIn('klassenlehrer_id', $meineLehrerIds)
+            ->whereHas('klassenleitung', fn ($q) => $q->whereIn('zeugnis_schuljahr_lehrer.id', $meineLehrerIds))
             ->pluck('id');
 
         $faecherJeKlasse = Lehrauftrag::whereIn('lehrer_id', $meineLehrerIds)

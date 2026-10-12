@@ -19,6 +19,11 @@
         $hatFach   = (bool) old('hat_fachzeugnis', $klasse->exists ? $klasse->hat_fachzeugnis : true);
         $hatHaupt  = (bool) old('hat_hauptzeugnis', $klasse->exists ? $klasse->hat_hauptzeugnis : false);
         $hatSpruch = (bool) old('hat_zeugnisspruch', $klasse->exists ? $klasse->hat_zeugnisspruch : false);
+        // Klassenleitung: mindestens eine (ggf. leere) Auswahlzeile.
+        $klassenlehrerIds = array_values(array_filter((array) old('klassenlehrer_ids', $klasse->exists ? $klasse->klassenlehrerIds()->all() : [])));
+        if ($klassenlehrerIds === []) {
+            $klassenlehrerIds = [null];
+        }
     @endphp
 
     <div class="max-w-2xl">
@@ -61,20 +66,32 @@
             </div>
 
             <div>
-                <label for="klassenlehrer_id" class="block text-sm font-medium text-gray-700">Klassenlehrer</label>
-                <select name="klassenlehrer_id" id="klassenlehrer_id"
-                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">— kein Klassenlehrer —</option>
-                    @foreach ($lehrer as $l)
-                        <option value="{{ $l->id }}" @selected(old('klassenlehrer_id', $klasse->klassenlehrer_id) == $l->id)>
-                            {{ $l->fullName() }}
-                        </option>
+                <span class="block text-sm font-medium text-gray-700">Klassenlehrer</span>
+                <div id="kl-liste" class="mt-1 space-y-2">
+                    @foreach ($klassenlehrerIds as $klId)
+                        <div class="kl-zeile flex items-center gap-2">
+                            <select name="klassenlehrer_ids[]"
+                                    class="kl-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">— kein Klassenlehrer —</option>
+                                @foreach ($lehrer as $l)
+                                    <option value="{{ $l->id }}" @selected((int) $klId === $l->id)>{{ $l->fullName() }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="kl-remove shrink-0 rounded-lg border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 {{ $loop->count > 1 ? '' : 'hidden' }}" title="Klassenlehrer entfernen">
+                                <i class="bx bx-x text-lg"></i>
+                            </button>
+                        </div>
                     @endforeach
-                </select>
+                </div>
+                <button type="button" id="kl-add"
+                        class="mt-2 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100 hidden">
+                    <i class="bx bx-plus"></i> Weiteren Klassenlehrer wählen
+                </button>
                 @if ($lehrer->isEmpty())
                     <p class="mt-1 text-xs text-amber-600">In diesem Schuljahr sind noch keine Lehrer angelegt.</p>
                 @endif
-                @error('klassenlehrer_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('klassenlehrer_ids') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('klassenlehrer_ids.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             {{-- ============ Fachzeugnis (Fächer) ============ --}}
@@ -204,6 +221,31 @@
             }
             bind('hat_fachzeugnis', 'fach-details');
             bind('hat_hauptzeugnis', 'haupt-details');
+
+            // Klassenleitung: „Weiteren Klassenlehrer wählen" erscheint, sobald die letzte
+            // Auswahl belegt ist – beliebig viele Zeilen.
+            var klListe = document.getElementById('kl-liste'), klAdd = document.getElementById('kl-add');
+            if (klListe && klAdd) {
+                var klZeilen = function () { return klListe.querySelectorAll('.kl-zeile'); };
+                var klAktualisieren = function () {
+                    var zeilen = klZeilen(), letzte = zeilen[zeilen.length - 1];
+                    klAdd.classList.toggle('hidden', !letzte || !letzte.querySelector('.kl-select').value);
+                    zeilen.forEach(function (z) { z.querySelector('.kl-remove').classList.toggle('hidden', zeilen.length < 2); });
+                };
+                klAdd.addEventListener('click', function () {
+                    var zeilen = klZeilen(), neu = zeilen[zeilen.length - 1].cloneNode(true);
+                    neu.querySelector('.kl-select').value = '';
+                    klListe.appendChild(neu);
+                    klAktualisieren();
+                    neu.querySelector('.kl-select').focus();
+                });
+                klListe.addEventListener('change', klAktualisieren);
+                klListe.addEventListener('click', function (e) {
+                    var btn = e.target.closest('.kl-remove');
+                    if (btn && klZeilen().length > 1) { btn.closest('.kl-zeile').remove(); klAktualisieren(); }
+                });
+                klAktualisieren();
+            }
 
             // Ankersprung #fachbereiche (aus dem Zeugnis-Hinweis): Box aufklappen,
             // hinscrollen und kurz umrahmen, damit klar ist, was gemeint ist.

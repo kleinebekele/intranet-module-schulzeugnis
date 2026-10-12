@@ -192,9 +192,16 @@ class KlasseImporter
         DB::transaction(function () use ($analyse): void {
             foreach ($analyse['zeilen'] as $r) {
                 if ($r['status'] === 'neu') {
-                    Klasse::create($r['apply']);
+                    $klasse = Klasse::create($r['apply']);
                 } elseif ($r['status'] === 'aktualisiert' && $r['ziel_id'] !== null) {
-                    Klasse::whereKey($r['ziel_id'])->update($r['apply']);
+                    $klasse = Klasse::find($r['ziel_id']);
+                    $klasse?->update($r['apply']);
+                } else {
+                    continue;
+                }
+                // Importierter Klassenlehrer wird der erste der Klassenleitung, weitere bleiben.
+                if (isset($r['apply']['klassenlehrer_id'])) {
+                    $klasse?->setzeErstenKlassenlehrer((int) $r['apply']['klassenlehrer_id']);
                 }
             }
         });

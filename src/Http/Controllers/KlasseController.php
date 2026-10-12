@@ -23,7 +23,7 @@ class KlasseController
         // Natürliche Sortierung: "1, 2, … 10, 11, 12, 13" statt alphabetisch
         // "1, 10, 11, 12, 13, 2, …". Cross-DB sicher in PHP (strnatcasecmp).
         $klassen = $schuljahr->klassen()
-            ->with(['standardFormat', 'klassenlehrer', 'stufe'])
+            ->with(['standardFormat', 'klassenleitung', 'stufe'])
             ->withCount(['lehrauftraege', 'hauptbereiche'])
             ->get()
             ->sort(fn ($a, $b) => strnatcasecmp($a->name, $b->name))
@@ -49,6 +49,7 @@ class KlasseController
         $data = $this->validated($request, $schuljahr->id);
 
         $klasse = $schuljahr->klassen()->create($data);
+        $klasse->setzeKlassenleitung($request->input('klassenlehrer_ids', []));
         $this->syncHauptzeugnis($request, $klasse);
 
         Protokoll::log('klasse_angelegt', [
@@ -79,6 +80,7 @@ class KlasseController
         $alt  = $klasse->name;
 
         $klasse->update($data);
+        $klasse->setzeKlassenleitung($request->input('klassenlehrer_ids', []));
         $this->syncHauptzeugnis($request, $klasse);
 
         Protokoll::log('klasse_geaendert', [
@@ -145,8 +147,12 @@ class KlasseController
             'stufe_id'               => ['nullable', 'integer', Rule::exists('zeugnis_stufen', 'id')],
             'standard_format_id'     => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
             'hauptzeugnis_format_id' => ['nullable', 'integer', Rule::exists('zeugnis_formate', 'id')],
-            'klassenlehrer_id'       => ['nullable', 'integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')->where('schuljahr_id', $schuljahrId)],
+            'klassenlehrer_ids'      => ['nullable', 'array'],
+            'klassenlehrer_ids.*'    => ['nullable', 'integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')->where('schuljahr_id', $schuljahrId)],
         ]);
+
+        // Klassenleitung läuft über die Zuordnungstabelle (setzeKlassenleitung), nicht als Spalte.
+        unset($data['klassenlehrer_ids']);
 
         // Checkboxen kommen nur beim Anhaken mit – daher explizit als bool lesen.
         $data['hat_fachzeugnis']   = $request->boolean('hat_fachzeugnis');

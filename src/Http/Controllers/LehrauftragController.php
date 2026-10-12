@@ -17,7 +17,7 @@ class LehrauftragController
 {
     public function index(Klasse $klasse)
     {
-        $klasse->load('schuljahr', 'klassenlehrer');
+        $klasse->load('schuljahr', 'klassenleitung');
 
         $lehrauftraege = $klasse->lehrauftraege()
             ->with(['fach', 'lehrer'])
