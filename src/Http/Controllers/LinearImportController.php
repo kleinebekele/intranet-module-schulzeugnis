@@ -117,6 +117,9 @@ class LinearImportController
 
             [$kopf, $zeilen] = $quelle->daten($art, $wahl['zid']);
             $analyse = $this->importer($art)->analysiere($kopf, $zeilen, ['schuljahr_id' => $schuljahr->id, 'quelle_label' => 'Linear']);
+            if ($art === 'schueler') {
+                $analyse['infos'][] = $this->fehlendeSchuelerInLinear($schuljahr, $zeilen, $quelle);
+            }
         } catch (ImportFehler $e) {
             return $this->zurueck($art, $schuljahr)->with('error', $e->getMessage());
         } catch (\Throwable $e) {
@@ -228,6 +231,57 @@ class LinearImportController
         return $gewaehlt
             ? ['zid' => $gewaehlt['id'], 'name' => LinearQuelle::zeitraumName($gewaehlt), 'verknuepfen' => true, 'auswahl' => []]
             : ['zid' => null, 'name' => '', 'verknuepfen' => true, 'auswahl' => $alle->all()];
+    }
+
+    /**
+     * Schüler, die hier im Schuljahr stehen, im Linear-Zeitraum aber nicht: was sagt
+     * Linear über sie (Adresse-Kennzeichen, letzter Klasseneintrag)? Nur Anzeige.
+     *
+     * @param  array<int,array<string,string>>  $zeilen
+     * @return array{label: string, items: array<int,string>, ton: string}
+     */
+    private function fehlendeSchuelerInLinear(Schuljahr $schuljahr, array $zeilen, LinearQuelle $quelle): array
+    {
+        $inLinear = array_flip(array_column($zeilen, 'schuelerid'));
+        $fehlende = $schuljahr->schueler()->orderBy('nachname')->orderBy('vorname')->get()
+            ->reject(fn ($s) => filled($s->quell_id) && isset($inLinear[trim((string) $s->quell_id)]));
+
+        $info = ['label' => 'Schüler stehen hier, aber nicht im Linear-Zeitraum – was Linear über sie weiß', 'items' => [], 'ton' => 'amber'];
+        if ($fehlende->isEmpty()) {
+            return $info;
+        }
+
+        try {
+            $status = $quelle->personenStatus($fehlende->pluck('quell_id')->filter()->map(fn ($q) => trim((string) $q))->all());
+        } catch (\Throwable $e) {
+            report($e);
+            $status = null;
+        }
+
+        foreach ($fehlende as $s) {
+            $id = trim((string) $s->quell_id);
+            if ($id === '') {
+                $text = 'ohne Linear-ID (von Hand angelegt?)';
+            } elseif ($status === null) {
+                $text = "Linear-ID {$id} – Abfrage fehlgeschlagen";
+            } elseif (! isset($status[$id]) || ($status[$id]['felder'] === [] && $status[$id]['letzter'] === null)) {
+                $text = "Linear-ID {$id} – in Linear nicht gefunden";
+            } else {
+                $teile = [];
+                foreach ($status[$id]['felder'] as $feld => $wert) {
+                    $teile[] = $feld.'='.($wert === '' ? '–' : $wert);
+                }
+                if ($l = $status[$id]['letzter']) {
+                    $teile[] = "zuletzt {$l['klasse']} in {$l['zeitraum']}".($l['klassenende'] !== '' ? ' (Klassenende '.\Carbon\Carbon::parse($l['klassenende'])->format('d.m.Y').')' : '');
+                } else {
+                    $teile[] = 'in keiner Klasse geführt';
+                }
+                $text = "Linear-ID {$id}: ".implode(', ', $teile);
+            }
+            $info['items'][] = $s->fullName().' – '.$text;
+        }
+
+        return $info;
     }
 
     /** Fächer sind jahresübergreifend; gelesen wird der Zeitraum des aktiven (oder gewählten) Schuljahres. */

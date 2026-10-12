@@ -225,6 +225,84 @@ class LinearQuelle
     }
 
     /**
+     * Was Linear über Personen weiß, die im Zeitraum NICHT (mehr) als Schüler geführt
+     * werden: Kennzeichen aus `Adresse` (Schuler + alles, was nach ehemalig/Austritt/Abgang
+     * klingt) und der letzte Eintrag in `WD_Schl`.
+     *
+     * Die Spalten kommen aus INFORMATION_SCHEMA statt `SELECT *` – lange Text-/LOB-Spalten
+     * würden über PDO_ODBC die folgenden Werte zerstören; Datumswerte serverseitig als Text.
+     *
+     * @param  array<int,string>  $adrNrs
+     * @return array<string,array{felder: array<string,string>, letzter: ?array<string,string>}>
+     */
+    public function personenStatus(array $adrNrs): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map(fn ($a) => is_numeric($a) ? (int) $a : null, $adrNrs))));
+        if ($ids === []) {
+            return [];
+        }
+
+        $spalten = $this->db()->select(
+            "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH AS LEN
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_NAME = 'Adresse'"
+        );
+        $auswahl = [];
+        foreach ($spalten as $sp) {
+            $name = trim((string) $sp->COLUMN_NAME);
+            $typ  = strtolower(trim((string) $sp->DATA_TYPE));
+            $len  = (int) $sp->LEN;
+            $passt = preg_match('/^schuler$|^schueler$|ehem|austr|abg|entl|abmeld|verlass|aktiv|status/i', $name);
+            $kurz  = ! in_array($typ, ['text', 'ntext', 'image', 'xml', 'varbinary', 'binary'], true) && $len !== -1 && $len <= 255;
+            if ($passt && $kurz && preg_match('/^[A-Za-z0-9_]+$/', $name)) {
+                $auswahl[$name] = in_array($typ, ['datetime', 'datetime2', 'date', 'smalldatetime'], true)
+                    ? "CONVERT(varchar(10), a.[{$name}], 120) AS [{$name}]"
+                    : "CAST(a.[{$name}] AS nvarchar(255)) AS [{$name}]";
+            }
+        }
+
+        $ergebnis = [];
+        $platz    = implode(',', array_fill(0, count($ids), '?'));
+        if ($auswahl !== []) {
+            $zeilen = $this->db()->select(
+                'SELECT a.AdrNr, '.implode(', ', $auswahl)." FROM Adresse a WHERE a.AdrNr IN ({$platz})",
+                $ids,
+            );
+            foreach ($zeilen as $z) {
+                $w = $this->normalisiere($z);
+                $id = (string) (int) $w['AdrNr'];
+                unset($w['AdrNr']);
+                $ergebnis[$id]['felder'] = array_map(fn ($v) => (string) $v, $w);
+            }
+        }
+
+        // Letzter Eintrag je Person in WD_Schl (höchste Zeitraum-ID).
+        $letzte = $this->db()->select(
+            "SELECT s.AdrNr, s.ID, s.Klasse, CONVERT(varchar(10), s.AustrittKl, 120) AS AustrittKl, z.Bezeichnung
+               FROM WD_Schl s
+               JOIN WD_Zeitraum z ON z.ID = s.ID
+              WHERE s.AdrNr IN ({$platz})
+                AND s.ID = (SELECT MAX(s2.ID) FROM WD_Schl s2 WHERE s2.AdrNr = s.AdrNr)",
+            $ids,
+        );
+        foreach ($letzte as $z) {
+            $w  = $this->normalisiere($z);
+            $id = (string) (int) $w['AdrNr'];
+            $ergebnis[$id]['letzter'] = [
+                'zeitraum'  => (string) ($w['Bezeichnung'] ?? '') ?: 'Zeitraum '.$w['ID'],
+                'klasse'    => (string) ($w['Klasse'] ?? ''),
+                'klassenende' => $this->datum($w['AustrittKl'] ?? ''),
+            ];
+        }
+
+        foreach ($ids as $id) {
+            $ergebnis[(string) $id] = ($ergebnis[(string) $id] ?? []) + ['felder' => [], 'letzter' => null];
+        }
+
+        return $ergebnis;
+    }
+
+    /**
      * Reguläres Klassenende = häufigstes AustrittKl; nur frühere Daten bleiben als Austritt.
      *
      * @param  array<int,array<string,string>>  $zeilen
