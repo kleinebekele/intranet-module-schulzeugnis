@@ -74,8 +74,9 @@
         </div>
     @endif
 
-    @if ($kannSelbst)
-        <label class="mt-3 flex items-start gap-2 {{ $wartenAufMich->isNotEmpty() ? 'zt-team-wartet-feld rounded-lg p-2' : '' }}">
+    {{-- Wartet nur noch meine Zustimmung, erledigt das der Knopf im Hinweis – dann kein zweites Häkchen. --}}
+    @if ($kannSelbst && $wartenAufMich->isEmpty())
+        <label class="mt-3 flex items-start gap-2">
             <input type="checkbox" name="zusammenfassen" value="1"
                    @checked(old('zusammenfassen', $getrennt ? $mein->zusammenfassen : true))
                    class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
@@ -101,7 +102,6 @@
         color: var(--color-amber-900, #78350f);
     }
     .zt-team-wartet i { color: var(--color-amber-500, #f59e0b); }
-    .zt-team-wartet-feld { outline: 2px dashed var(--color-amber-400, #fbbf24); outline-offset: 2px; }
     .zt-team-jetzt-knopf { background: var(--color-amber-500, #f59e0b); color: #fff; }
     .zt-team-jetzt-knopf:hover { background: var(--color-amber-600, #d97706); }
 </style>
