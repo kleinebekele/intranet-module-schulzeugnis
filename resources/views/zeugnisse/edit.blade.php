@@ -85,9 +85,13 @@
                                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
                     @else
+                        @php $teamGetrennt = ! $a->zusammengefasst && $a->teiltexte()->exists(); @endphp
+                        @if ($teamGetrennt)
+                            <p class="mt-2 text-xs text-indigo-600">Mehrere Fachlehrer schreiben hier getrennte Teiltexte – bearbeiten im Einzel-Editor des Abschnitts.</p>
+                        @endif
                         <textarea name="abschnitte[{{ $a->id }}][inhalt]" rows="5"
                                   @unless ($a->typ === \Intranet\Modules\Schulzeugnis\Models\Abschnitt::TYP_SPRUCH) data-fmt @endunless
-                                  @disabled($readonly)
+                                  @disabled($readonly || $teamGetrennt)
                                   class="mt-3 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Text …">{{ $a->inhalt }}</textarea>
                     @endif

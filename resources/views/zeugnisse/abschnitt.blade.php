@@ -165,9 +165,13 @@
 
                     {{-- Tab 1: Schülertext (individuell) --}}
                     <div class="zt-txt-panel" data-txt="schueler">
-                        <textarea name="inhalt" rows="16" data-fmt @disabled($readonly)
-                                  class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                  placeholder="Individueller Text für diesen Schüler …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
+                        @if (! empty($team))
+                            @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 12])
+                        @else
+                            <textarea name="inhalt" rows="16" data-fmt @disabled($readonly)
+                                      class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                      placeholder="Individueller Text für diesen Schüler …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
+                        @endif
                         <p class="mt-1 text-xs text-gray-500">Individueller Text für <strong>diesen Schüler</strong>.</p>
                     </div>
 
@@ -199,12 +203,16 @@
                         <p class="mt-1 text-xs text-gray-400">Danach im Textfeld frei anpassbar. <a href="{{ route('module.schulzeugnis.sprueche.index') }}" target="_blank" class="text-indigo-600 hover:text-indigo-700">Katalog pflegen</a>.</p>
                     </div>
                 @endif
+                @if (! empty($team))
+                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 8])
+                @else
                 <label class="block text-sm font-medium text-gray-700">{{ $istSpruch ? 'Zeugnisspruch' : ($klassentext ? 'Schülertext' : 'Text') }}
                     {{-- Der Zeugnisspruch druckt escaped über {Zeugnisspruch} – dort keine Formatierung. --}}
                     <textarea name="inhalt" id="inhalt-feld" rows="8" @unless ($istSpruch) data-fmt @endunless @disabled($readonly)
                               class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               placeholder="Text …">{{ old('inhalt', $abschnitt->inhalt) }}</textarea>
                 </label>
+                @endif
                 @if ($istSpruch && ! $readonly && $sprueche->isNotEmpty())
                     <script>
                         (function () {

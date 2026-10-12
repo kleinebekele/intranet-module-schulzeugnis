@@ -43,6 +43,21 @@ Unter dem Text wählen Sie, wohin es nach dem Speichern geht:
   den klassenweiten Text desselben Fachs.
 - **Zurück** zur Zeugnisliste bzw. zu Ihren ToDos – je nachdem, woher Sie gekommen sind.
 
+## Zwei Fachlehrer im selben Fach
+
+Haben mehrere Lehrkräfte einen Lehrauftrag im selben Fach der Klasse, schreibt zunächst
+jede ihren **eigenen Text**. Die Texte der anderen stehen ausgegraut darunter, mit Namen und
+mit dem Hinweis, ob sie schon zusammenfassen möchten. Auf dem Zeugnis stehen die Texte bis
+dahin nacheinander.
+
+- Mit **Texte zusammenfassen** stimmen Sie zu. Erst wenn **alle** zugestimmt haben, werden die
+  Texte in **einem gemeinsamen Feld** zusammengeführt, das alle bearbeiten.
+- Nimmt jemand das Häkchen wieder heraus, wird der aktuelle gemeinsame Text in **alle**
+  Teiltexte eingetragen, und jeder bearbeitet wieder nur seinen eigenen.
+
+Solange die Texte getrennt sind, lässt sich kein früherer Stand wiederherstellen, und
+Korrektoren korrigieren erst den zusammengefassten Text.
+
 ## Korrektoren
 
 Korrektoren werden **je Abschnitt** ausgewählt, nicht pauschal für ein Zeugnis. Wer als

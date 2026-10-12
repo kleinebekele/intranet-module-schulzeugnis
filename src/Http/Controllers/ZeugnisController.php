@@ -18,6 +18,7 @@ use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Spruch;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 use Intranet\Modules\Schulzeugnis\Support\Ghostscript;
+use Intranet\Modules\Schulzeugnis\Support\Teamtext;
 use Intranet\Modules\Schulzeugnis\Support\Textauszeichnung;
 use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
 
@@ -469,7 +470,12 @@ class ZeugnisController
             }
             $row = $eingaben[$abschnitt->id];
 
-            $abschnitt->inhalt = $row['inhalt'] ?? null;
+            // Getrennte Teiltexte (Team-Teaching) nur im Einzel-Editor – hier nicht überschreiben.
+            $teamGetrennt = ! $abschnitt->zusammengefasst && $abschnitt->teiltexte()->exists()
+                && Teamtext::sicherstellen($abschnitt);
+            if (! $teamGetrennt) {
+                $abschnitt->inhalt = $row['inhalt'] ?? null;
+            }
             if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
                 $abschnitt->note = $row['note'] ?? null;
             }
@@ -559,13 +565,13 @@ class ZeugnisController
 
         $hex = self::STATUS_FARBE_HEX;
         $verlauf = Protokoll::where('abschnitt_id', $abschnitt->id)
-            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt', 'abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt'])
+            ->whereIn('aktion', ['abschnitt_geaendert', 'abschnitt_status', 'abschnitt_notiz', 'abschnitt_klassentext', 'abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt', 'abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt', 'abschnitt_team'])
             ->orderByDesc('id')
             ->get()
             ->map(function (Protokoll $e) use ($hex) {
                 $istStatus  = $e->aktion === 'abschnitt_status';
                 $istRestore = in_array($e->aktion, ['abschnitt_wiederhergestellt', 'abschnitt_klassentext_wiederhergestellt'], true);
-                $istMeta    = in_array($e->aktion, ['abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt'], true);
+                $istMeta    = in_array($e->aktion, ['abschnitt_korrektor_hinzugefuegt', 'abschnitt_korrektor_entfernt', 'abschnitt_team'], true);
                 $wz = fn ($s) => trim((string) $s) === '' ? 0 : count(preg_split('/\s+/u', trim(Textauszeichnung::ohneMarker((string) $s))));
 
                 $status  = null;
@@ -620,6 +626,19 @@ class ZeugnisController
         $berechtigung = $this->berechtigung($abschnitt, auth()->user());
         $nachbarn     = $this->abschnittNachbarn($abschnitt);
 
+        // Team-Teaching: mehrere Fachlehrer → je Lehrkraft ein Teiltext, bis alle zusammenfassen.
+        $team = null;
+        if (! $zeugnis->istAbgeschlossen() && ($fachlehrer = Teamtext::sicherstellen($abschnitt))) {
+            $teile = Teamtext::teiltexte($abschnitt, $fachlehrer);
+            $meine = $this->meineLehrerIds($klasse);
+            $mein  = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
+            $team  = [
+                'modus'  => $abschnitt->zusammengefasst ? 'zusammen' : 'getrennt',
+                'mein'   => $mein,
+                'andere' => $teile->reject(fn ($t) => $mein && $t->id === $mein->id)->values(),
+            ];
+        }
+
         // Herkunft merken (?quelle=todo|zeugnisse) → passender „Zurück"-Button.
         // focus = zuletzt bearbeiteter Abschnitt → Zielseite scrollt/klappt ihn auf.
         $quelle  = request('quelle') === 'todo' ? 'todo' : 'zeugnisse';
@@ -640,6 +659,7 @@ class ZeugnisController
         return view('schulzeugnis::zeugnisse.abschnitt', [
             'quelle'         => $quelle,
             'zurueck'        => $zurueck,
+            'team'           => $team,
             'abschnitt'      => $abschnitt,
             'zeugnis'        => $zeugnis,
             'schueler'       => $zeugnis->schueler,
@@ -779,7 +799,11 @@ class ZeugnisController
 
             $altInhalt = $abschnitt->inhalt;
             $altStatus = $abschnitt->status;
-            $abschnitt->inhalt = $data['inhalt'] ?? null;
+            // Team-Teaching in der getrennten Phase: Korrektur erst am gemeinsamen Text.
+            $teamGetrennt = Teamtext::sicherstellen($abschnitt) && ! $abschnitt->zusammengefasst;
+            if (! $teamGetrennt) {
+                $abschnitt->inhalt = $data['inhalt'] ?? null;
+            }
             if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
                 $abschnitt->note = $data['note'] ?? null;
             }
@@ -810,7 +834,19 @@ class ZeugnisController
             'korrektoren'   => ['array'],
             'korrektoren.*' => ['integer', Rule::exists('zeugnis_schuljahr_lehrer', 'id')],
             'weiter'        => ['nullable', Rule::in(['next', 'prev', 'index', 'klassentext'])],
+            'teiltext'      => ['nullable', 'string'],
+            'team_modus'    => ['nullable', Rule::in(['getrennt', 'zusammen'])],
         ]);
+
+        // Team-Teaching: hat jemand anderes inzwischen zusammengefasst bzw. getrennt, passt das
+        // Formular nicht mehr – lieber neu laden, als einen Text an die falsche Stelle zu schreiben.
+        $team = Teamtext::sicherstellen($abschnitt);
+        if ($team && $request->filled('team_modus')
+            && $request->input('team_modus') !== ($abschnitt->zusammengefasst ? 'zusammen' : 'getrennt')) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
+                ->with('error', 'Inzwischen wurden die Texte '.($abschnitt->zusammengefasst ? 'zusammengefasst' : 'wieder getrennt')
+                    .' – bitte die Änderung noch einmal eintragen.');
+        }
 
         // Korrektor-Pflicht nur beim normalen Speichern erzwingen. Beim Blättern
         // („Speichern & vorheriger/nächster") nicht blockieren – dann wird gespeichert
@@ -827,7 +863,9 @@ class ZeugnisController
         $altStatus = $abschnitt->status;
 
         $istHaupt = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS;
-        if (! $istHaupt) {
+        if ($team) {
+            $this->teamSpeichern($abschnitt, $team, $request, $klasse);
+        } elseif (! $istHaupt) {
             $abschnitt->inhalt = $data['inhalt'] ?? null;
         }
         if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
@@ -972,6 +1010,12 @@ class ZeugnisController
                 ->with('status', 'Früherer Klassentext-Stand wiederhergestellt.');
         }
 
+        // Team-Teaching in der getrennten Phase: Abschnitt-Text ist nur die Verbindung der Teiltexte.
+        if (Teamtext::sicherstellen($abschnitt) && ! $abschnitt->zusammengefasst) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
+                ->with('error', 'Solange die Texte getrennt sind, lässt sich kein früherer Stand wiederherstellen – jede Lehrkraft bearbeitet ihren Teiltext.');
+        }
+
         // Schülertext: in den Abschnitt zurückschreiben.
         $altInhalt = $abschnitt->inhalt;
         $abschnitt->update(['inhalt' => $ziel]);
@@ -1034,6 +1078,61 @@ class ZeugnisController
     }
 
     /** Eine Feld-Änderung (Text/Notiz/Klassentext) protokollieren – nur wenn sie sich unterscheidet. */
+    /**
+     * Speichern im Team-Modus (siehe Support\Teamtext): getrennt → eigener Teiltext +
+     * Zustimmung; stimmen alle zu, wird zusammengefasst. Zusammengefasst → gemeinsames
+     * Feld; wer die Zustimmung zurücknimmt, trennt wieder (jeder Teiltext bekommt den
+     * aktuellen gemeinsamen Text). Abschnitt.inhalt ist danach der Text fürs Zeugnis.
+     */
+    private function teamSpeichern(Abschnitt $abschnitt, \Illuminate\Support\Collection $fachlehrer, Request $request, ?Klasse $klasse): void
+    {
+        $meine     = $this->meineLehrerIds($klasse);
+        $teile     = Teamtext::teiltexte($abschnitt, $fachlehrer);
+        $mein      = $teile->first(fn ($t) => $meine->contains($t->lehrer_id));
+        $zustimmen = $request->boolean('zusammenfassen');
+
+        if (! $abschnitt->zusammengefasst) {
+            if ($mein) {
+                $mein->inhalt         = $request->input('teiltext');
+                $mein->zusammenfassen = $zustimmen;
+                $mein->save();
+            }
+            if (Teamtext::alleStimmenZu($teile, $fachlehrer)) {
+                $abschnitt->zusammengefasst = true;
+                $this->logTeam($abschnitt, 'Texte zusammengefasst – ab jetzt ein gemeinsames Feld');
+            }
+            $abschnitt->inhalt = Teamtext::verbinden($teile);
+
+            return;
+        }
+
+        if ($request->has('inhalt')) {
+            $abschnitt->inhalt = $request->input('inhalt');
+        }
+        if ($mein && ! $zustimmen) {
+            foreach ($teile as $t) {
+                $t->inhalt = $abschnitt->inhalt;
+                if ($t->id === $mein->id) {
+                    $t->zusammenfassen = false;
+                }
+                $t->save();
+            }
+            $abschnitt->zusammengefasst = false;
+            $abschnitt->inhalt = Teamtext::verbinden($teile);
+            $this->logTeam($abschnitt, 'Zusammenfassen zurückgenommen ('.$mein->autor_name.') – jeder Teiltext enthält den bisherigen gemeinsamen Text');
+        }
+    }
+
+    private function logTeam(Abschnitt $abschnitt, string $text): void
+    {
+        Protokoll::log('abschnitt_team', [
+            'schuljahr_id' => $abschnitt->zeugnis?->schueler?->schuljahr_id,
+            'zeugnis_id'   => $abschnitt->zeugnis_id,
+            'abschnitt_id' => $abschnitt->id,
+            'beschreibung' => $text,
+        ]);
+    }
+
     private function logFeld(Abschnitt $abschnitt, string $feld, ?string $alt, ?string $neu, string $aktion = 'abschnitt_geaendert'): void
     {
         if ((string) $alt === (string) $neu) {

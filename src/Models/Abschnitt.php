@@ -84,6 +84,7 @@ class Abschnitt extends Model
 
     protected $casts = [
         'klassentext_neue_zeile' => 'boolean',
+        'zusammengefasst'        => 'boolean',
     ];
 
     protected $attributes = [
@@ -119,6 +120,12 @@ class Abschnitt extends Model
     }
 
     /** Schülertexte je Fachbereich – nur beim Hauptzeugnis-Abschnitt (typ = hauptzeugnis). */
+    /** Teiltexte je Fachlehrer (Team-Teaching), siehe Support\Teamtext. */
+    public function teiltexte(): HasMany
+    {
+        return $this->hasMany(Teiltext::class, 'abschnitt_id');
+    }
+
     public function bereichtexte(): HasMany
     {
         return $this->hasMany(Bereichtext::class, 'abschnitt_id')->orderBy('reihenfolge')->orderBy('id');
