@@ -77,7 +77,7 @@
 
             <div>
                 @if (! empty($team))
-                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 10, 'feld' => 'text', 'gemeinsam' => $klassentext->text, 'readonly' => false])
+                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 10, 'bereich' => 'klasse', 'readonly' => false])
                 @else
                 <label for="text" class="block text-sm font-medium text-gray-700">Klassenweiter Text</label>
                 {{-- Der Spruch dient als Vorlage und druckt nicht selbst – dort keine Formatierung. --}}

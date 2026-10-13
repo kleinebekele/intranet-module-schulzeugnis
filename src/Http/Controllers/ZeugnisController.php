@@ -1124,15 +1124,26 @@ class ZeugnisController
                 }
             }
 
-            // 2) Entscheidung geändert? Gilt für die ganze Klasse in diesem Fach.
-            if ($zustimmen !== (bool) $mein->zusammenfassen && $klasse && $traeger->fach_id) {
-                if ($traeger->exists && $traeger->isDirty()) {
-                    $traeger->save();
+            // 2) Entscheidung geändert? Schülertext: gilt für alle Schülertexte des Fachs der
+            //    Klasse. Klassenweiter Text: eigene Entscheidung, nur hier.
+            if ($zustimmen !== (bool) $mein->zusammenfassen) {
+                $wer = $mein->autor_name.($zustimmen ? ' fasst zusammen' : ' hat den eigenen Text herausgelöst');
+                if ($traeger instanceof Abschnitt && $klasse && $traeger->fach_id) {
+                    if ($traeger->exists && $traeger->isDirty()) {
+                        $traeger->save();
+                    }
+                    $anzahl = Teamtext::zustimmungUeberall($klasse, (int) $traeger->fach_id, (int) $mein->lehrer_id, $zustimmen);
+                    $traeger->refresh();
+                    $log("{$wer} – gilt für alle {$anzahl} Schülertexte des Fachs in der Klasse");
+                } else {
+                    Teamtext::zustimmungAnwenden($teile, (int) $mein->lehrer_id, $zustimmen);
+                    foreach ($teile as $t) {
+                        if ($t->isDirty()) {
+                            $t->save();
+                        }
+                    }
+                    $log("{$wer} – für den klassenweiten Text");
                 }
-                $anzahl = Teamtext::zustimmungUeberall($klasse, (int) $traeger->fach_id, (int) $mein->lehrer_id, $zustimmen);
-                $traeger->refresh();
-                $log($mein->autor_name.($zustimmen ? ' fasst zusammen' : ' hat den eigenen Text herausgelöst')
-                    ." – gilt für den klassenweiten Text und alle {$anzahl} Schülertexte des Fachs");
             }
             $teile = Teamtext::teiltexte($traeger, $fachlehrer);
         }

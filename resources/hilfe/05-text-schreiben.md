@@ -59,8 +59,9 @@ dem Hinweis, ob sie zusammenfassen möchten. Auf dem Zeugnis stehen die Texte na
   gemeinsamen Text als eigenen und schreiben wieder für sich. Die übrigen bleiben
   zusammengefasst, solange es mindestens zwei sind.
 
-Die Entscheidung gilt für die **ganze Klasse in diesem Fach**: für den klassenweiten Text und
-alle Schülertexte zugleich. Geschrieben wird weiter bei jedem Kind einzeln.
+Entschieden wird je Klasse und Fach **zweimal**: einmal für den **klassenweiten Text** und einmal
+für **alle Schülertexte** zugleich – wer bei einem Kind zusammenfasst, fasst bei allen Kindern des
+Fachs zusammen. Geschrieben wird weiter bei jedem Kind einzeln.
 
 Solange nicht **alle** Fachlehrer in einem gemeinsamen Text schreiben, lässt sich kein
 früherer Stand wiederherstellen, und Korrektoren korrigieren erst den vollständig

@@ -4,6 +4,10 @@
      gemeinsame Text, den der Server an alle Mitglieder verteilt. --}}
 @php
     $modus      = $team['modus'];
+    // Wofür gilt die Entscheidung? Schülertext → alle Schüler des Fachs; Klassentext → nur er.
+    $geltung    = ($bereich ?? 'schueler') === 'klasse'
+        ? 'nur für den klassenweiten Text (die Schülertexte entscheidet ihr getrennt)'
+        : 'für die Schülertexte aller Schüler dieses Fachs (den klassenweiten Text entscheidet ihr getrennt)';
     $mein       = $team['mein'];
     $kannSelbst = $mein && ! $readonly;
     $inGruppe   = $modus === 'gruppe';
@@ -69,7 +73,7 @@
                     {{ $namen($wartende) }}
                     {{ $fremdeGruppe->isNotEmpty() ? 'haben ihre Texte zusammengefasst.' : ($wartende->count() === 1 ? 'möchte' : 'möchten').' die Texte zusammenfassen.' }}
                 </strong>
-                <span class="block">Mit dem Knopf speicherst du deinen Text, fasst zusammen und bleibst hier – danach schreibst du im gemeinsamen Text mit. Das gilt für alle Schüler und den klassenweiten Text dieses Fachs.</span>
+                <span class="block">Mit dem Knopf speicherst du deinen Text, fasst zusammen und bleibst hier – danach schreibst du im gemeinsamen Text mit. Das gilt {{ $geltung }}.</span>
                 <button type="button" class="zt-team-jetzt-knopf mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium">
                     <i class="bx bx-merge"></i> {{ $fremdeGruppe->isNotEmpty() ? 'Meinen Text dazunehmen & speichern' : 'Jetzt zusammenfassen & speichern' }}
                 </button>
@@ -83,7 +87,7 @@
         @php $bleiben = $team['mitglieder']->count() >= 2; @endphp
         <div class="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" class="zt-team-trennen-knopf inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium"
-                    data-frage="Deinen Text aus der Zusammenfassung lösen – für alle Schüler und den klassenweiten Text dieses Fachs? Du behältst jeweils den bisherigen gemeinsamen Text als eigenen Text{{ $bleiben ? ' – '.$namen($team['mitglieder']).' bleiben zusammengefasst' : '' }}.">
+                    data-frage="Deinen Text aus der Zusammenfassung lösen – {{ $geltung }}? Du behältst jeweils den bisherigen gemeinsamen Text als eigenen Text{{ $bleiben ? ' – '.$namen($team['mitglieder']).' bleiben zusammengefasst' : '' }}.">
                 <i class="bx bx-unlink"></i> Meinen Text herauslösen &amp; speichern
             </button>
             @if ($bleiben)
@@ -98,7 +102,7 @@
                    class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
             <span class="text-sm text-gray-700">
                 <span class="font-medium">Texte zusammenfassen</span>
-                <span class="block text-xs text-gray-500">Gilt für alle Schüler und den klassenweiten Text dieses Fachs. Sobald eine weitere Lehrkraft zustimmt, entsteht je Text ein gemeinsamer Text; bis dahin stehen die Texte auf dem Zeugnis nacheinander.</span>
+                <span class="block text-xs text-gray-500">Gilt {{ $geltung }}. Sobald eine weitere Lehrkraft zustimmt, entsteht je Text ein gemeinsamer Text; bis dahin stehen die Texte auf dem Zeugnis nacheinander.</span>
             </span>
         </label>
     @endif

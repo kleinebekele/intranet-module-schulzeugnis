@@ -19,9 +19,9 @@ use Intranet\Modules\Schulzeugnis\Models\Lehrer;
  *    teilt die Gruppe EINEN Text (in jedem ihrer Teiltexte gleich gespeichert).
  *  - Wer sich herauslöst, betrifft nur sich: Er behält den bisherigen gemeinsamen Text als
  *    eigenen, die übrigen bleiben (ab zwei) zusammengefasst.
- *  - Die Entscheidung (zusammenfassen / herauslösen) gilt je KLASSE und FACH: für den
- *    klassenweiten Text und alle Schülertexte zugleich ({@see zustimmungUeberall()}).
- *    Geschrieben wird weiter je Schüler.
+ *  - Entschieden (zusammenfassen / herauslösen) wird je KLASSE und FACH zweimal: einmal
+ *    für den klassenweiten Text, einmal für alle Schülertexte zugleich
+ *    ({@see zustimmungUeberall()}). Geschrieben wird weiter je Schüler.
  *  - Text fürs Zeugnis (Träger-Feld) = alle Teiltexte nacheinander, gleiche nur einmal.
  *    `zusammengefasst` am Träger = ALLE Fachlehrer in einer Gruppe (erst dann arbeiten
  *    Korrektoren/Wiederherstellen am Träger-Text; das übernimmt sicherstellen() zurück).
@@ -58,23 +58,9 @@ class Teamtext
     {
         $klasse = $abschnitt->zeugnis?->schueler?->klasse;
 
+        // Neue Teiltexte übernehmen die Entscheidung der Klasse für die Schülertexte.
         return self::traegerSicherstellen($abschnitt, 'inhalt', self::fachlehrer($abschnitt),
-            $klasse && $abschnitt->fach_id ? self::vorgaben($klasse, (int) $abschnitt->fach_id) : []);
-    }
-
-    /**
-     * Die Entscheidung je Klasse × Fach, wie sie am klassenweiten Text steht (dort wird sie
-     * immer mitgeführt): lehrer_id => zusammenfassen. Vorgabe für neu angelegte Teiltexte.
-     *
-     * @return array<int,bool>
-     */
-    public static function vorgaben(Klasse $klasse, int $fachId): array
-    {
-        $kt = Klassentext::where('klasse_id', $klasse->id)->where('fach_id', $fachId)->where('art', 'fach')->first();
-
-        return $kt
-            ? $kt->teiltexte()->pluck('zusammenfassen', 'lehrer_id')->map(fn ($v) => (bool) $v)->all()
-            : [];
+            $klasse && $abschnitt->fach_id ? self::vorgabenAusAbschnitten($klasse, (int) $abschnitt->fach_id, $abschnitt->id) : []);
     }
 
     /** Team-Modus am klassenweiten Text eines Fachs (nicht Haupttext/Spruch). @return Collection<int,Lehrer>|null */
@@ -91,7 +77,7 @@ class Teamtext
             $kt->save();
         }
 
-        return self::traegerSicherstellen($kt, 'text', $lehrer, self::vorgabenAusAbschnitten($klasse, (int) $kt->fach_id));
+        return self::traegerSicherstellen($kt, 'text', $lehrer);
     }
 
     /** Ist der Träger im Team-Modus und noch getrennt? (Klassentext) */
@@ -140,10 +126,11 @@ class Teamtext
         return $lehrer;
     }
 
-    /** Erste vorhandene Entscheidung aus den Schülertexten (falls der klassenweite Text neu ist). @return array<int,bool> */
-    private static function vorgabenAusAbschnitten(Klasse $klasse, int $fachId): array
+    /** Entscheidung der Klasse für die Schülertexte (aus einem anderen Schülertext des Fachs). @return array<int,bool> */
+    private static function vorgabenAusAbschnitten(Klasse $klasse, int $fachId, ?int $ohneId = null): array
     {
         $a = Abschnitt::where('typ', Abschnitt::TYP_FACHTEXT)->where('fach_id', $fachId)
+            ->when($ohneId, fn ($q) => $q->where('id', '!=', $ohneId))
             ->whereHas('zeugnis.schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
             ->whereHas('teiltexte')->orderBy('id')->first();
 
@@ -190,8 +177,9 @@ class Teamtext
     }
 
     /**
-     * Entscheidung je Klasse × Fach: Zustimmung der Lehrkraft am klassenweiten Text und an
-     * allen Schülertexten des Fachs (nicht abgeschlossene Zeugnisse) übernehmen.
+     * Entscheidung für die Schülertexte je Klasse × Fach: Zustimmung der Lehrkraft an allen
+     * Schülertexten des Fachs übernehmen (nicht abgeschlossene Zeugnisse). Der klassenweite
+     * Text hat seine eigene Entscheidung und bleibt unberührt.
      *
      * @return int  Zahl der Schülertexte, die mitgezogen wurden
      */
@@ -202,9 +190,7 @@ class Teamtext
             return 0;
         }
 
-        $kt = Klassentext::where('klasse_id', $klasse->id)->where('fach_id', $fachId)->where('art', 'fach')->first()
-            ?? new Klassentext(['klasse_id' => $klasse->id, 'fach_id' => $fachId, 'art' => 'fach']);
-        $traeger = collect([[$kt, 'text']]);
+        $traeger = collect();
         Abschnitt::where('typ', Abschnitt::TYP_FACHTEXT)->where('fach_id', $fachId)
             ->whereHas('zeugnis', fn ($q) => $q->where('status', '!=', \Intranet\Modules\Schulzeugnis\Models\Zeugnis::STATUS_ABGESCHLOSSEN)
                 ->whereHas('schueler', fn ($s) => $s->where('klasse_id', $klasse->id)))
@@ -214,8 +200,7 @@ class Teamtext
 
         $anzahl = 0;
         foreach ($traeger as [$t, $feld]) {
-            $da = $t instanceof Klassentext ? self::sicherstellenKlassentext($t, $klasse) : self::sicherstellen($t);
-            if (! $da) {
+            if (! self::sicherstellen($t)) {
                 continue;
             }
             $teile = self::teiltexte($t, $lehrer);
