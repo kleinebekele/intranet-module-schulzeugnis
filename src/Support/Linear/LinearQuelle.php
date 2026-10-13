@@ -113,7 +113,9 @@ class LinearQuelle
     }
 
     /**
-     * Alle im Jahr vorkommenden Lehrkräfte (Klassenzuordnung ∪ Lehraufträge).
+     * Alle Lehrkräfte: Kennzeichen `Adresse.Lehrer = 'J'` – auch ohne Lehrauftrag im Jahr,
+     * der fehlt in Linear manchmal nur – plus alle, die im Jahr einer Klasse zugeordnet
+     * sind oder einen Lehrauftrag haben (falls dort das Kennzeichen fehlt).
      * AdrNr wird quell_id – dieselbe ID, die der BenutzerImport als
      * users.externe_id setzt; darüber löst der LehrerImporter das Konto auf.
      *
@@ -122,10 +124,11 @@ class LinearQuelle
     public function lehrer(int $zid): array
     {
         $zeilen = $this->db()->select(
-            'SELECT a.AdrNr, a.Vorname, a.Nachname
+            "SELECT a.AdrNr, a.Vorname, a.Nachname
                FROM Adresse a
-              WHERE a.AdrNr IN (SELECT l.AdrNr FROM WD_Lehrer l WHERE l.ID = ?)
-                 OR a.AdrNr IN (SELECT lf.AdrNr FROM WD_LehrFach lf WHERE lf.ID = ?)',
+              WHERE a.Lehrer = 'J'
+                 OR a.AdrNr IN (SELECT l.AdrNr FROM WD_Lehrer l WHERE l.ID = ?)
+                 OR a.AdrNr IN (SELECT lf.AdrNr FROM WD_LehrFach lf WHERE lf.ID = ?)",
             [$zid, $zid],
         );
 
@@ -457,9 +460,10 @@ class LinearQuelle
                 [$zid, $zid],
             ),
             'lehrer' => $eins(
-                'SELECT COUNT(*) AS n FROM Adresse a
-                  WHERE a.AdrNr IN (SELECT l.AdrNr FROM WD_Lehrer l WHERE l.ID = ?)
-                     OR a.AdrNr IN (SELECT lf.AdrNr FROM WD_LehrFach lf WHERE lf.ID = ?)',
+                "SELECT COUNT(*) AS n FROM Adresse a
+                  WHERE a.Lehrer = 'J'
+                     OR a.AdrNr IN (SELECT l.AdrNr FROM WD_Lehrer l WHERE l.ID = ?)
+                     OR a.AdrNr IN (SELECT lf.AdrNr FROM WD_LehrFach lf WHERE lf.ID = ?)",
                 [$zid, $zid],
             ),
             'klassen'       => $eins('SELECT COUNT(DISTINCT s.Klasse) AS n FROM WD_Schl s WHERE s.ID = ?', [$zid]),
