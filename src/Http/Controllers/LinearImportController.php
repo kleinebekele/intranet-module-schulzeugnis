@@ -3,6 +3,8 @@
 namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Intranet\Modules\Schulzeugnis\Models\Lehrer;
+use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Schuljahr;
 use Intranet\Modules\Schulzeugnis\Support\Import\FaecherImporter;
 use Intranet\Modules\Schulzeugnis\Support\Import\ImportFehler;
@@ -117,8 +119,10 @@ class LinearImportController
 
             [$kopf, $zeilen] = $quelle->daten($art, $wahl['zid']);
             $analyse = $this->importer($art)->analysiere($kopf, $zeilen, ['schuljahr_id' => $schuljahr->id, 'quelle_label' => 'Linear']);
+            $ohneId = [];
             if (in_array($art, ['schueler', 'lehrer'], true)) {
                 $analyse['infos'][] = $this->fehlendeInLinear($art, $schuljahr, $zeilen, $quelle);
+                $ohneId = $this->ohneLinearIdKandidaten($art, $schuljahr, $quelle);
             }
             // Je Zeile ein Schlüssel auf den Linear-Datensatz – für „nur diese Zeile übernehmen".
             foreach ($analyse['zeilen'] as &$r) {
@@ -143,6 +147,7 @@ class LinearImportController
             'zeitraumName' => $wahl['name'],
             'verknuepfen'  => $wahl['verknuepfen'],
             'reihenfolge'  => self::REIHENFOLGE,
+            'ohneId'       => $ohneId,
             'formUrl'      => $this->url($art, 'ausfuehren', $schuljahr),
             'zurueckUrl'   => $this->zurueckUrl($art, $schuljahr),
         ]);
@@ -311,6 +316,84 @@ class LinearImportController
         }
 
         return $info;
+    }
+
+    /**
+     * Lehrer/Schüler des Schuljahres OHNE Linear-ID samt Namens-Treffern in Linear – zum
+     * Verknüpfen von Hand (meist von Hand angelegt und anders geschrieben als in Linear).
+     *
+     * @return array<int,array{id:int, name:string, kandidaten: array<int,array<string,string>>, url:string}>
+     */
+    private function ohneLinearIdKandidaten(string $art, Schuljahr $schuljahr, LinearQuelle $quelle): array
+    {
+        $bestand = $art === 'lehrer' ? $schuljahr->lehrer() : $schuljahr->schueler();
+        $ohne = $bestand->where(fn ($q) => $q->whereNull('quell_id')->orWhere('quell_id', ''))
+            ->orderBy('nachname')->orderBy('vorname')->limit(20)->get();
+
+        $vergeben = array_flip($bestand->getModel()->newQuery()->where('schuljahr_id', $schuljahr->id)
+            ->whereNotNull('quell_id')->pluck('quell_id')->map(fn ($q) => trim((string) $q))->all());
+
+        $liste = [];
+        foreach ($ohne as $p) {
+            try {
+                $treffer = $quelle->namenSuchen((string) $p->vorname, (string) $p->nachname);
+            } catch (\Throwable $e) {
+                report($e);
+                $treffer = [];
+            }
+            $liste[] = [
+                'id'         => $p->id,
+                'name'       => $p->fullName(),
+                'kandidaten' => array_map(fn ($t) => $t + ['vergeben' => isset($vergeben[$t['adrnr']])], $treffer),
+                'url'        => route('module.schulzeugnis.'.$art.'.linear.verknuepfen', $p),
+            ];
+        }
+
+        return $liste;
+    }
+
+    /** „Mit dieser Linear-ID verknüpfen" – Lehrer. */
+    public function lehrerVerknuepfen(Request $request, Lehrer $lehrer)
+    {
+        return $this->verknuepfen($request, $lehrer, 'lehrer');
+    }
+
+    /** „Mit dieser Linear-ID verknüpfen" – Schüler. */
+    public function schuelerVerknuepfen(Request $request, Schueler $schueler)
+    {
+        return $this->verknuepfen($request, $schueler, 'schueler');
+    }
+
+    private function verknuepfen(Request $request, Lehrer|Schueler $person, string $art)
+    {
+        $schuljahr = Schuljahr::find($person->schuljahr_id);
+        $zurueck   = redirect()->to($this->url($art, 'vorschau', $schuljahr));
+        $adrNr     = (int) $request->validate(['adrnr' => ['required', 'integer', 'min:1']])['adrnr'];
+
+        if (filled($person->quell_id)) {
+            return $zurueck->with('error', "{$person->fullName()} hat schon eine Linear-ID.");
+        }
+        $doppelt = $person->newQuery()->where('schuljahr_id', $person->schuljahr_id)->where('quell_id', (string) $adrNr)->first();
+        if ($doppelt) {
+            return $zurueck->with('error', "Linear-ID {$adrNr} gehört in diesem Schuljahr schon zu {$doppelt->fullName()} – vermutlich ist {$person->fullName()} ein doppelter Eintrag.");
+        }
+        try {
+            if (! app(LinearQuelle::class)->adresseVorhanden($adrNr)) {
+                return $zurueck->with('error', "Linear-ID {$adrNr} gibt es in Linear nicht.");
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $zurueck->with('error', 'Linear ist gerade nicht erreichbar: '.$e->getMessage());
+        }
+
+        $person->update(['quell_id' => (string) $adrNr]);
+        \Intranet\Modules\Schulzeugnis\Models\Protokoll::log('linear_verknuepft', [
+            'schuljahr_id' => $person->schuljahr_id,
+            'beschreibung' => ($art === 'lehrer' ? 'Lehrer' : 'Schüler')." {$person->fullName()} mit Linear-ID {$adrNr} verknüpft",
+        ]);
+
+        return $zurueck->with('status', "{$person->fullName()} ist jetzt mit Linear-ID {$adrNr} verknüpft – die Vorschau zeigt den neuen Stand.");
     }
 
     /** Fächer sind jahresübergreifend; gelesen wird der Zeitraum des aktiven (oder gewählten) Schuljahres. */

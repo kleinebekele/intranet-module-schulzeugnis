@@ -354,6 +354,41 @@ class LinearQuelle
     }
 
     /**
+     * Personen in Linear mit ähnlichem Namen (für „ohne Linear-ID" in der Vorschau):
+     * gleicher Nachname, oder Vorname + Anfang des Nachnamens. Höchstens 8 Treffer.
+     *
+     * @return array<int,array{adrnr:string, vorname:string, nachname:string}>
+     */
+    public function namenSuchen(string $vorname, string $nachname): array
+    {
+        $esc = fn (string $s) => str_replace(['[', '%', '_'], ['[[]', '[%]', '[_]'], trim($s));
+        $nach = $esc($nachname);
+        if ($nach === '') {
+            return [];
+        }
+        $zeilen = $this->db()->select(
+            'SELECT TOP 8 a.AdrNr, a.Vorname, a.Nachname
+               FROM Adresse a
+              WHERE a.Nachname LIKE ?
+                 OR (a.Vorname LIKE ? AND a.Nachname LIKE ?)
+              ORDER BY a.Nachname, a.Vorname',
+            ['%'.$nach.'%', '%'.$esc($vorname).'%', mb_substr($nach, 0, 3).'%'],
+        );
+
+        return array_map(function (object $z): array {
+            $w = $this->normalisiere($z);
+
+            return ['adrnr' => (string) (int) $w['AdrNr'], 'vorname' => (string) ($w['Vorname'] ?? ''), 'nachname' => (string) ($w['Nachname'] ?? '')];
+        }, $zeilen);
+    }
+
+    /** Gibt es diese Adresse in Linear? */
+    public function adresseVorhanden(int $adrNr): bool
+    {
+        return (int) ($this->db()->select('SELECT COUNT(*) AS n FROM Adresse WHERE AdrNr = ?', [$adrNr])[0]->n ?? 0) > 0;
+    }
+
+    /**
      * Reguläres Klassenende = häufigstes AustrittKl; nur frühere Daten bleiben als Austritt.
      *
      * @param  array<int,array<string,string>>  $zeilen

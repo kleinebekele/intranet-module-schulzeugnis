@@ -130,6 +130,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
                 'lehrer.linear.vorschau', 'lehrer.linear.ausfuehren',
                 'klassen.linear.vorschau', 'klassen.linear.ausfuehren',
                 'klassen.lehrauftraege.linear.vorschau', 'klassen.lehrauftraege.linear.ausfuehren',
-                'schueler.linear.vorschau', 'schueler.linear.ausfuehren');
+                'schueler.linear.vorschau', 'schueler.linear.ausfuehren',
+                'lehrer.linear.verknuepfen', 'schueler.linear.verknuepfen');
     }
 }

@@ -36,6 +36,42 @@
             @endif
         </div>
 
+        @if (! empty($ohneId))
+            <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-sm">
+                <p class="font-medium text-indigo-800"><i class="bx bx-link"></i> Ohne Linear-ID – mit Linear verknüpfen</p>
+                <p class="mt-1 text-xs text-indigo-700">Meist von Hand angelegt und anders geschrieben als in Linear. Nach dem Verknüpfen erkennt der Import den Eintrag wieder.</p>
+                <div class="mt-3 space-y-3">
+                    @foreach ($ohneId as $p)
+                        <div class="rounded-lg border border-indigo-100 bg-white p-3">
+                            <p class="font-medium text-gray-800">{{ $p['name'] }}</p>
+                            @if (empty($p['kandidaten']))
+                                <p class="mt-1 text-xs text-gray-500">In Linear kein ähnlicher Name gefunden. Linear-ID unter Bearbeiten von Hand eintragen.</p>
+                            @else
+                                <ul class="mt-1 space-y-1">
+                                    @foreach ($p['kandidaten'] as $k)
+                                        <li class="flex flex-wrap items-center gap-2">
+                                            <span class="text-gray-700">{{ trim($k['vorname'].' '.$k['nachname']) }}</span>
+                                            <span class="text-xs text-gray-400">Linear-ID {{ $k['adrnr'] }}</span>
+                                            @if ($k['vergeben'])
+                                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">schon an einem anderen Eintrag – dann ist dieser hier wohl doppelt</span>
+                                            @else
+                                                <form method="POST" action="{{ $p['url'] }}" class="inline"
+                                                      data-bestaetigen="{{ $p['name'] }} mit Linear-ID {{ $k['adrnr'] }} ({{ trim($k['vorname'].' '.$k['nachname']) }}) verknüpfen?" data-knopf="Verknüpfen">
+                                                    @csrf
+                                                    <input type="hidden" name="adrnr" value="{{ $k['adrnr'] }}">
+                                                    <button type="submit" class="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">Mit dieser Linear-ID verknüpfen</button>
+                                                </form>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @include('schulzeugnis::import._tabelle', ['analyse' => $analyse, 'nurImportierte' => false, 'zeilenAktion' => ['url' => $formUrl, 'zeitraum' => $zid]])
 
         <div class="rounded-xl border border-gray-200 bg-white p-6">
