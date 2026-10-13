@@ -110,14 +110,17 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('klassenraeume', 'Klassenräume', 'module.schulzeugnis.klassenraeume.index', icon: 'door')
             ->item('todo', 'Meine ToDos', 'module.schulzeugnis.todo.index', icon: 'list')
             ->item('schuljahre', 'Schuljahre', 'module.schulzeugnis.schuljahre.index', icon: 'calendar', group: $verwaltung)
-            ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.index', icon: 'users', group: $verwaltung)
             ->item('stufen', 'Schulstufen', 'module.schulzeugnis.stufen.index', icon: 'layers', group: $verwaltung)
-            ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user', group: $verwaltung)
-            ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'chalkboard', group: $verwaltung)
+            ->item('klassen', 'Klassen', 'module.schulzeugnis.klassen.index', icon: 'users', group: $verwaltung)
             ->item('faecher', 'Fächer', 'module.schulzeugnis.faecher.index', icon: 'book-content', group: $verwaltung)
+            ->item('lehrer', 'Lehrer', 'module.schulzeugnis.lehrer.index', icon: 'chalkboard', group: $verwaltung)
+            ->item('schueler', 'Schüler', 'module.schulzeugnis.schueler.index', icon: 'user', group: $verwaltung)
             ->item('sprueche', 'Zeugnissprüche', 'module.schulzeugnis.sprueche.index', icon: 'quote', group: $verwaltung)
             ->item('formate', 'Zeugnisformate', 'module.schulzeugnis.formate.index', icon: 'layout', group: $verwaltung)
-            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'import', group: $verwaltung)
+            // CSV-Import nur, solange keine Linear-Anbindung da ist – sonst kommen die
+            // Stammdaten über „Aus Linear importieren" (Seite bleibt per Adresse erreichbar).
+            ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'import', group: $verwaltung,
+                visibleWhen: fn () => ! app(\Intranet\Modules\Schulzeugnis\Support\Linear\LinearQuelle::class)->verfuegbar())
             ->item('altumwandeln', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altumwandeln.index', icon: 'transfer')
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
