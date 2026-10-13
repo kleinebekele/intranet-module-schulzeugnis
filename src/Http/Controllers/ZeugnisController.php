@@ -1384,10 +1384,9 @@ class ZeugnisController
             $kt->load('korrektoren');
         }
 
+        // Ohne Zuständigkeit: nur ansehen (wie bei den Schülertexten) – Speichern lehnt
+        // klassentextUpdate() ab.
         $berechtigung = $this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user());
-        if ($berechtigung === 'keine') {
-            abort(403, 'Keine Berechtigung, diesen Klassentext zu bearbeiten.');
-        }
 
         // Der klassenweite Spruch ist einmalig je Klasse – keine Fach-zu-Fach-Navigation.
         $nachbarn = $art === 'spruch'
@@ -1409,7 +1408,7 @@ class ZeugnisController
             'berechtigung'   => $berechtigung,
             'alleLehrer'     => Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->whereNotIn('id', $this->meineLehrerIds($klasse))->orderBy('nachname')->orderBy('vorname')->get(),
             'korrektorIds'   => $kt->exists ? $kt->korrektoren->pluck('id')->diff($this->meineLehrerIds($klasse))->values()->all() : [],
-            'readonly'       => false,
+            'readonly'       => $berechtigung === 'keine',
             'navPrev'        => $nachbarn['prev'],
             'navNext'        => $nachbarn['next'],
             'navPosition'    => $nachbarn['position'],

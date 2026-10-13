@@ -232,21 +232,18 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{-- Klassenweit-Zeile: gemeinsame (Klassen-)Texte je Spalte, mit eigenem Status. --}}
+                    {{-- Klassenweit-Zeile: gemeinsame (Klassen-)Texte je Spalte, mit eigenem Status.
+                         Ansehen dürfen alle (wie die Schülertexte) – ohne Zuständigkeit nur lesend. --}}
                     <tr class="zt-klassenweit border-b border-gray-200">
                         <td class="border-r border-gray-200 px-4 whitespace-nowrap font-semibold text-indigo-800"
                             style="position: sticky; left: 0; z-index: 10; background: var(--color-indigo-50, #eef2ff);">Klassenweit</td>
                         @if ($hatHaupt)
                             @php $ktH = $ktRows['haupt'] ?? null; $kmH = $ktH?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="px-2 text-center" style="background: var(--color-indigo-50, #eef2ff);">
-                                @if ($istAdmin || $binKlassenlehrer || in_array('haupt', $ktKorrektorKeys))
-                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}"
-                                       title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
-                                        <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}"></i>
-                                    </a>
-                                @else
-                                    <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}" title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}"></i>
-                                @endif
+                                <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}"
+                                   title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                    <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}"></i>
+                                </a>
                             </td>
                             <td class="zt-mini text-center" style="background: var(--color-indigo-50, #eef2ff);">
                                 @if ($warnAgg['haupt'])
@@ -265,27 +262,19 @@
                         @foreach ($faecher as $fach)
                             @php $ktF = $ktRows[$fach->id] ?? null; $kmF = $ktF?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="zt-col zt-col-{{ $fach->id }} px-2 text-center" style="background: var(--color-indigo-50, #eef2ff);">
-                                @if ($istAdmin || in_array($fach->id, $meineFachIds) || in_array($fach->id, $ktKorrektorKeys))
-                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}"
-                                       title="Klassentext {{ $fach->name }} – {{ $kmF['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
-                                        <i class="bx {{ $kmF['icon'] }} text-lg {{ $farbeKlasse[$kmF['farbe']] ?? 'text-gray-300' }}"></i>
-                                    </a>
-                                @else
-                                    <i class="bx {{ $kmF['icon'] }} text-lg {{ $farbeKlasse[$kmF['farbe']] ?? 'text-gray-300' }}" title="Klassentext {{ $fach->name }} – {{ $kmF['label'] }}"></i>
-                                @endif
+                                <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach->id]) }}"
+                                   title="Klassentext {{ $fach->name }} – {{ $kmF['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                    <i class="bx {{ $kmF['icon'] }} text-lg {{ $farbeKlasse[$kmF['farbe']] ?? 'text-gray-300' }}"></i>
+                                </a>
                             </td>
                         @endforeach
                         @if ($hatSpruch)
                             @php $ktS = $ktRows['spruch'] ?? null; $kmS = $ktS?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="border-l border-gray-200 px-2 text-center" style="background: var(--color-indigo-50, #eef2ff);">
-                                @if ($istAdmin || $binKlassenlehrer || in_array('spruch', $ktKorrektorKeys))
-                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'spruch']) }}"
-                                       title="Klassenweiter Zeugnisspruch – {{ $kmS['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
-                                        <i class="bx {{ $kmS['icon'] }} text-lg {{ $farbeKlasse[$kmS['farbe']] ?? 'text-gray-300' }}"></i>
-                                    </a>
-                                @else
-                                    <i class="bx {{ $kmS['icon'] }} text-lg {{ $farbeKlasse[$kmS['farbe']] ?? 'text-gray-300' }}" title="Klassenweiter Zeugnisspruch – {{ $kmS['label'] }}"></i>
-                                @endif
+                                <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'spruch']) }}"
+                                   title="Klassenweiter Zeugnisspruch – {{ $kmS['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                    <i class="bx {{ $kmS['icon'] }} text-lg {{ $farbeKlasse[$kmS['farbe']] ?? 'text-gray-300' }}"></i>
+                                </a>
                             </td>
                         @endif
                         <td class="zt-mini border-l border-gray-200 text-center" style="background: var(--color-indigo-50, #eef2ff);">

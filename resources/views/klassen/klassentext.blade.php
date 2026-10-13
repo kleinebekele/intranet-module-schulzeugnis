@@ -20,6 +20,9 @@
                 <div class="text-sm text-gray-500">
                     {{ $klasse->name }} &middot; Schuljahr {{ $klasse->schuljahr->name }}
                 </div>
+                @if ($readonly)
+                    <span class="mt-1 inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">Nur ansehen</span>
+                @endif
             </div>
         </div>
     </x-slot>
@@ -77,11 +80,11 @@
 
             <div>
                 @if (! empty($team))
-                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 10, 'bereich' => 'klasse', 'readonly' => false])
+                    @include('schulzeugnis::zeugnisse._teamtext', ['rows' => 10, 'bereich' => 'klasse', 'readonly' => $readonly])
                 @else
                 <label for="text" class="block text-sm font-medium text-gray-700">Klassenweiter Text</label>
                 {{-- Der Spruch dient als Vorlage und druckt nicht selbst – dort keine Formatierung. --}}
-                <textarea name="text" id="text" rows="12" @unless ($istSpruch) data-fmt @endunless
+                <textarea name="text" id="text" rows="12" @unless ($istSpruch) data-fmt @endunless @disabled($readonly)
                           class="zt-txt-area mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           placeholder="Text, der für alle Schüler dieser Klasse gilt …">{{ old('text', $klassentext->text) }}</textarea>
                 @endif
@@ -107,9 +110,9 @@
             <div class="zt-two">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Bearbeitungsstatus</label>
-                    <div class="zt-status" id="zt-status">
+                    <div class="zt-status {{ $readonly ? 'zt-status-ro' : '' }}" id="zt-status">
                         <input type="hidden" name="status" value="{{ $aktStatus }}">
-                        <button type="button" class="zt-status-btn">
+                        <button type="button" class="zt-status-btn" @disabled($readonly)>
                             <i class="bx {{ $aktMeta['icon'] }}" style="color: {{ $statusFarbe[$aktMeta['farbe']] ?? '#9ca3af' }}"></i>
                             <span class="zt-status-label">{{ $aktMeta['label'] }}</span>
                             <i class="bx bx-chevron-down zt-status-caret"></i>
@@ -124,7 +127,9 @@
                             @endforeach
                         </ul>
                     </div>
-                    <p class="mt-1 text-xs text-gray-400">Erscheint in der „Klassenweit"-Zeile der Zeugnis-Tabelle.</p>
+                    @unless ($readonly)
+                        <p class="mt-1 text-xs text-gray-400">Erscheint in der „Klassenweit"-Zeile der Zeugnis-Tabelle.</p>
+                    @endunless
                 </div>
 
                 @if ($berechtigung === 'voll')
@@ -157,6 +162,7 @@
                 $urlSchueler = $navSchueler ? route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $navSchueler['id']]) : '';
                 $vorauswahl = $istVoll ? ($navNext ? 'next' : ($navSchueler ? 'schueler' : ($navPrev ? 'prev' : 'index'))) : 'index';
             @endphp
+            @unless ($readonly)
             <div class="space-y-3 border-t border-gray-100 pt-4" id="zt-nav">
                 <p class="text-sm font-medium text-gray-700">Danach weiter zu:</p>
                 <div class="space-y-1.5 text-sm">
@@ -209,6 +215,7 @@
                     @endif
                 </div>
             </div>
+            @endunless
         </form>
 
         {{-- Korrektor: Korrektur ablehnen (entfernt sich selbst, Status zurück auf „Frei zur Korrektur"). --}}
