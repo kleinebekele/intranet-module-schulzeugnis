@@ -102,6 +102,8 @@
         .zt-chip.zt-off { opacity: .45; text-decoration: line-through; }
         .zt-chip.zt-preset { border-color: var(--color-indigo-500, #6366f1); color: var(--color-indigo-600, #4f46e5); background: var(--color-indigo-50, #eef2ff); font-weight: 600; }
         #zt-table th.zt-kopf { cursor: help; }
+        /* Kopf schwebt beim Seiten-Scrollen mit (siehe Skript unten) – dann mit Schatten abheben. */
+        #zt-table thead.zt-kopf-schwebt th { box-shadow: 0 2px 0 var(--color-gray-200, #e5e7eb), 0 6px 10px -6px rgba(0, 0, 0, .25); }
         #zt-tip {
             position: fixed; z-index: 60; max-width: 300px;
             background: var(--color-white, #fff); border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: 12px;
@@ -193,7 +195,7 @@
             </div>
         </div>
 
-        <div id="zt-scroll" class="rounded-xl border border-gray-200 bg-white" style="max-height: 74vh; overflow: auto; width: fit-content; max-width: 100%;">
+        <div id="zt-scroll" class="rounded-xl border border-gray-200 bg-white" style="overflow-x: auto; width: fit-content; max-width: 100%;">
             <table id="zt-table" class="border-collapse text-sm">
                 <thead>
                     <tr class="text-gray-600">
@@ -604,23 +606,35 @@
         })();
     </script>
     <script>
-        // Fixer Tabellenkopf ohne Doppel-Scroll: den Scroll-Container exakt bis zum
-        // unteren Viewport-Rand aufziehen. Dann scrollt NUR die Tabelle (der Kopf bleibt
-        // per position:sticky fix) und die Seite selbst bekommt keinen zweiten Scrollbalken.
+        // Die SEITE scrollt (nicht mehr die Tabelle). Der Tabellenkopf kann dabei nicht per
+        // position:sticky am Fenster kleben – der Container muss seitlich scrollen können,
+        // und ein seitlich scrollender Container fängt sticky ab. Deshalb wird der Kopf beim
+        // Scrollen per translateY unter die feste Kopfleiste (bzw. den Als-Lehrkraft-Balken)
+        // geschoben, aber nie unter das Tabellenende.
         (function () {
-            var el = document.getElementById('zt-scroll');
-            if (!el) { return; }
-            function anpassen() {
-                var rect = el.getBoundingClientRect();
-                // Was steht UNTER der Tabelle (Footer etc.)? = Dokumenthöhe minus Container-Unterkante.
-                var unten = document.documentElement.scrollHeight - (window.scrollY + rect.bottom);
-                // Tabelle nur bis knapp über den Footer aufziehen → Seite passt exakt ins Fenster.
-                var ziel  = window.innerHeight - rect.top - Math.max(0, unten) - 8;
-                el.style.maxHeight = Math.max(320, ziel) + 'px';
+            var table = document.getElementById('zt-table');
+            var thead = table ? table.tHead : null;
+            if (!thead) { return; }
+            var zellen = thead.querySelectorAll('th');
+
+            function obenKante() {
+                var balken = document.getElementById('zeugnis-als-lehrer');
+                return balken ? balken.getBoundingClientRect().bottom : 64; // Kopfleiste des Cores: 4rem
             }
-            anpassen();
-            window.addEventListener('load', anpassen);
-            window.addEventListener('resize', anpassen);
+            function setzen() {
+                var r  = table.getBoundingClientRect();
+                var h  = thead.getBoundingClientRect().height;
+                var dy = Math.min(Math.max(0, obenKante() - r.top), Math.max(0, r.height - h));
+                var t  = dy > 0 ? 'translateY(' + dy + 'px)' : '';
+                zellen.forEach(function (th) { th.style.transform = t; });
+                thead.classList.toggle('zt-kopf-schwebt', dy > 0);
+            }
+            // Direkt rechnen statt per requestAnimationFrame: das ruht in Hintergrund-Tabs.
+            function planen() { setzen(); }
+            window.addEventListener('scroll', planen, { passive: true });
+            window.addEventListener('resize', planen);
+            window.addEventListener('load', planen);
+            setzen();
         })();
     </script>
 </x-app-layout>
