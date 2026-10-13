@@ -122,6 +122,9 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             ->item('import', 'Stammdaten-Import', 'module.schulzeugnis.import.index', icon: 'import', group: $verwaltung,
                 visibleWhen: fn () => ! app(\Intranet\Modules\Schulzeugnis\Support\Linear\LinearQuelle::class)->verfuegbar())
             ->item('altumwandeln', 'Alte Zeugnisse umwandeln', 'module.schulzeugnis.altumwandeln.index', icon: 'transfer')
+            // Beispieltexte werden im Format-Designer gepflegt – ihre Routen liegen nicht
+            // unter `formate.*`, gehören aber zu diesem Menüpunkt (sonst niedrigste Stufe).
+            ->gehoertZu('formate', 'beispieltexte')
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
             ->lesend('import.vorschau', 'altumwandeln.zeugnisse', 'altumwandeln.fachzeugnisse') // prüfen/umwandeln ohne Speichern

@@ -251,6 +251,12 @@ class ZeugnisController
      */
     public function store(Klasse $klasse, Schueler $schueler)
     {
+        // Schüler muss zur Klasse aus der Adresse gehören – sonst entstünde ein
+        // Zeugnis nach den Regeln (Fächer, Format, Klassenlehrer) einer fremden Klasse.
+        // Weitere Rechte wie beim automatischen Anlegen in index(): wer die
+        // Klassenräume bearbeiten darf (Menüpunkt-Gating des Cores).
+        abort_unless((int) $schueler->klasse_id === (int) $klasse->id, 404);
+
         if ($schueler->zeugnis_gesperrt) {
             return redirect()
                 ->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
@@ -440,21 +446,44 @@ class ZeugnisController
 
     public function edit(Zeugnis $zeugnis)
     {
-        $zeugnis->load(['schueler.klasse.schuljahr', 'format', 'abschnitte.fach']);
+        $zeugnis->load(['schueler.klasse.schuljahr', 'format', 'abschnitte.fach', 'abschnitte.korrektoren']);
 
         $abschnitte = $zeugnis->abschnitte
             ->sortBy([['reihenfolge', 'asc'], ['id', 'asc']])
             ->values();
 
+        // Lesen darf jeder mit Zugang; schreiben nur in den eigenen Abschnitten –
+        // dieselbe Prüfung wie beim Speichern (update), damit niemand vergeblich tippt.
+        $user = auth()->user();
+        $berechtigungen = $abschnitte->mapWithKeys(function (Abschnitt $a) use ($zeugnis, $user) {
+            $a->setRelation('zeugnis', $zeugnis);
+
+            return [$a->id => $this->berechtigung($a, $user)];
+        })->all();
+
         return view('schulzeugnis::zeugnisse.edit', [
-            'zeugnis'    => $zeugnis,
-            'schueler'   => $zeugnis->schueler,
-            'abschnitte' => $abschnitte,
-            'stati'      => Abschnitt::STATI,
-            'istAdmin'   => (bool) auth()->user()?->is_admin,
+            'zeugnis'         => $zeugnis,
+            'schueler'        => $zeugnis->schueler,
+            'abschnitte'      => $abschnitte,
+            'stati'           => Abschnitt::STATI,
+            'istAdmin'        => (bool) $user?->is_admin,
+            'berechtigungen'  => $berechtigungen,
+            'korrekturStati'  => self::KORREKTUR_STATI,
+            'darfAbschliessen' => $this->darfAbschliessen($zeugnis, $user),
         ]);
     }
 
+    /**
+     * Sammel-Speichern aus der Zeugnis-Ansicht (alle Abschnitte in EINEM Formular).
+     *
+     * Je Abschnitt gelten dieselben Rechte wie im Einzel-Editor (abschnittUpdate):
+     *  - voll berechtigt → Text, Note, Status (Freigabe zur Korrektur nur, wenn schon
+     *    Korrektoren zugewiesen sind – die wählt man im Einzel-Editor),
+     *  - Korrektor → Text und Note, Status nur auf „in Korrektur"/„Korrektur durchgeführt",
+     *  - sonst bleibt der Abschnitt unverändert.
+     * Das Formular schickt immer ALLE Abschnitte mit; unveränderte fremde Abschnitte
+     * werden still übergangen, geänderte in der Rückmeldung genannt.
+     */
     public function update(Request $request, Zeugnis $zeugnis)
     {
         if ($zeugnis->istAbgeschlossen()) {
@@ -462,46 +491,145 @@ class ZeugnisController
                 ->with('error', 'Das Zeugnis ist abgeschlossen und kann nicht geändert werden.');
         }
 
-        $eingaben = $request->input('abschnitte', []);
-
-        foreach ($zeugnis->abschnitte as $abschnitt) {
-            if (! array_key_exists($abschnitt->id, $eingaben)) {
-                continue;
-            }
-            $row = $eingaben[$abschnitt->id];
-
-            // Getrennte Teiltexte (Team-Teaching) nur im Einzel-Editor – hier nicht überschreiben.
-            $teamGetrennt = ! $abschnitt->zusammengefasst && $abschnitt->teiltexte()->exists()
-                && Teamtext::sicherstellen($abschnitt);
-            if (! $teamGetrennt) {
-                $abschnitt->inhalt = $row['inhalt'] ?? null;
-            }
-            if ($abschnitt->typ === Abschnitt::TYP_NOTE) {
-                $abschnitt->note = $row['note'] ?? null;
-            }
-            $statusEingabe = $row['status'] ?? '';
-            $abschnitt->status = array_key_exists($statusEingabe, Abschnitt::STATI)
-                ? $statusEingabe
-                : Abschnitt::STATUS_STANDARD;
-            $abschnitt->save();
-        }
-
-        Protokoll::log('zeugnis_gespeichert', [
-            'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
-            'zeugnis_id'   => $zeugnis->id,
-            'beschreibung' => "Zeugnis für {$zeugnis->schueler?->fullName()} gespeichert",
+        $request->validate([
+            'abschnitte'          => ['array'],
+            'abschnitte.*.inhalt' => ['nullable', 'string'],
+            'abschnitte.*.note'   => ['nullable', 'string', 'max:20'],
+            'abschnitte.*.status' => ['nullable', 'string'],
         ]);
 
-        $this->ueberlaufNeuBerechnen($zeugnis);
+        $zeugnis->loadMissing('schueler.klasse');
+        $klasse   = $zeugnis->schueler?->klasse;
+        $user     = auth()->user();
+        $eingaben = (array) $request->input('abschnitte', []);
+        $meine    = $this->meineLehrerIds($klasse);
 
-        return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
-            ->with('status', 'Zeugnis gespeichert.');
+        $gespeichert   = 0;
+        $uebersprungen = [];   // keine Berechtigung → nichts gespeichert
+        $ohneStatus    = [];   // Text gespeichert, Statuswechsel nicht erlaubt
+
+        foreach ($zeugnis->abschnitte()->with(['fach', 'korrektoren'])->get() as $abschnitt) {
+            $row = $eingaben[$abschnitt->id] ?? null;
+            if (! is_array($row)) {
+                continue;
+            }
+            $abschnitt->setRelation('zeugnis', $zeugnis); // berechtigung() braucht Schüler + Klasse
+
+            // Getrennte Teiltexte (Team-Teaching) nur im Einzel-Editor – hier nicht überschreiben.
+            // Fehlt das Feld (deaktiviert im Formular), bleibt der Text ebenfalls.
+            $teamGetrennt = ! $abschnitt->zusammengefasst && $abschnitt->teiltexte()->exists()
+                && Teamtext::sicherstellen($abschnitt);
+            $neuInhalt = (! $teamGetrennt && array_key_exists('inhalt', $row)) ? $row['inhalt'] : $abschnitt->inhalt;
+            $neuNote   = ($abschnitt->typ === Abschnitt::TYP_NOTE && array_key_exists('note', $row)) ? $row['note'] : $abschnitt->note;
+            $eingabe   = (string) ($row['status'] ?? '');
+            $neuStatus = array_key_exists($eingabe, Abschnitt::STATI) ? $eingabe : $abschnitt->status;
+
+            $textGeaendert   = $this->zeilenNormiert($neuInhalt) !== $this->zeilenNormiert($abschnitt->inhalt);
+            $noteGeaendert   = (string) $neuNote !== (string) $abschnitt->note;
+            $statusGeaendert = $neuStatus !== $abschnitt->status;
+            if (! $textGeaendert && ! $noteGeaendert && ! $statusGeaendert) {
+                continue;
+            }
+
+            $b = $this->berechtigung($abschnitt, $user);
+            if ($b === 'keine') {
+                $uebersprungen[] = $this->abschnittBezeichnung($abschnitt);
+                continue;
+            }
+
+            if ($statusGeaendert) {
+                $erlaubt = $b === 'voll'
+                    ? (! in_array($neuStatus, self::BRAUCHT_KORREKTOREN, true)
+                        || $abschnitt->korrektoren->pluck('id')->diff($meine)->isNotEmpty())
+                    : in_array($neuStatus, self::KORREKTUR_STATI, true);
+                if (! $erlaubt) {
+                    $ohneStatus[] = $this->abschnittBezeichnung($abschnitt);
+                    $neuStatus = $abschnitt->status;
+                    if (! $textGeaendert && ! $noteGeaendert) {
+                        continue;
+                    }
+                }
+            }
+
+            $altInhalt = $abschnitt->inhalt;
+            $altStatus = $abschnitt->status;
+
+            $abschnitt->inhalt = $neuInhalt;
+            $abschnitt->note   = $neuNote;
+            $abschnitt->status = $neuStatus;
+            $abschnitt->save();
+            $gespeichert++;
+
+            // Wie im Einzel-Editor in den Verlauf (Wiederherstellen schreibt in inhalt zurück).
+            $textFeld = $abschnitt->typ === Abschnitt::TYP_NOTE ? 'Note' : 'Schülertext';
+            $this->logFeld($abschnitt, $textFeld, $altInhalt, $abschnitt->inhalt);
+            $this->logStatus($abschnitt, $altStatus, $abschnitt->status);
+        }
+
+        if ($gespeichert > 0) {
+            Protokoll::log('zeugnis_gespeichert', [
+                'schuljahr_id' => $zeugnis->schueler?->schuljahr_id,
+                'zeugnis_id'   => $zeugnis->id,
+                'beschreibung' => "Zeugnis für {$zeugnis->schueler?->fullName()} gespeichert",
+            ]);
+
+            $this->ueberlaufNeuBerechnen($zeugnis);
+        }
+
+        $hinweise = [];
+        if ($uebersprungen) {
+            $hinweise[] = 'Nicht gespeichert (keine Berechtigung): ' . implode(', ', array_unique($uebersprungen)) . '.';
+        }
+        if ($ohneStatus) {
+            $hinweise[] = 'Status nicht geändert (nicht erlaubt bzw. erst Korrektoren im Einzel-Editor wählen): '
+                . implode(', ', array_unique($ohneStatus)) . '.';
+        }
+
+        $antwort = redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
+            ->with('status', $gespeichert > 0 ? 'Zeugnis gespeichert.' : 'Keine Änderungen gespeichert.');
+
+        return $hinweise ? $antwort->with('error', implode(' ', $hinweise)) : $antwort;
+    }
+
+    /** Text für den Änderungsvergleich: Zeilenenden vereinheitlicht, null = leer. */
+    private function zeilenNormiert(?string $text): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", (string) $text);
+    }
+
+    /** Kurzname eines Abschnitts für Rückmeldungen (Fach bzw. Art des Textes). */
+    private function abschnittBezeichnung(Abschnitt $abschnitt): string
+    {
+        return match ($abschnitt->typ) {
+            Abschnitt::TYP_HAUPTZEUGNIS => 'Hauptzeugnis',
+            Abschnitt::TYP_HAUPTTEXT    => 'Haupttext',
+            Abschnitt::TYP_SPRUCH       => 'Zeugnisspruch',
+            default                     => $abschnitt->fach?->name ?? 'Fachtext',
+        };
+    }
+
+    /** Abschließen (einfrieren): Klassenlehrer der Klasse, Zeugnisadmin oder Admin. */
+    private function darfAbschliessen(Zeugnis $zeugnis, $user): bool
+    {
+        if ($this->kannKlassenVerwalten($user)) {
+            return true;
+        }
+
+        $klasse = $zeugnis->schueler?->klasse;
+
+        return $klasse !== null && $klasse->hatKlassenlehrer($this->meineLehrerIds($klasse));
     }
 
     public function abschliessen(Zeugnis $zeugnis)
     {
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis);
+        }
+
+        $zeugnis->loadMissing('schueler.klasse');
+        if (! $this->darfAbschliessen($zeugnis, auth()->user())) {
+            return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
+                ->with('error', 'Abschließen dürfen nur die Klassenlehrer dieser Klasse, die Zeugnisadmins und Administratoren.');
         }
 
         $schueler = $zeugnis->schueler;

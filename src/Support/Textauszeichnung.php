@@ -207,6 +207,27 @@ final class Textauszeichnung
     }
 
     /**
+     * Fertiges HTML nur durchlassen, wenn es genau so aussieht, wie zuHtml() es baut
+     * (escapter Text + die festen Stil-Spans). Alles andere – etwa ein `inhalt_html`,
+     * das über ein importiertes oder altes Layout hereinkam – wird verworfen und
+     * stattdessen der Klartext escapt ausgegeben.
+     */
+    public static function nurEigenesHtml(?string $html, string $fallbackText): string
+    {
+        if ($html === null) {
+            return e($fallbackText);
+        }
+
+        $rest = preg_replace(
+            '#<span style="(?:font-weight:bold;)?(?:font-style:italic;)?(?:text-decoration:underline;)?">|</span>#',
+            '',
+            $html
+        );
+
+        return ($rest === null || preg_match('/[<>"]/', $rest)) ? e($fallbackText) : $html;
+    }
+
+    /**
      * Ganzer Marker-Text → HTML-Fließtext für frei umbrechende Blöcke
      * (white-space: pre-line; dompdf bricht selbst um, keine Vermessung).
      */

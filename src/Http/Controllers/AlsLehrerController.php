@@ -17,6 +17,7 @@ class AlsLehrerController
         $konto = $lehrer->core_user_id ? User::find($lehrer->core_user_id) : null;
         abort_unless($konto, 422, 'Diese Lehrkraft hat kein Intranet-Konto.');
         abort_if($konto->is($request->user()), 422, 'Das bist du selbst.');
+        abort_unless(AlsLehrer::zielErlaubt($request->user(), $konto), 403, 'Administratoren und Zeugnisadmins kann nur ein Administrator übernehmen.');
 
         $request->session()->put(AlsLehrer::SITZUNG, $konto->id);
         Audit::schreiben('schulzeugnis.als_lehrer_start', "Nutzt das Zeugnis-Modul als {$konto->name}", betroffener: $konto);

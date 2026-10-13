@@ -54,6 +54,11 @@
             @method('PUT')
 
             @foreach ($abschnitte as $a)
+                @php
+                    // Schreibrecht wie beim Speichern: fremde Abschnitte nur ansehen.
+                    $recht = $berechtigungen[$a->id] ?? 'keine';
+                    $fremd = $readonly || $recht === 'keine';
+                @endphp
                 <div class="rounded-xl border border-gray-200 bg-white p-5">
                     <div class="flex items-center justify-between">
                         <h2 class="font-semibold text-gray-800">
@@ -63,9 +68,11 @@
                                 {{ $a->fach?->name ?? 'Fach' }}
                             @endif
                         </h2>
-                        <select name="abschnitte[{{ $a->id }}][status]" @disabled($readonly)
+                        <select name="abschnitte[{{ $a->id }}][status]" @disabled($fremd)
                                 class="rounded-lg border-gray-300 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             @foreach ($stati as $key => $meta)
+                                {{-- Korrektor: nur der aktuelle Status und die Korrektur-Stati. --}}
+                                @continue($recht === 'korrektor' && $a->status !== $key && ! in_array($key, $korrekturStati, true))
                                 <option value="{{ $key }}" @selected($a->status === $key)>{{ $meta['label'] }}</option>
                             @endforeach
                         </select>
@@ -74,14 +81,17 @@
                     @if ($a->autor_name)
                         <p class="mt-0.5 text-xs text-gray-400">Autor: {{ $a->autor_name }}</p>
                     @endif
+                    @if (! $readonly && $recht === 'keine')
+                        <p class="mt-0.5 text-xs text-gray-400"><i class='bx bx-lock-alt'></i> Nur Ansicht – nicht deine Aufgabe.</p>
+                    @endif
 
                     @if ($a->typ === 'note')
                         <div class="mt-3 flex items-center gap-3">
                             <input type="text" name="abschnitte[{{ $a->id }}][note]" value="{{ $a->note }}"
-                                   placeholder="Note" @disabled($readonly)
+                                   placeholder="Note" @disabled($fremd)
                                    class="w-24 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <input type="text" name="abschnitte[{{ $a->id }}][inhalt]" value="{{ $a->inhalt }}"
-                                   placeholder="Ergänzung (optional)" @disabled($readonly)
+                                   placeholder="Ergänzung (optional)" @disabled($fremd)
                                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
                     @else
@@ -91,7 +101,7 @@
                         @endif
                         <textarea name="abschnitte[{{ $a->id }}][inhalt]" rows="5"
                                   @unless ($a->typ === \Intranet\Modules\Schulzeugnis\Models\Abschnitt::TYP_SPRUCH) data-fmt @endunless
-                                  @disabled($readonly || $teamGetrennt)
+                                  @disabled($fremd || $teamGetrennt)
                                   class="mt-3 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                   placeholder="Text …">{{ $a->inhalt }}</textarea>
                     @endif
@@ -110,7 +120,10 @@
 
         {{-- Abschließen / Wieder öffnen --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5">
-            @if (! $readonly)
+            @if (! $readonly && ! $darfAbschliessen)
+                <h2 class="text-sm font-semibold text-gray-700">Zeugnis abschließen</h2>
+                <p class="mt-1 text-sm text-gray-500">Abschließen dürfen die Klassenlehrer dieser Klasse, die Zeugnisadmins und Administratoren.</p>
+            @elseif (! $readonly)
                 <h2 class="text-sm font-semibold text-gray-700">Zeugnis abschließen</h2>
                 <p class="mt-1 text-sm text-gray-500">
                     Beim Abschließen werden Name, Geburtsdatum und -ort sowie alle Texte eingefroren. Danach ist das Zeugnis schreibgeschützt.

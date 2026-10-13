@@ -39,7 +39,7 @@ class AlsLehrer
         }
 
         $ziel = User::find($id);
-        if (! $ziel || ! self::darf($echt)) {
+        if (! $ziel || ! self::darf($echt) || ! self::zielErlaubt($echt, $ziel)) {
             $request->session()->forget(self::SITZUNG);
 
             return $next($request);
@@ -80,6 +80,22 @@ class AlsLehrer
     public static function darf(User $user): bool
     {
         return app(Modulzugriff::class)->darfRoute('module.schulzeugnis.lehrer.als', $user);
+    }
+
+    /**
+     * Darf $echt in die Rolle von $ziel schlüpfen? Admin-Konten und Zeugnisadmins
+     * nur, wenn $echt selbst Administrator ist – sonst hebt „als" die eigenen
+     * Rechte an (die Modul-Prüfungen in den Controllern laufen gegen das Ziel).
+     * Wird bei jeder Anfrage erneut geprüft, nicht nur beim Start.
+     */
+    public static function zielErlaubt(User $echt, User $ziel): bool
+    {
+        if ($echt->is_admin) {
+            return true;
+        }
+
+        return ! $ziel->is_admin
+            && ! $ziel->roles()->where('roles.role_id', 'zeugnis_admin')->exists();
     }
 
     /** Das gerade gewählte Konto (für den Balken), sonst null. */

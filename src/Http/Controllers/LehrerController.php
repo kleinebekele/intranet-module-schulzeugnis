@@ -56,7 +56,7 @@ class LehrerController
         return view('schulzeugnis::lehrer.form', [
             'schuljahr' => $lehrer->schuljahr,
             'lehrer'    => $lehrer,
-            'benutzer'  => $this->benutzerListe(),
+            'benutzer'  => $this->benutzerListe($lehrer),
         ]);
     }
 
@@ -64,7 +64,7 @@ class LehrerController
     {
         $alt = $lehrer->fullName();
 
-        $lehrer->update($this->validated($request));
+        $lehrer->update($this->validated($request, $lehrer));
 
         Protokoll::log('lehrer_geaendert', [
             'schuljahr_id' => $lehrer->schuljahr_id,
@@ -123,18 +123,37 @@ class LehrerController
             ->with('error', 'Kein aktives Schuljahr gesetzt – bitte zuerst eines aktiv schalten.');
     }
 
-    /** @return array<string,mixed> */
-    private function validated(Request $request): array
+    /**
+     * Ein Administratorkonto lässt sich nicht (neu) als Lehrkraft verknüpfen –
+     * sonst könnte die Zeugnisverwaltung über „Als Lehrer nutzen" in ein Admin-
+     * Konto schlüpfen. Eine schon bestehende Verknüpfung bleibt beim Speichern
+     * erhalten (unverändert übernommen), damit das Formular nicht hängen bleibt.
+     *
+     * @return array<string,mixed>
+     */
+    private function validated(Request $request, ?Lehrer $lehrer = null): array
     {
         return $request->validate([
             'vorname'      => ['required', 'string', 'max:255'],
             'nachname'     => ['required', 'string', 'max:255'],
-            'core_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'core_user_id' => ['nullable', 'integer', Rule::exists('users', 'id'),
+                function (string $attribut, $wert, \Closure $fail) use ($lehrer): void {
+                    if ($wert === null || ($lehrer && (int) $lehrer->core_user_id === (int) $wert)) {
+                        return;
+                    }
+                    if (User::whereKey($wert)->where('is_admin', true)->exists()) {
+                        $fail('Ein Administratorkonto kann nicht als Lehrkraft verknüpft werden.');
+                    }
+                }],
         ]);
     }
 
-    private function benutzerListe()
+    /** Auswahlliste fürs Formular: keine Admin-Konten (außer der bestehenden Verknüpfung). */
+    private function benutzerListe(?Lehrer $lehrer = null)
     {
-        return User::orderBy('name')->get(['id', 'name', 'email']);
+        return User::where(fn ($q) => $q->where('is_admin', false)
+                ->when($lehrer?->core_user_id, fn ($q2, $id) => $q2->orWhere('id', $id)))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
     }
 }

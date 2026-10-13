@@ -4,7 +4,6 @@ namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -159,20 +158,18 @@ class FormatController
                 ->with('error', 'Die Datei ist kein exportiertes Zeugnisformat.');
         }
 
-        // Nur Spalten übernehmen, die es hier gibt (andere Modulversion).
-        $spalten = array_diff(Schema::getColumnListing('zeugnis_formate'), ['id', 'created_at', 'updated_at']);
-        $daten   = array_intersect_key($paket['format'], array_flip($spalten));
-        $name    = trim((string) ($daten['name'] ?? '')) ?: 'Importiertes Format';
-        $basis   = $name;
+        // Fremde Datei: jede Spalte einzeln und geprüft übernehmen (Whitelist) und jedes
+        // Layout-Element durch dieselbe Säuberung wie beim Speichern im Designer schicken.
+        $daten = $this->importDaten($paket['format']);
+        $name  = $daten['name'];
+        $basis = $name;
         for ($i = 2; Format::where('name', $name)->exists(); $i++) {
             $name = "{$basis} ({$i})";
         }
         $daten['name'] = $name;
 
         $format = DB::transaction(function () use ($daten, $paket) {
-            $format = new Format();
-            $format->setRawAttributes($daten);
-            $format->save();
+            $format = Format::create($daten);
 
             // Bilder unter der neuen Format-ID ablegen und Pfade im Layout umschreiben.
             $neu = [];
@@ -186,10 +183,12 @@ class FormatController
                 Storage::disk('public')->put($pfad, $roh);
                 $neu[$alt] = $pfad;
             }
-            if ($neu) {
+            // Bild-Pfade umschreiben; Pfade ohne mitgeliefertes Bild verwerfen (sie
+            // zeigten sonst auf beliebige Dateien dieser Instanz).
+            if ($format->layout) {
                 $format->layout = array_map(function ($e) use ($neu) {
-                    if (($e['typ'] ?? '') === 'bild' && isset($e['bild'], $neu[$e['bild']])) {
-                        $e['bild'] = $neu[$e['bild']];
+                    if (($e['typ'] ?? '') === 'bild') {
+                        $e['bild'] = isset($e['bild'], $neu[$e['bild']]) ? $neu[$e['bild']] : null;
                     }
 
                     return $e;
@@ -206,6 +205,50 @@ class FormatController
 
         return redirect()->route('module.schulzeugnis.formate.index')
             ->with('status', "Format {$format->name} importiert.");
+    }
+
+    /**
+     * Spalten eines exportierten Formats geprüft übernehmen – dieselben Regeln wie
+     * Formular (validated) und Designer (saveLayout). Der Export enthält die rohen
+     * Spaltenwerte, layout/seiten also als JSON-Text.
+     *
+     * @param  array<string,mixed>  $roh
+     * @return array<string,mixed>
+     */
+    private function importDaten(array $roh): array
+    {
+        $json = fn ($v) => is_string($v) ? json_decode($v, true) : $v;
+
+        $broschuere = (bool) ($roh['broschuere'] ?? false);
+        $seiten = is_array($json($roh['seiten'] ?? null))
+            ? array_values(array_map(fn ($r) => $r === 'folge' ? 'folge' : 'start', array_slice($json($roh['seiten']), 0, 20)))
+            : [];
+        $anzahl = $broschuere ? 4 : max(1, count($seiten));
+
+        $layout = collect(is_array($json($roh['layout'] ?? null)) ? $json($roh['layout']) : [])
+            ->map(fn ($e) => $this->sanitizeElement($e))
+            ->filter()
+            ->map(function ($e) use ($anzahl) {
+                $e['seite'] = min($anzahl, max(1, (int) $e['seite']));
+
+                return $e;
+            })
+            ->values()
+            ->all();
+
+        $text = fn ($v, int $max) => is_scalar($v) ? mb_substr(trim((string) $v), 0, $max) : '';
+
+        return [
+            'name'         => $text($roh['name'] ?? '', 255) ?: 'Importiertes Format',
+            'typ'          => in_array($roh['typ'] ?? null, ['text', 'noten'], true) ? $roh['typ'] : 'text',
+            'seitenformat' => in_array($roh['seitenformat'] ?? null, ['a4', 'a3'], true) ? $roh['seitenformat'] : 'a4',
+            'ausrichtung'  => in_array($roh['ausrichtung'] ?? null, ['hoch', 'quer'], true) ? $roh['ausrichtung'] : 'hoch',
+            'beschreibung' => $text($roh['beschreibung'] ?? '', 2000) ?: null,
+            'aktiv'        => (bool) ($roh['aktiv'] ?? true),
+            'broschuere'   => $broschuere,
+            'seiten'       => (! $broschuere && $seiten) ? $seiten : null,
+            'layout'       => $layout ?: null,
+        ];
     }
 
     /** Vorschau als HTML (im Browser) – identisches Markup wie das PDF. */
