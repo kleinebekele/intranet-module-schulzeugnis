@@ -1116,39 +1116,25 @@ class ZeugnisController
             : $this->logTeam($traeger, $text);
 
         if ($mein) {
-            $text   = $request->input('teiltext');
-            $gruppe = Teamtext::gruppe($teile);
-
-            if ($gruppe->contains('id', $mein->id)) {
-                // Gemeinsamer Text der Gruppe – gilt für alle ihre Mitglieder.
-                foreach ($gruppe as $t) {
-                    $t->inhalt = $text;
-                }
-                if (! $zustimmen) {
-                    $mein->zusammenfassen = false;
-                    $rest = $gruppe->count() - 1;
-                    $log("{$mein->autor_name} hat den eigenen Text aus der Zusammenfassung gelöst"
-                        .($rest >= 2 ? " – die übrigen {$rest} bleiben zusammengefasst" : ''));
-                }
-            } else {
-                $mein->inhalt = $text;
-                $mein->zusammenfassen = $zustimmen;
-                $neueGruppe = Teamtext::gruppe($teile);
-                if ($zustimmen && $neueGruppe->contains('id', $mein->id)) {
-                    $gemeinsam = Teamtext::verbinden($neueGruppe);
-                    foreach ($neueGruppe as $t) {
-                        $t->inhalt = $gemeinsam;
-                    }
-                    $log("{$mein->autor_name} hat zusammengefasst – gemeinsamer Text mit "
-                        .$neueGruppe->reject(fn ($t) => $t->id === $mein->id)->pluck('autor_name')->implode(', '));
-                }
-            }
-
+            // 1) Text so speichern, wie die Lehrkraft ihn gerade sah (Gruppe oder eigen).
+            Teamtext::textSpeichern($teile, $mein, $request->input('teiltext'));
             foreach ($teile as $t) {
                 if ($t->isDirty()) {
                     $t->save();
                 }
             }
+
+            // 2) Entscheidung geändert? Gilt für die ganze Klasse in diesem Fach.
+            if ($zustimmen !== (bool) $mein->zusammenfassen && $klasse && $traeger->fach_id) {
+                if ($traeger->exists && $traeger->isDirty()) {
+                    $traeger->save();
+                }
+                $anzahl = Teamtext::zustimmungUeberall($klasse, (int) $traeger->fach_id, (int) $mein->lehrer_id, $zustimmen);
+                $traeger->refresh();
+                $log($mein->autor_name.($zustimmen ? ' fasst zusammen' : ' hat den eigenen Text herausgelöst')
+                    ." – gilt für den klassenweiten Text und alle {$anzahl} Schülertexte des Fachs");
+            }
+            $teile = Teamtext::teiltexte($traeger, $fachlehrer);
         }
 
         $traeger->{$feld} = Teamtext::verbinden($teile);

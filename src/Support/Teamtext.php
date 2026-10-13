@@ -19,6 +19,9 @@ use Intranet\Modules\Schulzeugnis\Models\Lehrer;
  *    teilt die Gruppe EINEN Text (in jedem ihrer Teiltexte gleich gespeichert).
  *  - Wer sich herauslöst, betrifft nur sich: Er behält den bisherigen gemeinsamen Text als
  *    eigenen, die übrigen bleiben (ab zwei) zusammengefasst.
+ *  - Die Entscheidung (zusammenfassen / herauslösen) gilt je KLASSE und FACH: für den
+ *    klassenweiten Text und alle Schülertexte zugleich ({@see zustimmungUeberall()}).
+ *    Geschrieben wird weiter je Schüler.
  *  - Text fürs Zeugnis (Träger-Feld) = alle Teiltexte nacheinander, gleiche nur einmal.
  *    `zusammengefasst` am Träger = ALLE Fachlehrer in einer Gruppe (erst dann arbeiten
  *    Korrektoren/Wiederherstellen am Träger-Text; das übernimmt sicherstellen() zurück).
@@ -53,7 +56,25 @@ class Teamtext
     /** Team-Modus am Schülertext prüfen + Teiltexte anlegen. @return Collection<int,Lehrer>|null */
     public static function sicherstellen(Abschnitt $abschnitt): ?Collection
     {
-        return self::traegerSicherstellen($abschnitt, 'inhalt', self::fachlehrer($abschnitt));
+        $klasse = $abschnitt->zeugnis?->schueler?->klasse;
+
+        return self::traegerSicherstellen($abschnitt, 'inhalt', self::fachlehrer($abschnitt),
+            $klasse && $abschnitt->fach_id ? self::vorgaben($klasse, (int) $abschnitt->fach_id) : []);
+    }
+
+    /**
+     * Die Entscheidung je Klasse × Fach, wie sie am klassenweiten Text steht (dort wird sie
+     * immer mitgeführt): lehrer_id => zusammenfassen. Vorgabe für neu angelegte Teiltexte.
+     *
+     * @return array<int,bool>
+     */
+    public static function vorgaben(Klasse $klasse, int $fachId): array
+    {
+        $kt = Klassentext::where('klasse_id', $klasse->id)->where('fach_id', $fachId)->where('art', 'fach')->first();
+
+        return $kt
+            ? $kt->teiltexte()->pluck('zusammenfassen', 'lehrer_id')->map(fn ($v) => (bool) $v)->all()
+            : [];
     }
 
     /** Team-Modus am klassenweiten Text eines Fachs (nicht Haupttext/Spruch). @return Collection<int,Lehrer>|null */
@@ -70,7 +91,7 @@ class Teamtext
             $kt->save();
         }
 
-        return self::traegerSicherstellen($kt, 'text', $lehrer);
+        return self::traegerSicherstellen($kt, 'text', $lehrer, self::vorgabenAusAbschnitten($klasse, (int) $kt->fach_id));
     }
 
     /** Ist der Träger im Team-Modus und noch getrennt? (Klassentext) */
@@ -83,7 +104,7 @@ class Teamtext
      * @param  Abschnitt|Klassentext  $traeger
      * @return Collection<int,Lehrer>|null
      */
-    private static function traegerSicherstellen(Model $traeger, string $feld, Collection $lehrer): ?Collection
+    private static function traegerSicherstellen(Model $traeger, string $feld, Collection $lehrer, array $vorgaben = []): ?Collection
     {
         if ($lehrer->count() < 2) {
             return null;
@@ -97,12 +118,13 @@ class Teamtext
 
         foreach ($lehrer as $l) {
             if (! isset($vorhanden[$l->id])) {
-                // Neu im Team: im gemeinsamen Feld steigt man mit ein, sonst beginnt man leer.
+                // Neu: Entscheidung der Klasse übernehmen; im gemeinsamen Feld steigt man mit ein.
+                $zustimmung = $vorgaben[$l->id] ?? (bool) $traeger->zusammengefasst;
                 $traeger->teiltexte()->create([
                     'lehrer_id'      => $l->id,
                     'autor_name'     => $l->fullName(),
                     'inhalt'         => $traeger->zusammengefasst ? $traeger->{$feld} : null,
-                    'zusammenfassen' => (bool) $traeger->zusammengefasst,
+                    'zusammenfassen' => $zustimmung,
                 ]);
             }
         }
@@ -116,6 +138,105 @@ class Teamtext
         $traeger->unsetRelation('teiltexte');
 
         return $lehrer;
+    }
+
+    /** Erste vorhandene Entscheidung aus den Schülertexten (falls der klassenweite Text neu ist). @return array<int,bool> */
+    private static function vorgabenAusAbschnitten(Klasse $klasse, int $fachId): array
+    {
+        $a = Abschnitt::where('typ', Abschnitt::TYP_FACHTEXT)->where('fach_id', $fachId)
+            ->whereHas('zeugnis.schueler', fn ($q) => $q->where('klasse_id', $klasse->id))
+            ->whereHas('teiltexte')->orderBy('id')->first();
+
+        return $a ? $a->teiltexte()->pluck('zusammenfassen', 'lehrer_id')->map(fn ($v) => (bool) $v)->all() : [];
+    }
+
+    /**
+     * Text der Lehrkraft speichern: in der Gruppe der gemeinsame Text (für alle Mitglieder),
+     * sonst der eigene.
+     */
+    public static function textSpeichern(Collection $teile, Model $mein, ?string $text): void
+    {
+        $gruppe = self::gruppe($teile);
+        if ($gruppe->contains('id', $mein->id)) {
+            foreach ($gruppe as $t) {
+                $t->inhalt = $text;
+            }
+        } else {
+            $mein->inhalt = $text;
+        }
+    }
+
+    /**
+     * Zustimmung einer Lehrkraft an EINEM Träger ändern. Beitreten: die Gruppe teilt danach
+     * den verbundenen Text ihrer Mitglieder. Herauslösen: nur diese Lehrkraft, sie behält
+     * den bisherigen gemeinsamen Text als eigenen.
+     */
+    public static function zustimmungAnwenden(Collection $teile, int $lehrerId, bool $zustimmen): void
+    {
+        $t = $teile->firstWhere('lehrer_id', $lehrerId);
+        if (! $t || (bool) $t->zusammenfassen === $zustimmen) {
+            return;
+        }
+        $t->zusammenfassen = $zustimmen;
+        if ($zustimmen) {
+            $gruppe = self::gruppe($teile);
+            if ($gruppe->contains('id', $t->id)) {
+                $gemeinsam = self::verbinden($gruppe);
+                foreach ($gruppe as $g) {
+                    $g->inhalt = $gemeinsam;
+                }
+            }
+        }
+    }
+
+    /**
+     * Entscheidung je Klasse × Fach: Zustimmung der Lehrkraft am klassenweiten Text und an
+     * allen Schülertexten des Fachs (nicht abgeschlossene Zeugnisse) übernehmen.
+     *
+     * @return int  Zahl der Schülertexte, die mitgezogen wurden
+     */
+    public static function zustimmungUeberall(Klasse $klasse, int $fachId, int $lehrerId, bool $zustimmen): int
+    {
+        $lehrer = self::fachlehrerVon($klasse, $fachId);
+        if ($lehrer->count() < 2) {
+            return 0;
+        }
+
+        $kt = Klassentext::where('klasse_id', $klasse->id)->where('fach_id', $fachId)->where('art', 'fach')->first()
+            ?? new Klassentext(['klasse_id' => $klasse->id, 'fach_id' => $fachId, 'art' => 'fach']);
+        $traeger = collect([[$kt, 'text']]);
+        Abschnitt::where('typ', Abschnitt::TYP_FACHTEXT)->where('fach_id', $fachId)
+            ->whereHas('zeugnis', fn ($q) => $q->where('status', '!=', \Intranet\Modules\Schulzeugnis\Models\Zeugnis::STATUS_ABGESCHLOSSEN)
+                ->whereHas('schueler', fn ($s) => $s->where('klasse_id', $klasse->id)))
+            ->with('zeugnis.schueler.klasse')
+            ->get()
+            ->each(fn (Abschnitt $a) => $traeger->push([$a, 'inhalt']));
+
+        $anzahl = 0;
+        foreach ($traeger as [$t, $feld]) {
+            $da = $t instanceof Klassentext ? self::sicherstellenKlassentext($t, $klasse) : self::sicherstellen($t);
+            if (! $da) {
+                continue;
+            }
+            $teile = self::teiltexte($t, $lehrer);
+            self::zustimmungAnwenden($teile, $lehrerId, $zustimmen);
+            foreach ($teile as $teil) {
+                if ($teil->isDirty()) {
+                    $teil->save();
+                }
+            }
+            $t->{$feld}          = self::verbinden($teile);
+            $t->zusammengefasst  = self::alleStimmenZu($teile, $lehrer);
+            if ($t instanceof Abschnitt) {
+                $t->status = Abschnitt::statusNachInhalt((string) $t->status, $t->hatInhalt());
+                $anzahl++;
+            }
+            if ($t->isDirty()) {
+                $t->save();
+            }
+        }
+
+        return $anzahl;
     }
 
     /** Teiltexte der aktuellen Fachlehrer, in deren Reihenfolge. @param Abschnitt|Klassentext $traeger */
