@@ -4,7 +4,9 @@ namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Beispieltext;
 use Intranet\Modules\Schulzeugnis\Models\Format;
@@ -114,6 +116,96 @@ class FormatController
         return redirect()
             ->route('module.schulzeugnis.formate.index')
             ->with('status', "Format {$name} gelöscht.");
+    }
+
+    /**
+     * Format als Datei herunterladen – zum Übertragen in eine andere Instanz
+     * (z. B. lokal entworfen, live eingespielt). Bilder reisen eingebettet mit.
+     */
+    public function export(Format $format)
+    {
+        $daten  = collect($format->getAttributes())->except(['id', 'created_at', 'updated_at'])->all();
+        $bilder = [];
+        foreach ((array) $format->layout as $e) {
+            $pfad = ($e['typ'] ?? '') === 'bild' ? ($e['bild'] ?? null) : null;
+            if ($pfad && ! isset($bilder[$pfad]) && Storage::disk('public')->exists($pfad)) {
+                $bilder[$pfad] = base64_encode(Storage::disk('public')->get($pfad));
+            }
+        }
+
+        $json = json_encode([
+            'art'     => 'schulzeugnis-format',
+            'version' => 1,
+            'format'  => $daten,
+            'bilder'  => $bilder,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $datei = 'zeugnisformat-' . (Str::slug($format->name) ?: $format->id) . '.json';
+
+        return response($json, 200, [
+            'Content-Type'        => 'application/json; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $datei . '"',
+        ]);
+    }
+
+    /** Exportierte Format-Datei einspielen – legt immer ein neues Format an. */
+    public function import(Request $request)
+    {
+        $request->validate(['datei' => ['required', 'file', 'max:20480']]);
+
+        $paket = json_decode((string) file_get_contents($request->file('datei')->getRealPath()), true);
+        if (! is_array($paket) || ($paket['art'] ?? null) !== 'schulzeugnis-format' || ! is_array($paket['format'] ?? null)) {
+            return redirect()->route('module.schulzeugnis.formate.index')
+                ->with('error', 'Die Datei ist kein exportiertes Zeugnisformat.');
+        }
+
+        // Nur Spalten übernehmen, die es hier gibt (andere Modulversion).
+        $spalten = array_diff(Schema::getColumnListing('zeugnis_formate'), ['id', 'created_at', 'updated_at']);
+        $daten   = array_intersect_key($paket['format'], array_flip($spalten));
+        $name    = trim((string) ($daten['name'] ?? '')) ?: 'Importiertes Format';
+        $basis   = $name;
+        for ($i = 2; Format::where('name', $name)->exists(); $i++) {
+            $name = "{$basis} ({$i})";
+        }
+        $daten['name'] = $name;
+
+        $format = DB::transaction(function () use ($daten, $paket) {
+            $format = new Format();
+            $format->setRawAttributes($daten);
+            $format->save();
+
+            // Bilder unter der neuen Format-ID ablegen und Pfade im Layout umschreiben.
+            $neu = [];
+            foreach ((array) ($paket['bilder'] ?? []) as $alt => $inhalt) {
+                $roh    = base64_decode((string) $inhalt, true);
+                $endung = strtolower(pathinfo((string) $alt, PATHINFO_EXTENSION));
+                if ($roh === false || ! in_array($endung, ['jpeg', 'jpg', 'png', 'gif', 'webp'], true)) {
+                    continue;
+                }
+                $pfad = "schulzeugnis/{$format->id}/" . Str::random(40) . '.' . $endung;
+                Storage::disk('public')->put($pfad, $roh);
+                $neu[$alt] = $pfad;
+            }
+            if ($neu) {
+                $format->layout = array_map(function ($e) use ($neu) {
+                    if (($e['typ'] ?? '') === 'bild' && isset($e['bild'], $neu[$e['bild']])) {
+                        $e['bild'] = $neu[$e['bild']];
+                    }
+
+                    return $e;
+                }, (array) $format->layout);
+                $format->save();
+            }
+
+            return $format;
+        });
+
+        Protokoll::log('format_importiert', [
+            'beschreibung' => "Zeugnisformat {$format->name} aus Datei importiert",
+        ]);
+
+        return redirect()->route('module.schulzeugnis.formate.index')
+            ->with('status', "Format {$format->name} importiert.");
     }
 
     /** Vorschau als HTML (im Browser) – identisches Markup wie das PDF. */

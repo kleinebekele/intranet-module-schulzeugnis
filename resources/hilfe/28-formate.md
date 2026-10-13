@@ -39,6 +39,12 @@ meisten Überläufe.
 Ein bestehendes Format, das schon in Zeugnissen benutzt wird, sollten Sie nicht für einen
 Versuch umbauen. **Duplizieren**, am Duplikat arbeiten, dann umstellen.
 
+## In eine andere Instanz übertragen
+
+**Exportieren** (Pfeil-Symbol am Format) lädt das Format samt Bildern als Datei herunter.
+In der anderen Instanz unter Zeugnisformate **Importieren** wählen und die Datei hochladen –
+es entsteht ein neues Format; gibt es den Namen schon, wird eine Nummer angehängt.
+
 ## Archivieren
 
 Nicht mehr benötigte Formate auf inaktiv stellen. Sie stehen dann nicht mehr zur Auswahl,

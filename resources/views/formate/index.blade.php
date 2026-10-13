@@ -5,10 +5,22 @@
                 <x-module-icon name="category" class="text-2xl text-indigo-600" />
                 <h1 class="text-xl font-semibold text-gray-800">Zeugnisformate</h1>
             </div>
-            <a href="{{ route('module.schulzeugnis.formate.create') }}"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                + Neues Format
-            </a>
+            <div class="flex items-center gap-2">
+                @darfRoute('module.schulzeugnis.formate.import')
+                    <form method="POST" action="{{ route('module.schulzeugnis.formate.import') }}" enctype="multipart/form-data">
+                        @csrf
+                        <label title="Exportierte Format-Datei (.json) einspielen – z. B. aus einer anderen Instanz"
+                               class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <i class="bx bx-import"></i> Importieren
+                            <input type="file" name="datei" accept=".json,application/json" class="sr-only" onchange="this.form.submit()">
+                        </label>
+                    </form>
+                @enddarfRoute
+                <a href="{{ route('module.schulzeugnis.formate.create') }}"
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    + Neues Format
+                </a>
+            </div>
         </div>
     </x-slot>
 
@@ -46,6 +58,10 @@
                        class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bxs-file-pdf"></i></a>
                     <a href="{{ route('module.schulzeugnis.formate.edit', $format) }}" title="Bearbeiten"
                        class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bx-cog"></i></a>
+                    @darfRoute('module.schulzeugnis.formate.export')
+                        <a href="{{ route('module.schulzeugnis.formate.export', $format) }}" title="Exportieren (Datei zum Übertragen in eine andere Instanz)"
+                           class="inline-flex items-center justify-center rounded-lg border border-gray-300 p-2.5 text-2xl text-gray-600 hover:bg-gray-50"><i class="bx bx-export"></i></a>
+                    @enddarfRoute
                     <form method="POST" action="{{ route('module.schulzeugnis.formate.duplicate', $format) }}">
                         @csrf
                         <button type="submit" title="Duplizieren"

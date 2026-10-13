@@ -174,6 +174,8 @@ Route::middleware(['web', 'auth', AlsLehrer::class])
         Route::get('formate', [FormatController::class, 'index'])->name('formate.index');
         Route::get('formate/neu', [FormatController::class, 'create'])->name('formate.create');
         Route::post('formate', [FormatController::class, 'store'])->name('formate.store');
+        Route::post('formate/import', [FormatController::class, 'import'])->name('formate.import');
+        Route::get('formate/{format}/export', [FormatController::class, 'export'])->name('formate.export');
         Route::get('formate/{format}/bearbeiten', [FormatController::class, 'edit'])->name('formate.edit');
         Route::get('formate/{format}/vorschau', [FormatController::class, 'vorschau'])->name('formate.vorschau');
         Route::get('formate/{format}/pdf', [FormatController::class, 'pdf'])->name('formate.pdf');

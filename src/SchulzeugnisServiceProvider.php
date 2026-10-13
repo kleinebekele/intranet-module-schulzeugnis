@@ -125,7 +125,7 @@ class SchulzeugnisServiceProvider extends ModuleServiceProvider
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
             ->lesend('import.vorschau', 'altumwandeln.zeugnisse', 'altumwandeln.fachzeugnisse') // prüfen/umwandeln ohne Speichern
-            ->stufe(Zugriffsstufe::Verwalten, 'import.ausfuehren', 'formate.duplicate', 'lehrer.als') // legen an / als Lehrkraft
+            ->stufe(Zugriffsstufe::Verwalten, 'import.ausfuehren', 'formate.duplicate', 'formate.import', 'formate.export', 'lehrer.als') // legen an / übertragen / als Lehrkraft
             ->stufe(Zugriffsstufe::Bearbeiten, 'beispieltexte.reset')                            // setzt nur zurück
             // „Aus Linear importieren": schon die Vorschau liest Linear – nur für Verwaltende.
             ->stufe(Zugriffsstufe::Verwalten,
