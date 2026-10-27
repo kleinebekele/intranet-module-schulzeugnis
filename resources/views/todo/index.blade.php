@@ -163,6 +163,43 @@
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
 
+        {{-- „Als Lehrkraft handeln" direkt von hier (Zeugnisverwaltung) – danach zeigt die Seite die ToDos dieser Lehrkraft. --}}
+        @if ($alsLehrerAuswahl->isNotEmpty())
+            <form method="POST" id="todo-als-form" action="{{ route('module.schulzeugnis.lehrer.als', ['lehrer' => '__ID__']) }}"
+                  data-url="{{ route('module.schulzeugnis.lehrer.als', ['lehrer' => '__ID__']) }}"
+                  data-titel="Als Lehrkraft handeln"
+                  class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                @csrf
+                <input type="hidden" name="zurueck" value="todo">
+                <span class="text-sm text-gray-600">ToDos einer Lehrkraft verwalten:</span>
+                <select id="todo-als-lehrer" required
+                        class="rounded-lg border-gray-300 py-1 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">— Lehrkraft wählen —</option>
+                    @foreach ($alsLehrerAuswahl as $l)
+                        <option value="{{ $l['lehrer_id'] }}">{{ $l['name'] }}</option>
+                    @endforeach
+                </select>
+                <button type="submit"
+                        class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                    <i class="bx bx-user text-sm"></i> Als Lehrkraft handeln
+                </button>
+            </form>
+            <script>
+                (() => {
+                    const form = document.getElementById('todo-als-form');
+                    const wahl = document.getElementById('todo-als-lehrer');
+                    wahl.addEventListener('change', () => {
+                        const name = wahl.selectedOptions[0]?.text ?? '';
+                        form.action = form.dataset.url.replace('__ID__', wahl.value);
+                        form.dataset.bestaetigen = wahl.value
+                            ? `Als ${name} handeln? Bis du es beendest, siehst und änderst du im Zeugnis-Modul genau das, was diese Lehrkraft sieht.`
+                            : '';
+                        form.dataset.knopf = `Als ${name} handeln`;
+                    });
+                })();
+            </script>
+        @endif
+
         @if ($istAdmin)
             <div class="rounded-xl border border-gray-200 bg-white p-6 text-gray-600">
                 <div class="flex items-start gap-3">

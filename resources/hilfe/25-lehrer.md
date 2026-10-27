@@ -36,7 +36,7 @@ Sie müssen also nichts nachtragen – nur warten oder das Konto anlegen.
 
 ## Als Lehrkraft nutzen
 
-Mit **als …** in der Zeile einer Lehrkraft sehen Sie das Zeugnismodul genau so, wie diese
+Mit **Als Lehrkraft handeln** in der Zeile einer Lehrkraft sehen Sie das Zeugnismodul genau so, wie diese
 Lehrkraft es sieht: ihre Klassenräume, ihre ToDos, ihre Rechte an den Texten, ihre
 Menüpunkte. Damit lässt sich prüfen, ob Lehraufträge und Klassenleitung richtig sitzen.
 
@@ -55,5 +55,5 @@ Die Reihenfolge zum Nachsehen:
 2. Ist sie mit ihrem Konto verknüpft?
 3. Hat sie einen **Lehrauftrag** in der Klasse und dem Fach – oder ist sie Klassenlehrer?
 
-Fast immer liegt es an Punkt 3. Am schnellsten prüfen Sie es mit **als …** – dann sehen Sie
+Fast immer liegt es an Punkt 3. Am schnellsten prüfen Sie es mit **Als Lehrkraft handeln** – dann sehen Sie
 selbst, was die Lehrkraft sieht.

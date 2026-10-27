@@ -22,7 +22,10 @@ class AlsLehrerController
         $request->session()->put(AlsLehrer::SITZUNG, $konto->id);
         Audit::schreiben('schulzeugnis.als_lehrer_start', "Nutzt das Zeugnis-Modul als {$konto->name}", betroffener: $konto);
 
-        return redirect()->route('module.schulzeugnis.klassenraeume.index')
+        // Von „Meine ToDos" aus gestartet → dort weiter (eigene ToDos der Lehrkraft).
+        $ziel = $request->input('zurueck') === 'todo' ? 'module.schulzeugnis.todo.index' : 'module.schulzeugnis.klassenraeume.index';
+
+        return redirect()->route($ziel)
             ->with('status', "Du siehst das Zeugnis-Modul jetzt als {$konto->name}. Alles, was du hier änderst, gilt für diese Person.");
     }
 

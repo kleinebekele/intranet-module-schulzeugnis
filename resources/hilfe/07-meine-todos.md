@@ -32,3 +32,10 @@ in vielen Klassen unterrichtet, kommt mit der zweiten Ansicht meist schneller du
 Das ist Absicht. Ein Administrator hat Einsicht in alles, aber keine eigenen Zeugnisaufgaben –
 auch dann nicht, wenn er zusätzlich als Lehrer hinterlegt ist. Sonst stünden hier hunderte
 fremder Texte, und die Seite wäre für ihren Zweck unbrauchbar.
+
+## ToDos einer Lehrkraft verwalten
+
+Die Zeugnisverwaltung sieht oben eine Auswahl **ToDos einer Lehrkraft verwalten**. Lehrkraft
+wählen, **Als Lehrkraft handeln** – danach zeigt diese Seite deren ToDos, und alles, was Sie
+ändern, gilt für diese Lehrkraft. Der rote Balken oben beendet das wieder. Zur Auswahl stehen
+nur Lehrkräfte mit verknüpftem Intranet-Konto.

@@ -2,7 +2,9 @@
 
 namespace Intranet\Modules\Schulzeugnis\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Support\Collection;
+use Intranet\Modules\Schulzeugnis\Http\Middleware\AlsLehrer;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Klassentext;
@@ -52,6 +54,7 @@ class TodoController
             'zuKorrigierenAnzahl'   => 0,
             'inKorrekturAnzahl'     => 0,
             'stati'                 => Abschnitt::STATI,
+            'alsLehrerAuswahl'      => $this->alsLehrerAuswahl($schuljahr),
         ];
 
         // Admin: nur Einsicht → keine ToDos. Ebenso ohne aktives Schuljahr.
@@ -178,7 +181,32 @@ class TodoController
             'zuKorrigierenAnzahl'  => $korrektur->count() + $ktKorrektur->count(),
             'inKorrekturAnzahl'    => $inKorrektur->count(),
             'stati'                => Abschnitt::STATI,
+            'alsLehrerAuswahl'     => $leer['alsLehrerAuswahl'],
         ]);
+    }
+
+    /**
+     * Lehrkräfte für „Als Lehrkraft handeln" direkt auf dieser Seite: nur für die
+     * Zeugnisverwaltung und nur, solange sie nicht schon als jemand handelt (dann
+     * zeigt der rote Balken den Ausstieg). Nur verknüpfte Konten, die sie übernehmen darf.
+     *
+     * @return Collection<int,array{lehrer_id:int,name:string}>
+     */
+    private function alsLehrerAuswahl(?Schuljahr $schuljahr): Collection
+    {
+        $user = auth()->user();
+        if (! $user || ! $schuljahr || request()->attributes->has('schulzeugnis_echter_user') || ! AlsLehrer::darf($user)) {
+            return collect();
+        }
+
+        $lehrer = Lehrer::where('schuljahr_id', $schuljahr->id)->whereNotNull('core_user_id')->get();
+        $konten = User::whereIn('id', $lehrer->pluck('core_user_id'))->get()->keyBy('id');
+
+        return $lehrer
+            ->filter(fn (Lehrer $l) => ($k = $konten[$l->core_user_id] ?? null) && ! $k->is($user) && AlsLehrer::zielErlaubt($user, $k))
+            ->map(fn (Lehrer $l) => ['lehrer_id' => $l->id, 'name' => $l->fullName()])
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
     }
 
     /**

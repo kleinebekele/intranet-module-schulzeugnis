@@ -74,10 +74,13 @@
                                         @darfRoute('module.schulzeugnis.lehrer.als')
                                         @if ($konto && ! $konto->is(auth()->user()) && \Intranet\Modules\Schulzeugnis\Http\Middleware\AlsLehrer::zielErlaubt(auth()->user(), $konto))
                                             <form method="POST" action="{{ route('module.schulzeugnis.lehrer.als', $l) }}" class="inline"
-                                                  data-bestaetigen="Als {{ $konto->name }} nutzen? Bis du es beendest, siehst und änderst du im Zeugnis-Modul genau das, was diese Lehrkraft sieht."
-                                                  data-titel="Als Lehrkraft nutzen" data-knopf="Als {{ $konto->name }} nutzen">
+                                                  data-bestaetigen="Als {{ $konto->name }} handeln? Bis du es beendest, siehst und änderst du im Zeugnis-Modul genau das, was diese Lehrkraft sieht."
+                                                  data-titel="Als Lehrkraft handeln" data-knopf="Als {{ $konto->name }} handeln">
                                                 @csrf
-                                                <button type="submit" title="Als {{ $konto->name }} nutzen" class="text-gray-500 hover:text-red-700">als …</button>
+                                                <button type="submit" title="Als {{ $konto->name }} handeln"
+                                                        class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                                                    <i class="bx bx-user text-sm"></i> Als Lehrkraft handeln
+                                                </button>
                                             </form>
                                             <span class="text-gray-300">·</span>
                                         @endif
