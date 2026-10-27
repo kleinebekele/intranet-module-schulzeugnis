@@ -20,8 +20,8 @@ class Abschnitt extends Model
     public const TYP_FACHTEXT = 'fachtext';
     public const TYP_NOTE = 'note';
     public const TYP_FACHBEREICH = 'fachbereich';
-    /** Der eine Abschnitt eines Hauptzeugnisses – trägt Status/Korrektoren/Klassentext,
-     *  seine mehreren Schülertexte (je Fachbereich) hängen als Bereichtext-Zeilen dran. */
+    /** Altbestand (vor v1.16): der eine Sammelabschnitt eines Hauptzeugnisses mit Bereichtexten.
+     *  Ersetzt durch je Fachbereich einen Abschnitt (TYP_FACHBEREICH); bleibt nur zur Ansicht. */
     public const TYP_HAUPTZEUGNIS = 'hauptzeugnis';
     /** Zeugnisspruch je Schüler – eigener Baustein (wie ein Fach), nur vom
      *  Klassenlehrer setzbar; Inhalt aus dem Spruch-Katalog, danach frei editierbar. */
@@ -111,6 +111,18 @@ class Abschnitt extends Model
     public function ueberschrift(): string
     {
         return $this->bereich?->name ?? (string) $this->bereich_name;
+    }
+
+    /** Kurzname für Überschriften und Rückmeldungen (Fach, Fachbereich bzw. Art des Textes). */
+    public function bezeichnung(): string
+    {
+        return match ($this->typ) {
+            self::TYP_HAUPTZEUGNIS => 'Hauptzeugnis',
+            self::TYP_HAUPTTEXT    => 'Haupttext',
+            self::TYP_SPRUCH       => 'Zeugnisspruch',
+            self::TYP_FACHBEREICH  => $this->ueberschrift() ?: 'Fachbereich',
+            default                => $this->fach?->name ?? 'Fachtext',
+        };
     }
 
     /** Lehrer, die diesen Abschnitt korrigieren dürfen. */

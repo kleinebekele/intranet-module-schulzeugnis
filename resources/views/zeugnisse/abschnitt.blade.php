@@ -1,7 +1,7 @@
 @php
-    $titel = $abschnitt->typ === 'hauptzeugnis'
-        ? 'Hauptzeugnis'
-        : ($abschnitt->typ === 'haupttext' ? 'Haupttext' : ($abschnitt->fach?->name ?? 'Fachtext'));
+    $titel = $abschnitt->typ === 'fachbereich'
+        ? 'Hauptzeugnis · ' . $abschnitt->bezeichnung()
+        : $abschnitt->bezeichnung();
     $istNote = $abschnitt->typ === 'note';
 @endphp
 <x-app-layout>

@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Fach;
 use Intranet\Modules\Schulzeugnis\Models\Format;
+use Intranet\Modules\Schulzeugnis\Models\Hauptbereich;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Klassentext;
 use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
@@ -42,7 +43,7 @@ class ZeugnisController
         $klasse->load(['schuljahr', 'klassenlehrer', 'klassenleitung']);
 
         // Spalten der Tabelle: alle Fächer, die in dieser Klasse einen Lehrauftrag haben –
-        // ohne die, die das Hauptzeugnis ersetzt (sonst stünde „Haupt…" doppelt da).
+        // ohne den Hauptunterricht – der ist in Klassen mit Hauptzeugnis die Spalte HAU.
         $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
         $faecher = Fach::whereIn('id', $fachIds)
             ->whereNotIn('id', $klasse->entfallendeFachIds())
@@ -58,7 +59,7 @@ class ZeugnisController
 
         $schueler = $klasse->schueler()
             ->zeugnisberechtigt()
-            ->with(['fachzeugnis.abschnitte', 'hauptzeugnis.abschnitte'])
+            ->with(['fachzeugnis.abschnitte', 'hauptzeugnis.abschnitte.bereich'])
             ->orderBy('nachname')
             ->orderBy('vorname')
             ->get();
@@ -91,8 +92,15 @@ class ZeugnisController
             ->map(fn ($g) => $g->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->values()->all());
 
         $ktRows = Klassentext::where('klasse_id', $klasse->id)->with('korrektoren')->get()
-            ->keyBy(fn ($kt) => $kt->art === 'spruch' ? 'spruch' : ($kt->fach_id === null ? 'haupt' : $kt->fach_id));
+            ->keyBy(fn (Klassentext $kt) => $kt->param());
         $klassentexte = $ktRows->map(fn ($kt) => (string) $kt->text);
+
+        // Hauptzeugnis: HAU = Fach Hauptunterricht, daneben je Fachbereich eine Spalte.
+        $bereiche       = $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche : collect();
+        $huLehrerIds    = $klasse->hat_hauptzeugnis ? $klasse->hauptunterrichtLehrerIds() : collect();
+        $huLehrerNamen  = Lehrer::whereIn('id', $huLehrerIds)->get()->map(fn ($l) => $l->fullName())->implode(', ');
+        $meineLehrerIdsHaupt = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->where('core_user_id', $userId)->pluck('id');
+        $binHauptzeugnis = $klasse->hat_hauptzeugnis && $klasse->darfHauptzeugnis($meineLehrerIdsHaupt);
 
         // Klassenweit-Status auch für zugewiesene Korrektoren anklickbar machen (öffnet den Editor).
         $meineLehrerIds  = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->where('core_user_id', $userId)->pluck('id');
@@ -148,10 +156,32 @@ class ZeugnisController
             'ktKorrektorKeys'  => $ktKorrektorKeys,
             'hatFach'          => (bool) $klasse->hat_fachzeugnis,
             'hatHaupt'         => (bool) $klasse->hat_hauptzeugnis,
-            'bereiche'         => $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche : collect(),
+            'bereiche'         => $bereiche,
+            'huLehrerNamen'    => $huLehrerNamen,
+            'binHauptzeugnis'  => $binHauptzeugnis,
+            'huOhneHaupt'      => ! $klasse->hat_hauptzeugnis && $klasse->hatHauptunterricht(),
+            'hauStatus'        => $schueler->mapWithKeys(fn ($s) => [$s->id => $this->hauGesamtstatus($s->hauptzeugnis)])->all(),
             'istAdmin'         => (bool) auth()->user()?->is_admin,
             'gsVerfuegbar'     => Ghostscript::verfuegbar(),
         ]);
+    }
+
+    /**
+     * Gesamtstand der Spalte HAU: der am wenigsten fortgeschrittene Status aller
+     * Fachbereiche des Schülers (Reihenfolge von Abschnitt::STATI = Fortschritt).
+     */
+    private function hauGesamtstatus(?Zeugnis $hz): ?string
+    {
+        $stati = $hz?->abschnitte
+            ->where('typ', Abschnitt::TYP_FACHBEREICH)
+            ->filter(fn (Abschnitt $a) => $a->bereich_id !== null)
+            ->pluck('status');
+        if (! $stati || $stati->isEmpty()) {
+            return null;
+        }
+        $rang = array_flip(array_keys(Abschnitt::STATI));
+
+        return $stati->sortBy(fn ($s) => $rang[$s] ?? 0)->first();
     }
 
     /** HTML-Vorschau des befüllten Zeugnisses (echte Daten durchs Format-Layout). */
@@ -303,11 +333,29 @@ class ZeugnisController
             ->whereHas($containerRel, fn ($q) => $q->whereDoesntHave('abschnitte', fn ($a) => $a->where('typ', Abschnitt::TYP_SPRUCH)))
             ->exists();
 
-        if (! $fehltFach && ! $fehltHaupt && ! $fehltSpruch) {
+        // Je Hauptzeugnis und Fachbereich ein Abschnitt – auch für später ergänzte Bereiche.
+        $bereichIds   = $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche->pluck('id') : collect();
+        $fehltBereich = $bereichIds->isNotEmpty() && Zeugnis::where('typ', Zeugnis::TYP_HAUPT)
+            ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
+            ->whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id)->zeugnisberechtigt())
+            ->withCount(['abschnitte as bereiche_count' => fn ($q) => $q->where('typ', Abschnitt::TYP_FACHBEREICH)->whereIn('bereich_id', $bereichIds)])
+            ->get()
+            ->contains(fn ($z) => (int) $z->bereiche_count < $bereichIds->count());
+
+        if (! $fehltFach && ! $fehltHaupt && ! $fehltSpruch && ! $fehltBereich) {
             return; // alles vorhanden – kein Schreibaufwand
         }
 
-        DB::transaction(function () use ($klasse, $containerRel, $fehltFach, $fehltHaupt, $fehltSpruch): void {
+        DB::transaction(function () use ($klasse, $containerRel, $fehltFach, $fehltHaupt, $fehltSpruch, $fehltBereich): void {
+            if ($fehltBereich) {
+                $zeugnisse = Zeugnis::where('typ', Zeugnis::TYP_HAUPT)
+                    ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
+                    ->whereHas('schueler', fn ($q) => $q->where('klasse_id', $klasse->id)->zeugnisberechtigt())
+                    ->get();
+                foreach ($zeugnisse as $hz) {
+                    $this->syncFachbereiche($hz, $klasse);
+                }
+            }
             if ($fehltFach) {
                 foreach ($klasse->schueler()->zeugnisberechtigt()->whereDoesntHave('fachzeugnis')->get() as $ohne) {
                     $ohne->setRelation('klasse', $klasse);
@@ -393,7 +441,7 @@ class ZeugnisController
         ]);
     }
 
-    /** Hauptzeugnis = EIN Abschnitt (Status/Korrektoren/Klassentext), je Fachbereich ein Schülertext. */
+    /** Hauptzeugnis = je Fachbereich ein eigener Abschnitt (Status/Korrektoren wie ein Fach). */
     private function erzeugeHauptzeugnis(Klasse $klasse, Schueler $schueler): void
     {
         $zeugnis = Zeugnis::create([
@@ -403,15 +451,7 @@ class ZeugnisController
             'status'      => Zeugnis::STATUS_ENTWURF,
         ]);
 
-        $abschnitt = $zeugnis->abschnitte()->create([
-            'typ'             => Abschnitt::TYP_HAUPTZEUGNIS,
-            'autor_lehrer_id' => $klasse->klassenlehrer_id,
-            'autor_name'      => $klasse->klassenlehrer?->fullName(),
-            'reihenfolge'     => 0,
-            'status'          => Abschnitt::STATUS_STANDARD,
-        ]);
-
-        $this->syncBereichtexte($abschnitt, $klasse);
+        $this->syncFachbereiche($zeugnis, $klasse);
 
         // Nur bei reinen Hauptzeugnis-Klassen lebt der Spruch hier (sonst am Fachzeugnis).
         if ($klasse->hat_zeugnisspruch && ! $klasse->hat_fachzeugnis) {
@@ -429,7 +469,39 @@ class ZeugnisController
     }
 
     /**
-     * Legt zu jedem aktuellen Fachbereich der Klasse eine Bereichtext-Zeile am HAU-Abschnitt
+     * Legt am Hauptzeugnis zu jedem Fachbereich der Klasse einen Abschnitt an (falls
+     * noch keiner da ist). Autor = Lehrkräfte des Hauptunterrichts, sonst Klassenleitung.
+     */
+    private function syncFachbereiche(Zeugnis $zeugnis, Klasse $klasse): void
+    {
+        $vorhanden = $zeugnis->abschnitte()->where('typ', Abschnitt::TYP_FACHBEREICH)->pluck('bereich_id')->filter()->all();
+        $fehlend   = $klasse->hauptbereiche->reject(fn ($b) => in_array($b->id, $vorhanden, true));
+        if ($fehlend->isEmpty()) {
+            return;
+        }
+
+        $huLehrer = Lehrer::whereIn('id', $klasse->hauptunterrichtLehrerIds())->get();
+        $autorId  = $huLehrer->first()?->id ?? $klasse->klassenlehrer_id;
+        $autor    = $huLehrer->isNotEmpty()
+            ? $huLehrer->map(fn ($l) => $l->fullName())->implode(', ')
+            : $klasse->klassenlehrer?->fullName();
+
+        foreach ($fehlend as $bereich) {
+            $zeugnis->abschnitte()->create([
+                'typ'             => Abschnitt::TYP_FACHBEREICH,
+                'bereich_id'      => $bereich->id,
+                'bereich_name'    => $bereich->name,
+                'autor_lehrer_id' => $autorId,
+                'autor_name'      => $autor ?: null,
+                'reihenfolge'     => $bereich->reihenfolge,
+                'status'          => Abschnitt::STATUS_STANDARD,
+            ]);
+        }
+    }
+
+    /**
+     * Altbestand (HAU-Abschnitt mit Bereichtexten, vor v1.16): legt zu jedem aktuellen
+     * Fachbereich der Klasse eine Bereichtext-Zeile am HAU-Abschnitt
      * an (falls noch nicht vorhanden) – so erscheinen später ergänzte Bereiche automatisch.
      */
     private function syncBereichtexte(Abschnitt $abschnitt, Klasse $klasse): void
@@ -449,9 +521,11 @@ class ZeugnisController
 
     public function edit(Zeugnis $zeugnis)
     {
-        $zeugnis->load(['schueler.klasse.schuljahr', 'format', 'abschnitte.fach', 'abschnitte.korrektoren']);
+        $zeugnis->load(['schueler.klasse.schuljahr', 'format', 'abschnitte.fach', 'abschnitte.bereich', 'abschnitte.korrektoren']);
 
+        // Der alte HAU-Sammelabschnitt (vor v1.16) ist durch die Fachbereich-Abschnitte ersetzt.
         $abschnitte = $zeugnis->abschnitte
+            ->reject(fn (Abschnitt $a) => $a->typ === Abschnitt::TYP_HAUPTZEUGNIS)
             ->sortBy([['reihenfolge', 'asc'], ['id', 'asc']])
             ->values();
 
@@ -603,12 +677,7 @@ class ZeugnisController
     /** Kurzname eines Abschnitts für Rückmeldungen (Fach bzw. Art des Textes). */
     private function abschnittBezeichnung(Abschnitt $abschnitt): string
     {
-        return match ($abschnitt->typ) {
-            Abschnitt::TYP_HAUPTZEUGNIS => 'Hauptzeugnis',
-            Abschnitt::TYP_HAUPTTEXT    => 'Haupttext',
-            Abschnitt::TYP_SPRUCH       => 'Zeugnisspruch',
-            default                     => $abschnitt->fach?->name ?? 'Fachtext',
-        };
+        return $abschnitt->bezeichnung();
     }
 
     /** Abschließen (einfrieren): Klassenlehrer der Klasse, Zeugnisadmin oder Admin. */
@@ -684,7 +753,7 @@ class ZeugnisController
     /** Einzelnen Abschnitt (Fachtext/Note/Fachbereich) bearbeiten – mit Änderungsverlauf. */
     public function abschnittEdit(Abschnitt $abschnitt)
     {
-        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach', 'bereichtexte.bereich', 'korrektoren']);
+        $abschnitt->load(['zeugnis.schueler.klasse.schuljahr', 'fach', 'bereich', 'bereichtexte.bereich', 'korrektoren']);
         $zeugnis = $abschnitt->zeugnis;
         $klasse  = $zeugnis->schueler?->klasse;
 
@@ -856,7 +925,8 @@ class ZeugnisController
             return $leer;
         }
 
-        $istHaupt = $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS;
+        // Hauptzeugnis-Bausteine liegen am Hauptzeugnis, alles andere am Fachzeugnis.
+        $istHaupt = in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH], true);
         $kette = $klasse->schueler()
             ->zeugnisberechtigt()
             ->with([$istHaupt ? 'hauptzeugnis.abschnitte' : 'fachzeugnis.abschnitte'])
@@ -866,9 +936,9 @@ class ZeugnisController
             ->map(function ($s) use ($abschnitt, $istHaupt) {
                 $z = $istHaupt ? $s->hauptzeugnis : $s->fachzeugnis;
                 $treffer = $z?->abschnitte->first(
-                    fn ($a) => $istHaupt
-                        ? $a->typ === Abschnitt::TYP_HAUPTZEUGNIS
-                        : ($a->typ === $abschnitt->typ && $a->fach_id === $abschnitt->fach_id)
+                    fn ($a) => $a->typ === $abschnitt->typ
+                        && $a->fach_id === $abschnitt->fach_id
+                        && $a->bereich_id === $abschnitt->bereich_id
                 );
 
                 return $treffer ? ['id' => $treffer->id, 'name' => $s->fullName()] : null;
@@ -899,12 +969,7 @@ class ZeugnisController
         // Für die Rückmeldung: wessen Text (Name + Fach) tatsächlich gespeichert wurde
         // – wichtig beim Blättern, wo danach schon der nächste Schüler angezeigt wird.
         $gespeichertName = $zeugnis->schueler?->fullName() ?: 'Schüler';
-        $gespeichertWas  = match ($abschnitt->typ) {
-            Abschnitt::TYP_HAUPTZEUGNIS => 'Hauptzeugnis',
-            Abschnitt::TYP_HAUPTTEXT    => 'Haupttext',
-            Abschnitt::TYP_SPRUCH       => 'Zeugnisspruch',
-            default                     => $abschnitt->fach?->name ?? 'Fachtext',
-        };
+        $gespeichertWas  = $abschnitt->bezeichnung();
 
         if ($zeugnis->istAbgeschlossen()) {
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
@@ -1132,12 +1197,12 @@ class ZeugnisController
         // Klassenweiter Text: in den Klassentext (Klasse + Fach) zurückschreiben.
         if (in_array($eintrag->aktion, ['abschnitt_klassentext', 'abschnitt_klassentext_wiederhergestellt'], true)) {
             $klasse = $zeugnis->schueler?->klasse;
-            if ($klasse && Teamtext::klassentextGetrennt($this->klassentextFuer($klasse->id, $abschnitt->fach_id), $klasse)) {
+            if ($klasse && Teamtext::klassentextGetrennt($this->klassentextFuerAbschnitt($abschnitt, $klasse), $klasse)) {
                 return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', $abschnitt)
                     ->with('error', 'Solange die Teiltexte des klassenweiten Texts getrennt sind, lässt sich kein früherer Stand wiederherstellen.');
             }
             if ($klasse) {
-                $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
+                $kt  = $this->klassentextFuerAbschnitt($abschnitt, $klasse);
                 $alt = $kt->text;
                 $kt->text = $ziel;
                 $kt->save();
@@ -1371,8 +1436,13 @@ class ZeugnisController
             ->where('core_user_id', $user->id)
             ->pluck('id');
 
-        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_SPRUCH], true)) {
-            // Haupttext / Hauptzeugnis / Zeugnisspruch: nur der Klassenlehrer ist voll berechtigt.
+        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH], true)) {
+            // Hauptzeugnis-Fachbereiche: Klassenleitung und Lehrkräfte des Hauptunterrichts.
+            if ($klasse->darfHauptzeugnis($meineLehrerIds)) {
+                return 'voll';
+            }
+        } elseif (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_SPRUCH], true)) {
+            // Haupttext / Zeugnisspruch: nur der Klassenlehrer ist voll berechtigt.
             if ($klasse->hatKlassenlehrer($meineLehrerIds)) {
                 return 'voll';
             }
@@ -1423,23 +1493,35 @@ class ZeugnisController
     }
 
     /**
-     * Klassentext-Route-Parameter (fach-id | 'haupt') für die „Vorherige Zeile"-Navigation
-     * eines Abschnitts. null bei Hauptzeugnis/Fachbereich (dort kein einzelner Fach-Klassentext).
+     * Klassentext-Route-Parameter (fach-id | 'b{bereich}' | 'haupt') für die „Vorherige
+     * Zeile"-Navigation eines Abschnitts. null beim alten HAU-Abschnitt und beim Spruch.
      */
     private function klassentextParamFuerAbschnitt(Abschnitt $abschnitt): ?string
     {
-        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_FACHBEREICH, Abschnitt::TYP_SPRUCH], true)) {
+        if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
+            return $abschnitt->bereich_id ? 'b' . $abschnitt->bereich_id : null;
+        }
+        if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_SPRUCH], true)) {
             return null;
         }
 
         return $abschnitt->fach_id === null ? 'haupt' : (string) $abschnitt->fach_id;
     }
 
+    /** Klassentext eines Abschnitts – je Fach bzw. je Fachbereich des Hauptzeugnisses. */
+    private function klassentextFuerAbschnitt(Abschnitt $abschnitt, Klasse $klasse): Klassentext
+    {
+        return $abschnitt->typ === Abschnitt::TYP_FACHBEREICH
+            ? $this->klassentextFuer($klasse->id, null, 'fach', $abschnitt->bereich_id)
+            : $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
+    }
+
     /** Klassentext-Objekt (mit ->text) für die Editor-Anzeige – je Fach oder Fachbereich. */
     private function klassentextAnzeige(Abschnitt $abschnitt, ?Klasse $klasse): ?object
     {
-        if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
-            return (object) ['text' => $abschnitt->bereich?->klassentext];
+        // Fachbereich ohne lebenden Bereich (entfernt): kein klassenweiter Text mehr.
+        if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH && ! $abschnitt->bereich_id) {
+            return null;
         }
 
         // Zeugnisspruch nutzt keinen Fach-/Haupt-Klassentext (sein klassenweiter Text ist eine
@@ -1448,11 +1530,11 @@ class ZeugnisController
             return null;
         }
 
-        return $klasse ? $this->klassentextFuer($klasse->id, $abschnitt->fach_id) : null;
+        return $klasse ? $this->klassentextFuerAbschnitt($abschnitt, $klasse) : null;
     }
 
     /**
-     * Klassentext speichern – Fach → zeugnis_fach_klassentexte, Fachbereich → am Bereich.
+     * Klassentext speichern – je Fach bzw. Fachbereich in zeugnis_fach_klassentexte.
      *
      * @return array{0:?string,1:bool} [alter Wert, wurde geändert]
      */
@@ -1463,25 +1545,10 @@ class ZeugnisController
             return [null, false];
         }
 
-        if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
-            $bereich = $abschnitt->bereich;
-            if (! $bereich) {
-                return [null, false];
-            }
-            $alt = $bereich->klassentext;
-            if ((string) $alt === (string) $neu) {
-                return [$alt, false];
-            }
-            $bereich->klassentext = $neu;
-            $bereich->save();
-
-            return [$alt, true];
-        }
-
-        if (! $klasse) {
+        if (! $klasse || ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH && ! $abschnitt->bereich_id)) {
             return [null, false];
         }
-        $kt  = $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
+        $kt  = $this->klassentextFuerAbschnitt($abschnitt, $klasse);
         $alt = $kt->text;
         if ((string) $alt === (string) $neu) {
             return [$alt, false];
@@ -1492,13 +1559,17 @@ class ZeugnisController
         return [$alt, true];
     }
 
-    /** Klassenweiter Text für (Klasse, Fach) – fach_id null = Haupttext. */
-    private function klassentextFuer(int $klasseId, ?int $fachId, string $art = 'fach'): Klassentext
+    /**
+     * Klassenweiter Text für (Klasse, Fach bzw. Fachbereich) – beides null = Haupttext
+     * (Vorspann des Hauptzeugnisses, Spalte HAU).
+     */
+    private function klassentextFuer(int $klasseId, ?int $fachId, string $art = 'fach', ?int $bereichId = null): Klassentext
     {
         $q = Klassentext::where('klasse_id', $klasseId)->where('art', $art);
         $fachId ? $q->where('fach_id', $fachId) : $q->whereNull('fach_id');
+        $bereichId ? $q->where('bereich_id', $bereichId) : $q->whereNull('bereich_id');
 
-        return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId, 'art' => $art]);
+        return $q->first() ?? new Klassentext(['klasse_id' => $klasseId, 'fach_id' => $fachId, 'bereich_id' => $bereichId, 'art' => $art]);
     }
 
     /**
@@ -1508,9 +1579,9 @@ class ZeugnisController
      */
     public function klassentextEdit(Klasse $klasse, string $fach)
     {
-        [$fachId, $fachModel, $art] = $this->fachAusParam($fach);
+        [$fachId, $fachModel, $art, $bereichId, $label] = $this->fachAusParam($fach, $klasse);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art, $bereichId);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
@@ -1522,14 +1593,14 @@ class ZeugnisController
         // Der klassenweite Spruch ist einmalig je Klasse – keine Fach-zu-Fach-Navigation.
         $nachbarn = $art === 'spruch'
             ? ['prev' => null, 'next' => null, 'position' => 1, 'gesamt' => 1]
-            : $this->klassentextNachbarn($klasse, $fachId);
+            : $this->klassentextNachbarn($klasse, $fach);
 
         return view('schulzeugnis::klassen.klassentext', [
-            'navSchueler'    => $berechtigung === 'voll' ? $this->ersterSchuelerAbschnitt($klasse, $fachId, $art) : null,
+            'navSchueler'    => $berechtigung === 'voll' ? $this->ersterSchuelerAbschnitt($klasse, $fachId, $art, $bereichId) : null,
             'klasse'         => $klasse,
             'fach'           => $fachModel,
             'fachParam'      => $fach,
-            'bezeichnung'    => $art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($fachModel?->name ?? 'Haupttext'),
+            'bezeichnung'    => $label,
             'kannBereiche'   => $this->kannKlassenVerwalten(auth()->user()),
             'klassentext'    => $kt,
             'team'           => ($ktLehrer = Teamtext::sicherstellenKlassentext($kt, $klasse)) ? $this->teamAnsicht($kt, $ktLehrer, $klasse) : null,
@@ -1549,14 +1620,13 @@ class ZeugnisController
 
     public function klassentextUpdate(Request $request, Klasse $klasse, string $fach)
     {
-        [$fachId, $fachModel, $art] = $this->fachAusParam($fach);
+        [$fachId, $fachModel, $art, $bereichId, $label] = $this->fachAusParam($fach, $klasse);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art, $bereichId);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
         $b     = $this->klassentextBerechtigung($kt, $fachId, $klasse, auth()->user());
-        $label = $art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($fachModel?->name ?? 'Haupttext');
 
         if ($b === 'keine') {
             return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fach])
@@ -1589,7 +1659,7 @@ class ZeugnisController
             }
             $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
-            return $this->klassentextZiel($request, $klasse, $fachId, $label, $b, $art);
+            return $this->klassentextZiel($request, $klasse, $fach, $fachId, $bereichId, $label, $b, $art);
         }
 
         // Voll berechtigt: Text, Notiz, Status, Korrektoren.
@@ -1657,15 +1727,15 @@ class ZeugnisController
 
         $this->klassentextUeberlaufVerwerfen($klasse, $altText, $kt->text);
 
-        return $this->klassentextZiel($request, $klasse, $fachId, $label, $b, $art);
+        return $this->klassentextZiel($request, $klasse, $fach, $fachId, $bereichId, $label, $b, $art);
     }
 
     /** Einen früheren Textstand eines Klassentextes aus dem Verlauf wiederherstellen. */
     public function klassentextWiederherstellen(Request $request, Klasse $klasse, string $fach)
     {
-        [$fachId, , $art] = $this->fachAusParam($fach);
+        [$fachId, , $art, $bereichId] = $this->fachAusParam($fach, $klasse);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art, $bereichId);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
@@ -1699,9 +1769,9 @@ class ZeugnisController
     /** Korrektor lehnt die Korrektur eines Klassentexts ab (siehe abschnittAblehnen). */
     public function klassentextAblehnen(Klasse $klasse, string $fach)
     {
-        [$fachId, , $art] = $this->fachAusParam($fach);
+        [$fachId, , $art, $bereichId] = $this->fachAusParam($fach, $klasse);
         $klasse->loadMissing('schuljahr');
-        $kt = $this->klassentextFuer($klasse->id, $fachId, $art);
+        $kt = $this->klassentextFuer($klasse->id, $fachId, $art, $bereichId);
         if ($kt->exists) {
             $kt->load('korrektoren');
         }
@@ -1730,18 +1800,27 @@ class ZeugnisController
             ->with('status', 'Korrektur abgelehnt – der Klassentext ist zurück bei der Lehrkraft.');
     }
 
-    /** Route-Parameter → [fachId|null, Fach|null]. "haupt" = Haupttext. */
-    private function fachAusParam(string $fach): array
+    /**
+     * Route-Parameter → [fachId|null, Fach|null, art, bereichId|null, Bezeichnung].
+     * "haupt" = Haupttext (Vorspann, Spalte HAU), "spruch" = klassenweiter Spruch,
+     * "b{id}" = Fachbereich des Hauptzeugnisses dieser Klasse.
+     */
+    private function fachAusParam(string $fach, Klasse $klasse): array
     {
         if ($fach === 'haupt') {
-            return [null, null, 'fach'];
+            return [null, null, 'fach', null, $klasse->hat_hauptzeugnis ? 'Hauptunterricht' : 'Haupttext'];
         }
         if ($fach === 'spruch') {
-            return [null, null, 'spruch'];
+            return [null, null, 'spruch', null, 'Zeugnisspruch (klassenweit)'];
+        }
+        if (preg_match('/^b(\d+)$/', $fach, $m)) {
+            $bereich = Hauptbereich::where('klasse_id', $klasse->id)->findOrFail((int) $m[1]);
+
+            return [null, null, 'fach', $bereich->id, $bereich->name];
         }
         $model = Fach::findOrFail((int) $fach);
 
-        return [$model->id, $model, 'fach'];
+        return [$model->id, $model, 'fach', null, $model->name];
     }
 
     /**
@@ -1762,7 +1841,11 @@ class ZeugnisController
             ->pluck('id');
 
         if ($fachId === null) {
-            if ($klasse->hatKlassenlehrer($meineLehrerIds)) {
+            // Spruch: Klassenleitung. Haupttext/Fachbereiche: auch der Hauptunterricht.
+            $voll = $kt->art === 'spruch'
+                ? $klasse->hatKlassenlehrer($meineLehrerIds)
+                : $klasse->darfHauptzeugnis($meineLehrerIds);
+            if ($voll) {
                 return 'voll';
             }
         } else {
@@ -1786,28 +1869,38 @@ class ZeugnisController
 
     /**
      * Vor-/nächstes Fach der Klasse für die „Danach weiter"-Navigation (gleiche
-     * Reihenfolge wie die Spalten der Zeugnis-Tabelle). Haupttext hat keine Nachbarn.
+     * Reihenfolge wie die Spalten der Zeugnis-Tabelle): Hauptunterricht (HAU) und seine
+     * Fachbereiche, danach die Fächer. Haupttext ohne Hauptzeugnis hat keine Nachbarn.
      *
      * @return array{prev:?array{param:string,name:string},next:?array{param:string,name:string},position:?int,gesamt:?int}
      */
-    private function klassentextNachbarn(Klasse $klasse, ?int $fachId): array
+    private function klassentextNachbarn(Klasse $klasse, string $param): array
     {
         $leer = ['prev' => null, 'next' => null, 'position' => null, 'gesamt' => null];
-        if ($fachId === null) {
+        if ($param === 'spruch' || ($param === 'haupt' && ! $klasse->hat_hauptzeugnis)) {
             return $leer;
         }
 
-        // Lehrkräfte blättern nur durch ihre eigenen Fächer (Lehrauftrag in dieser Klasse),
-        // Admins durch alle.
-        $user    = auth()->user();
+        // Lehrkräfte blättern nur durch ihre eigenen Texte (Lehrauftrag bzw. Hauptzeugnis
+        // in dieser Klasse), Admins durch alle.
+        $user  = auth()->user();
+        $meine = $this->meineLehrerIds($klasse);
+        $kette = collect();
+        if ($klasse->hat_hauptzeugnis && ($user?->is_admin || $klasse->darfHauptzeugnis($meine))) {
+            $kette->push(['param' => 'haupt', 'name' => 'Hauptunterricht']);
+            foreach ($klasse->hauptbereiche as $b) {
+                $kette->push(['param' => 'b' . $b->id, 'name' => $b->name]);
+            }
+        }
         $fachIds = $klasse->lehrauftraege()
-            ->when(! $user?->is_admin, fn ($q) => $q->whereIn('lehrer_id', $this->meineLehrerIds($klasse)))
+            ->when(! $user?->is_admin, fn ($q) => $q->whereIn('lehrer_id', $meine))
             ->distinct()->pluck('fach_id');
-        $kette   = Fach::whereIn('id', $fachIds)->whereNotIn('id', $klasse->entfallendeFachIds())->orderBy('reihenfolge')->orderBy('name')->get()
-            ->map(fn ($f) => ['param' => (string) $f->id, 'name' => $f->name])
-            ->values();
+        $kette = $kette->concat(
+            Fach::whereIn('id', $fachIds)->whereNotIn('id', $klasse->entfallendeFachIds())->orderBy('reihenfolge')->orderBy('name')->get()
+                ->map(fn ($f) => ['param' => (string) $f->id, 'name' => $f->name])
+        )->values();
 
-        $idx = $kette->search(fn ($e) => $e['param'] === (string) $fachId);
+        $idx = $kette->search(fn ($e) => $e['param'] === $param);
         if ($idx === false) {
             return $leer;
         }
@@ -1826,7 +1919,7 @@ class ZeugnisController
      *
      * @return array{id:int,name:string}|null
      */
-    private function ersterSchuelerAbschnitt(Klasse $klasse, ?int $fachId, string $art): ?array
+    private function ersterSchuelerAbschnitt(Klasse $klasse, ?int $fachId, string $art, ?int $bereichId = null): ?array
     {
         $q = Abschnitt::query()
             ->join('zeugnisse', 'zeugnisse.id', '=', 'zeugnis_abschnitte.zeugnis_id')
@@ -1835,6 +1928,12 @@ class ZeugnisController
 
         if ($art === 'spruch') {
             $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_SPRUCH);
+        } elseif ($bereichId !== null) {
+            $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_FACHBEREICH)->where('zeugnis_abschnitte.bereich_id', $bereichId);
+        } elseif ($fachId === null && $klasse->hat_hauptzeugnis) {
+            // Vorspann (HAU): weiter zum ersten Fachbereich des ersten Schülers.
+            $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_FACHBEREICH)->whereNotNull('zeugnis_abschnitte.bereich_id')
+                ->orderBy('s.nachname')->orderBy('s.vorname')->orderBy('zeugnis_abschnitte.reihenfolge');
         } elseif ($fachId === null) {
             $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_HAUPTTEXT);
         } else {
@@ -1853,7 +1952,7 @@ class ZeugnisController
      * Zeugnis-Tabelle). Korrektoren dürfen NICHT zu Nachbar-Fächern springen (dort sind
      * sie nicht zugewiesen → 403); sie landen wieder in ihren ToDos.
      */
-    private function klassentextZiel(Request $request, Klasse $klasse, ?int $fachId, string $label, string $berechtigung = 'voll', string $art = 'fach')
+    private function klassentextZiel(Request $request, Klasse $klasse, string $param, ?int $fachId, ?int $bereichId, string $label, string $berechtigung = 'voll', string $art = 'fach')
     {
         if ($berechtigung !== 'voll') {
             return redirect()->route('module.schulzeugnis.todo.index')
@@ -1861,7 +1960,7 @@ class ZeugnisController
         }
 
         $weiter   = (string) $request->input('weiter');
-        $nachbarn = $this->klassentextNachbarn($klasse, $fachId);
+        $nachbarn = $this->klassentextNachbarn($klasse, $param);
 
         $ziel = null;
         if ($weiter === 'next' && $nachbarn['next']) {
@@ -1878,14 +1977,12 @@ class ZeugnisController
             return redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.index', $klasse)
                 ->with('status', 'Klassentext (' . $label . ') gespeichert.');
         }
-        if ($weiter === 'schueler' && ($erster = $this->ersterSchuelerAbschnitt($klasse, $fachId, $art))) {
+        if ($weiter === 'schueler' && ($erster = $this->ersterSchuelerAbschnitt($klasse, $fachId, $art, $bereichId))) {
             return redirect()->route('module.schulzeugnis.klassenraeume.abschnitte.edit', ['abschnitt' => $erster['id']])
                 ->with('status', 'Klassentext (' . $label . ') gespeichert.');
         }
 
-        $fachParam = $fachId === null ? 'haupt' : (string) $fachId;
-
-        return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $fachParam])
+        return redirect()->route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $param])
             ->with('status', 'Klassentext (' . $label . ') gespeichert.');
     }
 

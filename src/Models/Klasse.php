@@ -54,13 +54,40 @@ class Klasse extends Model
 
     /**
      * Fächer, die in dieser Klasse entfallen, weil das Hauptzeugnis sie ersetzt
-     * (Fach „Wird durch das Hauptzeugnis ersetzt" + Klasse mit Hauptzeugnis).
+     * (Fach „Ist der Hauptunterricht" + Klasse mit Hauptzeugnis → Spalte HAU).
      *
      * @return array<int,int>
      */
     public function entfallendeFachIds(): array
     {
         return $this->hat_hauptzeugnis ? Fach::durchHauptzeugnisIds() : [];
+    }
+
+    /**
+     * Lehrer mit Lehrauftrag im Hauptunterricht dieser Klasse (Fach „Ist der
+     * Hauptunterricht") – sie schreiben die Fachbereiche des Hauptzeugnisses.
+     */
+    public function hauptunterrichtLehrerIds(): Collection
+    {
+        $hu = Fach::durchHauptzeugnisIds();
+
+        return $hu === [] ? collect() : $this->lehrauftraege()->whereIn('fach_id', $hu)->pluck('lehrer_id')->unique()->values();
+    }
+
+    /** Hat die Klasse einen Lehrauftrag im Hauptunterricht? */
+    public function hatHauptunterricht(): bool
+    {
+        $hu = Fach::durchHauptzeugnisIds();
+
+        return $hu !== [] && $this->lehrauftraege()->whereIn('fach_id', $hu)->exists();
+    }
+
+    /** Darf einer der Lehrer (IDs) das Hauptzeugnis schreiben? Klassenlehrer oder Hauptunterricht. */
+    public function darfHauptzeugnis(iterable $lehrerIds): bool
+    {
+        $ids = collect($lehrerIds);
+
+        return $this->hatKlassenlehrer($ids) || $this->hauptunterrichtLehrerIds()->intersect($ids)->isNotEmpty();
     }
 
     /**

@@ -60,8 +60,8 @@
                        @checked(old('durch_hauptzeugnis', $fach->durch_hauptzeugnis))
                        class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                 <span class="text-sm text-gray-700">
-                    Wird durch das Hauptzeugnis ersetzt
-                    <span class="block text-xs text-gray-500">In Klassen mit Hauptzeugnis entfällt dieses Fach: keine eigene Spalte, kein Abschnitt im Fachzeugnis, keine ToDos.</span>
+                    Ist der Hauptunterricht (Spalte HAU)
+                    <span class="block text-xs text-gray-500">In Klassen mit Hauptzeugnis wird dieses Fach zur Spalte HAU: seine Lehrkräfte schreiben die Fachbereiche des Hauptzeugnisses, im Fachzeugnis entfällt es.</span>
                 </span>
             </label>
 

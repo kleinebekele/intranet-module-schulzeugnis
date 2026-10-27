@@ -19,7 +19,10 @@ class Fach extends Model
         'durch_hauptzeugnis' => 'boolean',
     ];
 
-    /** IDs der Fächer, die in Klassen mit Hauptzeugnis entfallen (das Hauptzeugnis ersetzt sie). */
+    /**
+     * IDs der Fächer „Ist der Hauptunterricht" (Spalte durch_hauptzeugnis): in Klassen mit
+     * Hauptzeugnis bilden sie die Spalte HAU und entfallen im Fachzeugnis.
+     */
     public static function durchHauptzeugnisIds(): array
     {
         return self::where('durch_hauptzeugnis', true)->pluck('id')->all();

@@ -53,8 +53,13 @@
             </div>
         @else
             <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-indigo-900">
-                Dieser Text gilt <strong>klassenweit</strong> für {{ $fach?->name ?? 'den Haupttext' }} und erscheint auf jedem
-                Zeugnis dieser Klasse <strong>vor</strong> dem jeweiligen Schülertext.
+                @if ($istHaupt && $klasse->hat_hauptzeugnis)
+                    Dieser Text gilt <strong>klassenweit</strong> für den Hauptunterricht und steht auf jedem
+                    Hauptzeugnis dieser Klasse <strong>vor</strong> allen Fachbereichen.
+                @else
+                    Dieser Text gilt <strong>klassenweit</strong> für {{ $bezeichnung ?? $fach?->name ?? 'den Haupttext' }} und erscheint auf jedem
+                    Zeugnis dieser Klasse <strong>vor</strong> dem jeweiligen Schülertext.
+                @endif
             </div>
         @endif
 

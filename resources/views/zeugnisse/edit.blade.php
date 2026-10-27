@@ -62,11 +62,7 @@
                 <div class="rounded-xl border border-gray-200 bg-white p-5">
                     <div class="flex items-center justify-between">
                         <h2 class="font-semibold text-gray-800">
-                            @if ($a->typ === 'haupttext')
-                                Haupttext
-                            @else
-                                {{ $a->fach?->name ?? 'Fach' }}
-                            @endif
+                            {{ $a->bezeichnung() }}
                         </h2>
                         <select name="abschnitte[{{ $a->id }}][status]" @disabled($fremd)
                                 class="rounded-lg border-gray-300 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">

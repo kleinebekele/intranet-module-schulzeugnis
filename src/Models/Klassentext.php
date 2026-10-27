@@ -38,6 +38,25 @@ class Klassentext extends Model
         return $this->belongsTo(Fach::class, 'fach_id');
     }
 
+    /** Fachbereich des Hauptzeugnisses (loser Verweis, null = Fach- bzw. Haupttext). */
+    public function bereich(): BelongsTo
+    {
+        return $this->belongsTo(Hauptbereich::class, 'bereich_id');
+    }
+
+    /**
+     * Route-Parameter des Klassentext-Editors: Fach-ID, 'b{bereich}', 'haupt' oder 'spruch'.
+     */
+    public function param(): string
+    {
+        return match (true) {
+            $this->art === 'spruch'    => 'spruch',
+            $this->bereich_id !== null => 'b' . $this->bereich_id,
+            $this->fach_id !== null    => (string) $this->fach_id,
+            default                    => 'haupt',
+        };
+    }
+
     /** Lehrer, die diesen klassenweiten Text korrigieren dürfen (analog Abschnitt). */
     public function korrektoren(): BelongsToMany
     {

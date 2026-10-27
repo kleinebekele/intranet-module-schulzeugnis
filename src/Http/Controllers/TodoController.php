@@ -84,6 +84,9 @@ class TodoController
 
         $relevanteKlassen = $klassenAlsKL->merge($faecherJeKlasse->keys())->unique();
 
+        // Fachbereiche des Hauptzeugnisses schreiben Klassenleitung und Hauptunterricht.
+        $huFachIds = Fach::durchHauptzeugnisIds();
+
         // 1) Alle eigenen Abschnitte (Zeugnis nicht abgeschlossen) – inkl. erledigte,
         //    damit man sie in „Meine Zeugnistexte" bei Bedarf wieder anfassen kann.
         $eigene = collect();
@@ -91,12 +94,16 @@ class TodoController
             $eigene = Abschnitt::whereHas('zeugnis', fn ($q) => $q
                     ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
                     ->whereHas('schueler', fn ($s) => $s->whereIn('klasse_id', $relevanteKlassen)->zeugnisberechtigt()))
-                ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
+                ->with(['fach', 'bereich', 'zeugnis.schueler.klasse.stufe'])
                 ->get()
-                ->filter(function (Abschnitt $a) use ($klassenAlsKL, $faecherJeKlasse) {
+                ->filter(function (Abschnitt $a) use ($klassenAlsKL, $faecherJeKlasse, $huFachIds) {
                     $klasseId = $a->zeugnis?->schueler?->klasse_id;
                     if (! $klasseId) {
                         return false;
+                    }
+                    if ($a->typ === Abschnitt::TYP_FACHBEREICH) {
+                        return $a->bereich_id !== null && ($klassenAlsKL->contains($klasseId)
+                            || array_intersect($huFachIds, $faecherJeKlasse[$klasseId] ?? []) !== []);
                     }
                     if (in_array($a->typ, [Abschnitt::TYP_HAUPTTEXT, Abschnitt::TYP_SPRUCH], true)) {
                         return $klassenAlsKL->contains($klasseId);
@@ -108,12 +115,14 @@ class TodoController
         $eigene = $this->ohneEntfallendeFaecher($eigene);
 
         // 2) Offene Korrektur-Anfragen an mich.
+        // Der alte HAU-Sammelabschnitt (vor v1.16) ist durch die Fachbereiche ersetzt.
         $korrektur = Abschnitt::whereIn('status', self::KORREKTUR_OFFEN)
+            ->where('typ', '!=', Abschnitt::TYP_HAUPTZEUGNIS)
             ->whereHas('korrektoren', fn ($q) => $q->whereIn('zeugnis_schuljahr_lehrer.id', $meineLehrerIds))
             ->whereHas('zeugnis', fn ($q) => $q
                 ->where('status', '!=', Zeugnis::STATUS_ABGESCHLOSSEN)
                 ->whereHas('schueler', fn ($s) => $s->zeugnisberechtigt()->whereHas('klasse', fn ($k) => $k->where('schuljahr_id', $schuljahr->id))))
-            ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
+            ->with(['fach', 'bereich', 'zeugnis.schueler.klasse.stufe'])
             ->get();
         $korrektur = $this->ohneEntfallendeFaecher($korrektur);
 
@@ -122,7 +131,7 @@ class TodoController
         $ktKorrektur = Klassentext::whereIn('status', self::KORREKTUR_OFFEN)
             ->whereHas('korrektoren', fn ($q) => $q->whereIn('zeugnis_schuljahr_lehrer.id', $meineLehrerIds))
             ->whereHas('klasse', fn ($k) => $k->where('schuljahr_id', $schuljahr->id))
-            ->with(['klasse.stufe', 'fach'])
+            ->with(['klasse.stufe', 'fach', 'bereich'])
             ->get();
 
         $ktGruppen = $ktKorrektur
@@ -136,13 +145,22 @@ class TodoController
                     'farbe' => $klasse->stufe?->farbe ?: '#64748b',
                     'sub'   => $klasse->stufe?->name,
                     'items' => $g
-                        ->sortBy(fn (Klassentext $kt) => $kt->art === 'spruch' ? 9999 : ($kt->fach_id === null ? -1 : ($kt->fach?->reihenfolge ?? 999)))
+                        ->sortBy(fn (Klassentext $kt) => match (true) {
+                            $kt->art === 'spruch'    => 9999,
+                            $kt->bereich_id !== null => -1 + (($kt->bereich?->reihenfolge ?? 0) + 2) / 1000,
+                            $kt->fach_id === null    => -1,
+                            default                  => $kt->fach?->reihenfolge ?? 999,
+                        })
                         ->map(fn (Klassentext $kt) => [
                             'url'    => route('module.schulzeugnis.klassenraeume.klassentexte.edit', [
                                 'klasse' => $kt->klasse_id,
-                                'fach'   => $kt->art === 'spruch' ? 'spruch' : ($kt->fach_id === null ? 'haupt' : $kt->fach_id),
+                                'fach'   => $kt->param(),
                             ]),
-                            'fach'   => $kt->art === 'spruch' ? 'Zeugnisspruch (klassenweit)' : ($kt->fach?->name ?? 'Hauptzeugnis'),
+                            'fach'   => match (true) {
+                                $kt->art === 'spruch'    => 'Zeugnisspruch (klassenweit)',
+                                $kt->bereich_id !== null => 'Hauptzeugnis · ' . ($kt->bereich?->name ?? 'Fachbereich'),
+                                default                  => $kt->fach?->name ?? 'Hauptunterricht',
+                            },
                             'status' => $kt->statusMeta(),
                         ])
                         ->values()
@@ -186,6 +204,17 @@ class TodoController
             'stati'                => Abschnitt::STATI,
             'alsLehrerAuswahl'     => $leer['alsLehrerAuswahl'],
         ]);
+    }
+
+    /** Schlüssel des Blatts bzw. Klassentext-Parameter: Fach-ID | 'b{bereich}' | 'haupt' | 'spruch'. */
+    private function fachKey(Abschnitt $a): string
+    {
+        return match ($a->typ) {
+            Abschnitt::TYP_HAUPTTEXT   => 'haupt',
+            Abschnitt::TYP_SPRUCH      => 'spruch',
+            Abschnitt::TYP_FACHBEREICH => 'b' . $a->bereich_id,
+            default                    => (string) $a->fach_id,
+        };
     }
 
     /**
@@ -241,7 +270,7 @@ class TodoController
      */
     /**
      * Klassenweite Texte der relevanten Klassen, Schlüssel „klasseId|fachKey"
-     * (fachKey = Fach-ID | 'haupt' | 'spruch' wie in {@see gruppiere()}). Noch nicht
+     * (fachKey = Fach-ID | 'b{bereich}' | 'haupt' | 'spruch' wie in {@see gruppiere()}). Noch nicht
      * angelegte Texte fehlen hier und erscheinen als „Unbearbeitet".
      *
      * @return array<string,Klassentext>
@@ -253,7 +282,7 @@ class TodoController
         }
 
         return Klassentext::whereIn('klasse_id', $klassenIds)->get()
-            ->keyBy(fn (Klassentext $kt) => $kt->klasse_id . '|' . ($kt->art === 'spruch' ? 'spruch' : ($kt->fach_id ?? 'haupt')))
+            ->keyBy(fn (Klassentext $kt) => $kt->klasse_id . '|' . $kt->param())
             ->all();
     }
 
@@ -277,13 +306,15 @@ class TodoController
             'natural' => true,
         ];
         $fachMeta = function (Abschnitt $a) {
-            $istHaupt  = $a->typ === Abschnitt::TYP_HAUPTTEXT;
-            $istSpruch = $a->typ === Abschnitt::TYP_SPRUCH;
+            $istHaupt   = $a->typ === Abschnitt::TYP_HAUPTTEXT;
+            $istSpruch  = $a->typ === Abschnitt::TYP_SPRUCH;
+            $istBereich = $a->typ === Abschnitt::TYP_FACHBEREICH;
 
             return [
-                'key'     => $istHaupt ? 'haupt' : ($istSpruch ? 'spruch' : (string) $a->fach_id),
-                'label'   => $istHaupt ? 'Haupttext' : ($istSpruch ? 'Zeugnisspruch' : ($a->fach?->name ?? 'Fachtext')),
-                'sort'    => $istHaupt ? -1 : ($istSpruch ? 9999 : ($a->fach?->reihenfolge ?? 999)),
+                'key'     => $this->fachKey($a),
+                'label'   => $istBereich ? 'Hauptzeugnis · ' . $a->bezeichnung() : $a->bezeichnung(),
+                // Hauptzeugnis-Fachbereiche direkt hinter dem Haupttext, vor den Fächern.
+                'sort'    => $istHaupt ? -1 : ($istSpruch ? 9999 : ($istBereich ? -1 + (($a->bereich?->reihenfolge ?? 0) + 2) / 1000 : ($a->fach?->reihenfolge ?? 999))),
                 'farbe'   => null,
                 'sub'     => null,
                 'natural' => false,
@@ -324,7 +355,7 @@ class TodoController
                         if ($klassentexte !== null) {
                             $a        = $proSek->first();
                             $klasseId = $a->zeugnis->schueler->klasse_id;
-                            $fachKey  = $a->typ === Abschnitt::TYP_HAUPTTEXT ? 'haupt' : ($a->typ === Abschnitt::TYP_SPRUCH ? 'spruch' : (string) $a->fach_id);
+                            $fachKey  = $this->fachKey($a);
                             $kt       = $klassentexte[$klasseId . '|' . $fachKey] ?? null;
                             $ktZeile  = [
                                 'url'    => route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasseId, 'fach' => $fachKey]),

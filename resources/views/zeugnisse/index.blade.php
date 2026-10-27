@@ -86,6 +86,8 @@
         #zt-table .zt-col, #zt-table .zt-mini { width: 35px; max-width: 35px; }
         #zt-table th.zt-col, #zt-table th.zt-mini { padding-left: 3px; padding-right: 3px; }
         #zt-table td.zt-col, #zt-table td.zt-mini { padding-left: 2px; padding-right: 2px; }
+        /* Fachbereich-Namen sind frei und oft lang – gekürzt, voller Name im Tooltip. */
+        #zt-table .zt-bereich-kopf { display: block; max-width: 35px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #zt-table tr.zt-focus td { background: var(--color-amber-50, #fffbeb) !important; transition: background .3s ease; }
         #zt-table td.zt-focus-cell { box-shadow: inset 0 0 0 2px var(--color-amber-500, #f59e0b); border-radius: 4px; }
 
@@ -172,6 +174,16 @@
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
 
+        @if ($huOhneHaupt)
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Diese Klasse hat den <strong>Hauptunterricht</strong>, aber kein Hauptzeugnis – das Zeugnis wird erst aufgeteilt,
+                wenn das Hauptzeugnis in den Klasseneinstellungen eingeschaltet ist.
+                @if ($kannKlassenlehrer)
+                    <a href="{{ route('module.schulzeugnis.klassen.edit', $klasse) }}" class="font-medium text-amber-800 underline hover:no-underline">Klasse bearbeiten</a>.
+                @endif
+            </div>
+        @endif
+
         {{-- Filterleiste --}}
         <div class="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -179,6 +191,9 @@
                 <button type="button" id="zt-mine" class="zt-chip">Meine Fächer</button>
                 <button type="button" id="zt-all" class="zt-chip">Alle</button>
                 <span class="mx-1 text-gray-300">|</span>
+                @foreach ($bereiche as $bereich)
+                    <button type="button" class="zt-chip" data-col="b{{ $bereich->id }}" title="Hauptzeugnis · {{ $bereich->name }}">{{ $bereich->name }}</button>
+                @endforeach
                 @foreach ($faecher as $fach)
                     <button type="button" class="zt-chip" data-col="{{ $fach->id }}" title="{{ $fach->name }}">{{ $fach->kuerzel ?: $fach->name }}</button>
                 @endforeach
@@ -203,10 +218,21 @@
                         @if ($hatHaupt)
                             <th class="zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
                                 style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);"
-                                data-fach="Hauptzeugnis" data-rolle="Klassenlehrer"
-                                data-lehrer="{{ $klasse->klassenleitungNamen() }}"
+                                data-fach="Hauptunterricht" data-rolle="{{ $huLehrerNamen ? 'Hauptunterricht' : 'Klassenlehrer' }}"
+                                data-lehrer="{{ $huLehrerNamen ?: $klasse->klassenleitungNamen() }}"
                                 data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
-                                title="Hauptzeugnis">HAU</th>
+                                @if ($istAdmin || $binHauptzeugnis || in_array('haupt', $ktKorrektorKeys, true)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif
+                                title="Hauptunterricht (Hauptzeugnis gesamt)">HAU</th>
+                            @foreach ($bereiche as $bereich)
+                                @php $bKey = 'b' . $bereich->id; @endphp
+                                <th class="zt-col zt-col-{{ $bKey }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
+                                    style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);"
+                                    data-fach="{{ $bereich->name }}" data-rolle="{{ $huLehrerNamen ? 'Hauptunterricht' : 'Klassenlehrer' }}"
+                                    data-lehrer="{{ $huLehrerNamen ?: $klasse->klassenleitungNamen() }}"
+                                    data-klassentext="{{ $klassentexte[$bKey] ?? '' }}"
+                                    @if ($istAdmin || $binHauptzeugnis || in_array($bKey, $ktKorrektorKeys, true)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $bKey]) }}" @endif
+                                    title="Hauptzeugnis · {{ $bereich->name }}"><span class="zt-bereich-kopf">{{ $bereich->name }}</span></th>
+                            @endforeach
                             <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);" title="Warnhinweis Hauptzeugnis">⚠</th>
                             <th class="zt-mini border-b border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);" title="Vorschau Hauptzeugnis"><i class="bx bx-show"></i></th>
                             <th class="zt-mini border-b border-r border-gray-200 text-center font-semibold" style="position: sticky; top: 0; z-index: 20; background: var(--color-indigo-50, #eef2ff);" title="PDF Hauptzeugnis">PDF</th>
@@ -241,10 +267,19 @@
                             @php $ktH = $ktRows['haupt'] ?? null; $kmH = $ktH?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="px-2 text-center" style="background: var(--color-indigo-50, #eef2ff);">
                                 <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}"
-                                   title="Klassentext Hauptzeugnis – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                   title="Klassentext Hauptunterricht (Vorspann) – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                     <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}"></i>
                                 </a>
                             </td>
+                            @foreach ($bereiche as $bereich)
+                                @php $bKey = 'b' . $bereich->id; $ktB = $ktRows[$bKey] ?? null; $kmB = $ktB?->statusMeta() ?? $stati['unbearbeitet']; @endphp
+                                <td class="zt-col zt-col-{{ $bKey }} px-2 text-center" style="background: var(--color-indigo-50, #eef2ff);">
+                                    <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => $bKey]) }}"
+                                       title="Klassentext {{ $bereich->name }} – {{ $kmB['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                        <i class="bx {{ $kmB['icon'] }} text-lg {{ $farbeKlasse[$kmB['farbe']] ?? 'text-gray-300' }}"></i>
+                                    </a>
+                                </td>
+                            @endforeach
                             <td class="zt-mini text-center" style="background: var(--color-indigo-50, #eef2ff);">
                                 @if ($warnAgg['haupt'])
                                     <i class="bx bxs-error text-amber-600" title="Bei mindestens einem Schüler ist der Hauptzeugnis-Text zu lang"></i>
@@ -298,7 +333,8 @@
                             $hz = $s->hauptzeugnis;
                             $abs = $z ? $z->abschnitte : collect();
                             $fachMap = $abs->whereIn('typ', ['fachtext', 'note'])->keyBy('fach_id');
-                            $haz = $hz ? $hz->abschnitte->firstWhere('typ', 'hauptzeugnis') : null;
+                            $bereichMap = $hz ? $hz->abschnitte->where('typ', 'fachbereich')->whereNotNull('bereich_id')->keyBy('bereich_id') : collect();
+                            $hauSt = $hauStatus[$s->id] ?? null;
                         @endphp
                         <tr class="border-b border-gray-100">
                             <td class="border-r border-gray-200 px-4 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10;">
@@ -308,11 +344,10 @@
                             @if ($hatHaupt)
                                 @php $wh = $warnungen[$s->id]['haupt'] ?? null; @endphp
                                 {{-- Hauptzeugnis (HAU) + Warnung/Vorschau/PDF --}}
-                                <td class="px-2 text-center" data-status="{{ $haz?->status ?? '' }}">
-                                    @if ($haz)
-                                        @php $hm = $haz->statusMeta(); @endphp
-                                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $haz) }}" title="Hauptzeugnis – {{ $hm['label'] }}"
-                                           data-ab="{{ $haz->id }}"
+                                <td class="px-2 text-center" data-status="{{ $hauSt ?? '' }}">
+                                    @if ($hz && $hauSt)
+                                        @php $hm = $stati[$hauSt] ?? $stati['unbearbeitet']; @endphp
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $hz) }}" title="Hauptzeugnis gesamt – {{ $hm['label'] }} (Stand des am wenigsten fortgeschrittenen Fachbereichs)"
                                            class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                             <i class="bx {{ $hm['icon'] }} text-lg {{ $farbeKlasse[$hm['farbe']] ?? 'text-gray-300' }}"></i>
                                         </a>
@@ -320,6 +355,21 @@
                                         <span class="text-gray-200">–</span>
                                     @endif
                                 </td>
+                                @foreach ($bereiche as $bereich)
+                                    @php $ba = $bereichMap->get($bereich->id); @endphp
+                                    <td class="zt-col zt-col-b{{ $bereich->id }} px-2 text-center" data-status="{{ $ba?->status ?? '' }}">
+                                        @if ($ba)
+                                            @php $bm = $ba->statusMeta(); @endphp
+                                            <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $ba) }}" title="{{ $bereich->name }} – {{ $bm['label'] }}"
+                                               data-ab="{{ $ba->id }}"
+                                               class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                                <i class="bx {{ $bm['icon'] }} text-lg {{ $farbeKlasse[$bm['farbe']] ?? 'text-gray-300' }}"></i>
+                                            </a>
+                                        @else
+                                            <span class="text-gray-200">–</span>
+                                        @endif
+                                    </td>
+                                @endforeach
                                 <td class="zt-mini text-center">
                                     @if ($wh && $wh['status'] === 'verkleinert')
                                         <i class="bx bx-error-circle text-amber-600" title="Text zu lang – passt verkleinert bei {{ $wh['passtBei'] }} pt"></i>
@@ -416,7 +466,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $faecher->count() + ($hatHaupt ? 4 : 0) + 4 }}" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="{{ $faecher->count() + ($hatHaupt ? 4 + $bereiche->count() : 0) + 4 }}" class="px-4 py-8 text-center text-gray-500">
                                 Noch keine Schüler in dieser Klasse.
                                 <a href="{{ route('module.schulzeugnis.schueler.jahr', $klasse->schuljahr_id) }}" class="text-indigo-600 hover:text-indigo-700">Schüler anlegen</a>.
                             </td>
@@ -446,7 +496,14 @@
             const table = document.getElementById('zt-table');
             const statusSel = document.getElementById('zt-status');
             const countEl = document.getElementById('zt-count');
-            const mineIds = @json(array_map('strval', $meineFachIds));
+            const mineIds = @json(array_merge(
+                array_map('strval', $meineFachIds),
+                $binHauptzeugnis ? $bereiche->map(fn ($b) => 'b' . $b->id)->all() : []
+            ));
+            const alleCols = @json(array_merge(
+                $bereiche->map(fn ($b) => 'b' . $b->id)->all(),
+                $faecher->map(fn ($f) => (string) $f->id)->all()
+            ));
 
             function setCol(key, show) {
                 document.querySelectorAll('.zt-col-' + key).forEach((el) => el.classList.toggle('zt-hidden-col', !show));
@@ -494,15 +551,11 @@
                 chip.addEventListener('click', () => { setCol(chip.dataset.col, chip.classList.contains('zt-off')); applyRows(); updatePresets(); });
             });
             document.getElementById('zt-mine').addEventListener('click', () => {
-                @foreach ($faecher as $fach)
-                    setCol('{{ $fach->id }}', mineIds.includes('{{ $fach->id }}'));
-                @endforeach
+                alleCols.forEach((key) => setCol(key, mineIds.includes(key)));
                 applyRows(); updatePresets();
             });
             document.getElementById('zt-all').addEventListener('click', () => {
-                @foreach ($faecher as $fach)
-                    setCol('{{ $fach->id }}', true);
-                @endforeach
+                alleCols.forEach((key) => setCol(key, true));
                 applyRows(); updatePresets();
             });
             statusSel.addEventListener('change', applyRows);

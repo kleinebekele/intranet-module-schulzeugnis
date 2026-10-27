@@ -124,7 +124,7 @@ class ZeugnisRenderer
      */
     public function daten(Zeugnis $zeugnis): array
     {
-        $zeugnis->loadMissing(['schueler.klasse.schuljahr', 'schueler.klasse.klassenleitung', 'abschnitte.fach', 'abschnitte.bereichtexte.bereich']);
+        $zeugnis->loadMissing(['schueler.klasse.schuljahr', 'schueler.klasse.klassenleitung', 'abschnitte.fach', 'abschnitte.bereich', 'abschnitte.bereichtexte.bereich']);
         $schueler = $zeugnis->schueler;
         $klasse   = $schueler?->klasse;
         $schuljahr = $klasse?->schuljahr;
@@ -139,19 +139,34 @@ class ZeugnisRenderer
         $haupttext = '';
 
         if ($zeugnis->istHaupt()) {
-            // Hauptzeugnis = EIN Abschnitt: ein gemeinsamer Klassentext (fach_id null) als
-            // Vorspann + je Fachbereich ein Schülertext (Überschrift + Text).
-            $hauptAbschnitt = $abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTZEUGNIS);
+            // Hauptzeugnis: Klassentext des Hauptunterrichts als Vorspann + je Fachbereich
+            // Überschrift, klassenweiter Text des Bereichs und Schülertext (wie ein Fach).
+            $ktZeilen = $klasse
+                ? Klassentext::where('klasse_id', $klasse->id)->where('art', 'fach')->whereNull('fach_id')->get()
+                : collect();
+            $haupttext = trim((string) $ktZeilen->firstWhere('bereich_id', null)?->text);
+            $bereichKt = $ktZeilen->whereNotNull('bereich_id')->pluck('text', 'bereich_id');
 
-            $haupttext = $klasse
-                ? trim((string) Klassentext::where('klasse_id', $klasse->id)->whereNull('fach_id')->value('text'))
-                : '';
-
-            $fachtexte = ($hauptAbschnitt ? $hauptAbschnitt->bereichtexte->sortBy([['reihenfolge', 'asc'], ['id', 'asc']]) : collect())
-                ->map(fn ($bt) => ['fach' => $bt->ueberschrift(), 'text' => (string) ($bt->inhalt ?? '')])
-                ->filter(fn ($b) => trim($b['text']) !== '')
-                ->values()
-                ->all();
+            $bereichAbschnitte = $abschnitte->where('typ', Abschnitt::TYP_FACHBEREICH);
+            if ($bereichAbschnitte->isNotEmpty()) {
+                $fachtexte = $bereichAbschnitte
+                    ->map(fn ($a) => ['fach' => $a->ueberschrift(), 'text' => $this->verbinden(
+                        trim((string) ($a->bereich_id ? ($bereichKt[$a->bereich_id] ?? '') : '')),
+                        (string) ($a->inhalt ?? ''),
+                        (bool) $a->klassentext_neue_zeile
+                    )])
+                    ->filter(fn ($b) => trim($b['text']) !== '')
+                    ->values()
+                    ->all();
+            } else {
+                // Altbestand (vor v1.16): EIN HAU-Abschnitt mit Bereichtexten.
+                $hauptAbschnitt = $abschnitte->firstWhere('typ', Abschnitt::TYP_HAUPTZEUGNIS);
+                $fachtexte = ($hauptAbschnitt ? $hauptAbschnitt->bereichtexte->sortBy([['reihenfolge', 'asc'], ['id', 'asc']]) : collect())
+                    ->map(fn ($bt) => ['fach' => $bt->ueberschrift(), 'text' => (string) ($bt->inhalt ?? '')])
+                    ->filter(fn ($b) => trim($b['text']) !== '')
+                    ->values()
+                    ->all();
+            }
         } else {
             // Fachzeugnis: kein Haupttext mehr – je Fach klassenweiter Text + Schülertext.
             $klassentexte = $klasse
@@ -169,13 +184,7 @@ class ZeugnisRenderer
                         : (string) ($a->inhalt ?? '');
                     $klassenText = trim((string) ($klassentexte[$a->fach_id] ?? ''));
 
-                    if ($klassenText !== '' && $schuelerText !== '') {
-                        $text = $klassenText . ($a->klassentext_neue_zeile ? "\n" : ' ') . $schuelerText;
-                    } else {
-                        $text = $klassenText !== '' ? $klassenText : $schuelerText;
-                    }
-
-                    return ['fach' => $a->fach?->name ?? '', 'text' => $text];
+                    return ['fach' => $a->fach?->name ?? '', 'text' => $this->verbinden($klassenText, $schuelerText, (bool) $a->klassentext_neue_zeile)];
                 })
                 ->filter(fn ($f) => trim($f['text']) !== '')
                 ->values()
@@ -229,6 +238,16 @@ class ZeugnisRenderer
             'ausgabe.zeile'         => $ausgabe,
             'unterschrift'          => $klasse?->klassenleitungNamen() ?: 'Klassenlehrer/in',
         ];
+    }
+
+    /** Klassenweiter Text + Schülertext: angeschlossen oder in neuer Zeile; fehlt einer, bleibt der andere. */
+    private function verbinden(string $klassenText, string $schuelerText, bool $neueZeile): string
+    {
+        if ($klassenText !== '' && $schuelerText !== '') {
+            return $klassenText . ($neueZeile ? "\n" : ' ') . $schuelerText;
+        }
+
+        return $klassenText !== '' ? $klassenText : $schuelerText;
     }
 
     /** Basis-Schriftgröße = kleinste Größe der Zeugnistext-Felder (Designer koppelt sie ohnehin). */

@@ -13,7 +13,8 @@ Klassen und Lehraufträge lassen sich über **Klassen aus Linear** bzw. **Lehrau
 
 ## Was eine Klasse festlegt
 
-- **Klassenlehrer** – sie schreiben Haupttext, Hauptzeugnis und Zeugnisspruch. Eine Klasse
+- **Klassenlehrer** – sie schreiben Haupttext, Hauptzeugnis und Zeugnisspruch (die
+  Fachbereiche des Hauptzeugnisses auch die Lehrkräfte des Hauptunterrichts). Eine Klasse
   kann **beliebig viele** haben: Ist einer gewählt, erscheint „Weiteren Klassenlehrer wählen".
   Das Feld ist eine Suche – Namen eintippen, mit Pfeiltasten und Enter auswählen. Der erste
   in der Liste wird bei neu angelegten Texten als Autor eingetragen.
@@ -27,6 +28,9 @@ Klassen und Lehraufträge lassen sich über **Klassen aus Linear** bzw. **Lehrau
 
 Ob eine Klasse ein Fachzeugnis, ein Hauptzeugnis und einen Zeugnisspruch bekommt, entscheidet
 sich hier. Danach richtet sich, was in der Zeugnisliste überhaupt als Zeile erscheint.
+
+Hat eine Klasse einen Lehrauftrag im Hauptunterricht, braucht sie das Hauptzeugnis – fehlt
+das Häkchen, weist die Zeugnisliste darauf hin.
 
 Schalten Sie ein Häkchen **nach** dem Schreiben ab, verschwindet die zugehörige Arbeit aus
 der Ansicht. Setzen Sie es früh richtig – am besten vor dem ersten Öffnen der Klasse.

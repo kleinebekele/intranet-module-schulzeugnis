@@ -29,10 +29,14 @@ neue Lehraufträge nicht mehr zur Auswahl, bleibt aber in allen alten Zeugnissen
 Löschen ist der falsche Weg, wenn an dem Fach schon Texte hängen. Ein Zeugnis von 2024 soll
 in fünf Jahren noch dasselbe sagen wie heute.
 
-## Wird durch das Hauptzeugnis ersetzt
+## Ist der Hauptunterricht (Spalte HAU)
 
-Beschreibt das Hauptzeugnis bereits dieses Fach, setzen Sie den Haken **Wird durch das
-Hauptzeugnis ersetzt**. In Klassen mit Hauptzeugnis entfällt das Fach dann: keine eigene
-Spalte in der Zeugnisliste, kein Abschnitt im Fachzeugnis, keine ToDos. In Klassen ohne
-Hauptzeugnis bleibt es ein normales Fach. Schon geschriebene Texte werden nur ausgeblendet,
-nicht gelöscht.
+Am Fach Hauptunterricht setzen Sie den Haken **Ist der Hauptunterricht (Spalte HAU)**. In
+Klassen mit Hauptzeugnis wird das Fach dann zur Spalte **HAU** der Zeugnisliste:
+
+- Die Lehrkräfte mit Lehrauftrag im Hauptunterricht schreiben – neben der Klassenleitung –
+  die Fachbereiche des Hauptzeugnisses.
+- Im Fachzeugnis entfällt das Fach (kein eigener Abschnitt, keine doppelte Spalte).
+
+In Klassen ohne Hauptzeugnis bleibt es ein normales Fach. Schon geschriebene Fachtexte werden
+nur ausgeblendet, nicht gelöscht.
