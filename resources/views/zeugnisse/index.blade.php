@@ -376,10 +376,13 @@
                                         <i class="bx bx-error-circle text-amber-600" title="Text zu lang – passt verkleinert bei {{ $wh['passtBei'] }} pt"></i>
                                     @elseif ($wh && $wh['status'] === 'ueberlauf')
                                         <i class="bx bxs-error text-red-600" title="Text passt auch bei kleinster Schrift nicht vollständig"></i>
-                                    @elseif ($wh && $wh['status'] === 'ok')
+                                    @elseif ($wh && $wh['status'] === 'ok' && empty($namenHinweise[$s->id]['haupt']))
                                         <i class="bx bx-check text-green-500" title="passt"></i>
-                                    @else
+                                    @elseif (empty($namenHinweise[$s->id]['haupt']))
                                         <span class="text-gray-200">–</span>
+                                    @endif
+                                    @if (! empty($namenHinweise[$s->id]['haupt']))
+                                        <i class="bx bxs-user-x text-red-600" title="Bitte Namen prüfen:&#10;{{ implode("\n", $namenHinweise[$s->id]['haupt']) }}"></i>
                                     @endif
                                 </td>
                                 <td class="zt-mini text-center">
@@ -438,10 +441,13 @@
                                     <i class="bx bx-error-circle text-amber-600" title="Text zu lang – passt automatisch verkleinert bei {{ $w['passtBei'] }} pt"></i>
                                 @elseif ($w && $w['status'] === 'ueberlauf')
                                     <i class="bx bxs-error text-red-600" title="Text passt auch bei kleinster Schrift nicht vollständig"></i>
-                                @elseif ($w && $w['status'] === 'ok')
+                                @elseif ($w && $w['status'] === 'ok' && empty($namenHinweise[$s->id]['fach']))
                                     <i class="bx bx-check text-green-500" title="passt"></i>
-                                @else
+                                @elseif (empty($namenHinweise[$s->id]['fach']))
                                     <span class="text-gray-200">–</span>
+                                @endif
+                                @if (! empty($namenHinweise[$s->id]['fach']))
+                                    <i class="bx bxs-user-x text-red-600" title="Bitte Namen prüfen:&#10;{{ implode("\n", $namenHinweise[$s->id]['fach']) }}"></i>
                                 @endif
                             </td>
 

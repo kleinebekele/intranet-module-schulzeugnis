@@ -39,6 +39,20 @@
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
 
+        @if (! empty($namenHinweise))
+            <div class="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                <i class="bx bxs-user-x text-2xl text-red-600"></i>
+                <div>
+                    <p class="font-semibold">Bitte Namen prüfen</p>
+                    <ul class="mt-1 list-disc pl-5">
+                        @foreach ($namenHinweise as $h)
+                            <li>{{ $h }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        @endif
+
         @if ($zeugnis->istAbgeschlossen())
             <div class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">
                 Das Zeugnis ist abgeschlossen – der Text ist schreibgeschützt.

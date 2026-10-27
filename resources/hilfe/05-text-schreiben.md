@@ -96,3 +96,17 @@ den Stand *vor* einer Änderung zurück.
 Das darf nur die verantwortliche Lehrkraft – ein Korrektor kann Texte bearbeiten, aber nicht
 auf frühere Stände zurücksetzen. Und bei einem abgeschlossenen Zeugnis geht beides nicht
 mehr.
+
+## Namen prüfen
+
+Beim Speichern sucht das Modul im Schülertext nach Namen, die dort vermutlich nicht
+hingehören:
+
+- den **Vornamen eines anderen Kindes der Klasse** – etwa wenn ein Text beim falschen Kind
+  gelandet oder aus einem anderen Zeugnis übernommen ist,
+- ein Wort, das dem **eigenen Namen sehr ähnelt** – ein Tippfehler wie „Karla" statt „Carla".
+
+Dann erscheint ein roter Hinweis im Editor und in der Rückmeldung nach dem Speichern, und in
+der Zeugnisliste zeigt die ⚠-Spalte ein Personen-Symbol. Gespeichert wird der Text trotzdem –
+es ist nur ein Hinweis. Ist der Name gewollt (das andere Kind wird bewusst erwähnt), lassen Sie
+ihn einfach stehen.

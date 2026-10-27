@@ -19,6 +19,7 @@ use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Spruch;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 use Intranet\Modules\Schulzeugnis\Support\Ghostscript;
+use Intranet\Modules\Schulzeugnis\Support\Namenspruefung;
 use Intranet\Modules\Schulzeugnis\Support\Teamtext;
 use Intranet\Modules\Schulzeugnis\Support\Textauszeichnung;
 use Intranet\Modules\Schulzeugnis\Support\ZeugnisRenderer;
@@ -59,7 +60,7 @@ class ZeugnisController
 
         $schueler = $klasse->schueler()
             ->zeugnisberechtigt()
-            ->with(['fachzeugnis.abschnitte', 'hauptzeugnis.abschnitte.bereich'])
+            ->with(['fachzeugnis.schueler', 'fachzeugnis.abschnitte.fach', 'hauptzeugnis.schueler', 'hauptzeugnis.abschnitte.bereich'])
             ->orderBy('nachname')
             ->orderBy('vorname')
             ->get();
@@ -127,6 +128,15 @@ class ZeugnisController
             }
         }
 
+        // Namensprüfung je Schüler und Zeugnis (⚠-Spalte): fremdes Kind, Tippfehler im Namen.
+        $namenHinweise = [];
+        foreach ($schueler as $s) {
+            $namenHinweise[$s->id] = [
+                'fach'  => $this->namenHinweiseZeugnis($s->fachzeugnis, $klasse),
+                'haupt' => $this->namenHinweiseZeugnis($s->hauptzeugnis, $klasse),
+            ];
+        }
+
         // Zeugnisspruch je Schüler (der eine Spruch-Abschnitt am Container-Zeugnis).
         $spruchAbschnitte = [];
         if ($klasse->hat_zeugnisspruch) {
@@ -151,6 +161,7 @@ class ZeugnisController
             'binKlassenlehrer' => $binKlassenlehrer,
             'warnungen'        => $warnungen,
             'warnAgg'          => $warnAgg,
+            'namenHinweise'    => $namenHinweise,
             'fachlehrer'       => $fachlehrer,
             'klassentexte'     => $klassentexte,
             'ktRows'           => $ktRows,
@@ -645,9 +656,29 @@ class ZeugnisController
         }
 
         $antwort = redirect()->route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis)
-            ->with('status', $gespeichert > 0 ? 'Zeugnis gespeichert.' : 'Keine Änderungen gespeichert.');
+            ->with('status', $gespeichert > 0
+                ? $this->mitNamenHinweis('Zeugnis gespeichert.', $this->namenHinweiseZeugnis($zeugnis, $klasse))
+                : 'Keine Änderungen gespeichert.');
 
         return $hinweise ? $antwort->with('error', implode(' ', $hinweise)) : $antwort;
+    }
+
+    /**
+     * Namensprüfung über alle Schülertexte eines Zeugnisses, je Hinweis mit Fach bzw.
+     * Fachbereich davor.
+     *
+     * @return array<int,string>
+     */
+    private function namenHinweiseZeugnis(?Zeugnis $zeugnis, ?Klasse $klasse): array
+    {
+        if (! $zeugnis || ! $klasse || ! $zeugnis->schueler) {
+            return [];
+        }
+        $texte = $zeugnis->abschnitte
+            ->reject(fn (Abschnitt $a) => in_array($a->typ, [Abschnitt::TYP_SPRUCH, Abschnitt::TYP_HAUPTZEUGNIS], true))
+            ->mapWithKeys(fn (Abschnitt $a) => [$a->bezeichnung() => $a->inhalt]);
+
+        return Namenspruefung::pruefenMehrere($texte, $zeugnis->schueler, $this->klassenSchueler($klasse));
     }
 
     /** Text für den Änderungsvergleich: Zeilenenden vereinheitlicht, null = leer. */
@@ -845,6 +876,7 @@ class ZeugnisController
             'stati'          => Abschnitt::STATI,
             'verlauf'        => $verlauf,
             'klassentext'    => $this->klassentextAnzeige($abschnitt, $klasse),
+            'namenHinweise'  => $this->namenHinweise($abschnitt, $klasse),
             'klassentextZeileUrl' => $klassentextZeileUrl,
             'bereichtexte'   => $abschnitt->typ === Abschnitt::TYP_HAUPTZEUGNIS ? $abschnitt->bereichtexte : collect(),
             'klasse'         => $klasse,
@@ -996,7 +1028,7 @@ class ZeugnisController
             $this->ueberlaufNeuBerechnen($zeugnis);
 
             return $this->zielNachSpeichern($request, $abschnitt)
-                ->with('status', $gespeichertWas . ' für ' . $gespeichertName . ' korrigiert.');
+                ->with('status', $this->mitNamenHinweis($gespeichertWas . ' für ' . $gespeichertName . ' korrigiert.', $this->namenHinweise($abschnitt, $klasse)));
         }
 
         // Voll berechtigt (Autor / Klassenlehrer / Admin): alles inkl. Korrektoren-Zuweisung.
@@ -1112,7 +1144,7 @@ class ZeugnisController
         }
 
         return $this->zielNachSpeichern($request, $abschnitt)
-            ->with('status', $gespeichertWas . ' für ' . $gespeichertName . ' gespeichert.');
+            ->with('status', $this->mitNamenHinweis($gespeichertWas . ' für ' . $gespeichertName . ' gespeichert.', $this->namenHinweise($abschnitt, $klasse)));
     }
 
     /**
@@ -1393,6 +1425,36 @@ class ZeugnisController
     private function logStatus(Abschnitt $abschnitt, string $alt, string $neu): void
     {
         $this->logFeld($abschnitt, 'Status', $alt, $neu, 'abschnitt_status');
+    }
+
+    /** Schüler der Klasse für die Namensprüfung (einmal je Anfrage geladen). */
+    private array $klassenSchueler = [];
+
+    private function klassenSchueler(Klasse $klasse): \Illuminate\Support\Collection
+    {
+        return $this->klassenSchueler[$klasse->id] ??= $klasse->schueler()->get(['id', 'vorname', 'nachname']);
+    }
+
+    /**
+     * Namensprüfung eines Schülertexts (fremdes Kind der Klasse, Tippfehler im eigenen
+     * Namen). Der Zeugnisspruch ist ein Zitat und bleibt außen vor.
+     *
+     * @return array<int,string>
+     */
+    private function namenHinweise(Abschnitt $abschnitt, ?Klasse $klasse): array
+    {
+        $schueler = $abschnitt->zeugnis?->schueler;
+        if (! $klasse || ! $schueler || in_array($abschnitt->typ, [Abschnitt::TYP_SPRUCH, Abschnitt::TYP_HAUPTZEUGNIS], true)) {
+            return [];
+        }
+
+        return Namenspruefung::pruefen($abschnitt->inhalt, $schueler, $this->klassenSchueler($klasse));
+    }
+
+    /** Rückmeldung nach dem Speichern um einen Namens-Hinweis ergänzen. */
+    private function mitNamenHinweis(string $meldung, array $hinweise): string
+    {
+        return $hinweise ? $meldung . ' Bitte Namen prüfen: ' . implode(' ', $hinweise) : $meldung;
     }
 
     /**
