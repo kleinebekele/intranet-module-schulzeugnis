@@ -59,7 +59,10 @@ class Namenspruefung
                 continue;
             }
             if ($treffer = array_values(array_intersect($formen, array_keys($fremde)))) {
-                $hinweise[] = '„' . $wort . '" ist ein anderes Kind der Klasse (' . $fremde[$treffer[0]] . ').';
+                // Name in Klammern nur, wenn er anders aussieht als das Wort (Genitiv „Johannas").
+                $name = $fremde[$treffer[0]];
+                $hinweise[] = '„' . $wort . '" ist ein anderes Kind der Klasse'
+                    . ($treffer[0] === $klein ? '.' : ' (' . $name . ').');
                 continue;
             }
             foreach ($eigene as $name) {
