@@ -104,7 +104,11 @@ hingehören:
 
 - den **Vornamen eines anderen Kindes der Klasse** – etwa wenn ein Text beim falschen Kind
   gelandet oder aus einem anderen Zeugnis übernommen ist,
-- ein Wort, das dem **eigenen Namen sehr ähnelt** – ein Tippfehler wie „Karla" statt „Carla".
+- ein Wort, das dem **eigenen Namen sehr ähnelt** – ein Tippfehler wie „Karla" statt „Carla",
+- **Pronomen, die nicht zum Kind passen** (nach dem beim Schüler eingetragenen Geschlecht):
+  bei einem Mädchen „er", „ihm", „seine" …; bei einem Jungen „sie", „ihre" … – Letzteres nur,
+  wenn im Text gar kein „er/sein" vorkommt, denn „sie/ihre" kann auch Mehrzahl sein. Ohne
+  eingetragenes Geschlecht wird nicht geprüft.
 
 Dann erscheint ein roter Hinweis im Editor und in der Rückmeldung nach dem Speichern, und in
 der Zeugnisliste zeigt die ⚠-Spalte ein Personen-Symbol. Gespeichert wird der Text trotzdem –

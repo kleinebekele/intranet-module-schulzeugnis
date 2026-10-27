@@ -1454,7 +1454,7 @@ class ZeugnisController
     /** Rückmeldung nach dem Speichern um einen Namens-Hinweis ergänzen. */
     private function mitNamenHinweis(string $meldung, array $hinweise): string
     {
-        return $hinweise ? $meldung . ' Bitte Namen prüfen: ' . implode(' ', $hinweise) : $meldung;
+        return $hinweise ? $meldung . ' Bitte Namen und Pronomen prüfen: ' . implode(' ', $hinweise) : $meldung;
     }
 
     /**

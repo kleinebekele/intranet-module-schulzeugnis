@@ -39,7 +39,7 @@
             <div class="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
                 <i class="bx bxs-user-x text-2xl text-red-600"></i>
                 <div>
-                    <p class="font-semibold">Bitte Namen prüfen</p>
+                    <p class="font-semibold">Bitte Namen und Pronomen prüfen</p>
                     <ul class="mt-1 list-disc pl-5">
                         @foreach ($namenHinweise as $h)
                             <li>{{ $h }}</li>

@@ -382,7 +382,7 @@
                                         <span class="text-gray-200">–</span>
                                     @endif
                                     @if (! empty($namenHinweise[$s->id]['haupt']))
-                                        <i class="bx bxs-user-x text-red-600" title="Bitte Namen prüfen:&#10;{{ implode("\n", $namenHinweise[$s->id]['haupt']) }}"></i>
+                                        <i class="bx bxs-user-x text-red-600" title="Bitte Namen und Pronomen prüfen:&#10;{{ implode("\n", $namenHinweise[$s->id]['haupt']) }}"></i>
                                     @endif
                                 </td>
                                 <td class="zt-mini text-center">
@@ -447,7 +447,7 @@
                                     <span class="text-gray-200">–</span>
                                 @endif
                                 @if (! empty($namenHinweise[$s->id]['fach']))
-                                    <i class="bx bxs-user-x text-red-600" title="Bitte Namen prüfen:&#10;{{ implode("\n", $namenHinweise[$s->id]['fach']) }}"></i>
+                                    <i class="bx bxs-user-x text-red-600" title="Bitte Namen und Pronomen prüfen:&#10;{{ implode("\n", $namenHinweise[$s->id]['fach']) }}"></i>
                                 @endif
                             </td>
 

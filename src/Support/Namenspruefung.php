@@ -27,7 +27,7 @@ class Namenspruefung
     {
         $woerter = self::woerter($text);
         if ($woerter === []) {
-            return [];
+            return self::pronomen($text, $schueler);
         }
 
         $eigene = array_merge(self::teile($schueler->vorname), self::teile($schueler->nachname));
@@ -78,7 +78,40 @@ class Namenspruefung
             }
         }
 
-        return array_values(array_unique($hinweise));
+        return array_values(array_unique(array_merge($hinweise, self::pronomen($text, $schueler))));
+    }
+
+    private const PRONOMEN_M = ['er', 'ihm', 'ihn', 'seine', 'seinen', 'seinem', 'seiner', 'seines'];
+    private const PRONOMEN_W = ['sie', 'ihr', 'ihre', 'ihren', 'ihrem', 'ihrer', 'ihres'];
+
+    /**
+     * Pronomen passend zum eingetragenen Geschlecht (m/w; sonst keine Prüfung).
+     *  - Mädchen: „er/ihm/ihn/seine…" ist eindeutig falsch → immer ein Hinweis.
+     *  - Junge: „sie/ihre…" kann auch Mehrzahl sein („bei ihren Aufgaben") → nur ein
+     *    Hinweis, wenn im Text gar kein männliches Pronomen steht (typisch: Text eines
+     *    Mädchens übernommen).
+     *
+     * @return array<int,string>
+     */
+    private static function pronomen(?string $text, Schueler $schueler): array
+    {
+        $g = $schueler->geschlecht;
+        if (! in_array($g, ['m', 'w'], true)) {
+            return [];
+        }
+        $rein = html_entity_decode(strip_tags(Textauszeichnung::ohneMarker((string) $text)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        preg_match_all('/\p{L}+/u', mb_strtolower($rein), $m);
+        $woerter = array_unique($m[0]);
+
+        if ($g === 'w') {
+            $falsch = array_intersect(self::PRONOMEN_M, $woerter);
+            $wer = 'einem Mädchen';
+        } else {
+            $falsch = array_intersect(self::PRONOMEN_M, $woerter) === [] ? array_intersect(self::PRONOMEN_W, $woerter) : [];
+            $wer = 'einem Jungen';
+        }
+
+        return array_values(array_map(fn ($w) => '„' . $w . '" passt nicht zu ' . $wer . '.', $falsch));
     }
 
     /**
