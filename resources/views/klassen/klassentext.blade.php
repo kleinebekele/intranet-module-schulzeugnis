@@ -94,6 +94,11 @@
                           placeholder="Text, der für alle Schüler dieser Klasse gilt …">{{ old('text', $klassentext->text) }}</textarea>
                 @endif
                 @error('text') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                @unless ($readonly || $istSpruch)
+                    <p class="mt-1 text-xs text-gray-500">
+                        Platzhalter: <code>{vorname}</code>, <code>{nachname}</code>, <code>{name}</code> – werden auf jedem Zeugnis durch den Namen des jeweiligen Kindes ersetzt.
+                    </p>
+                @endunless
             </div>
 
             @if (in_array($berechtigung, ['voll', 'korrektor']))

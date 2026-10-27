@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Storage;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
 use Intranet\Modules\Schulzeugnis\Models\Format;
 use Intranet\Modules\Schulzeugnis\Models\Klassentext;
+use Intranet\Modules\Schulzeugnis\Models\Schueler;
 use Intranet\Modules\Schulzeugnis\Models\Zeugnis;
 
 /**
@@ -196,6 +197,11 @@ class ZeugnisRenderer
                 ->all();
         }
 
+        // Platzhalter im Text ({vorname}, {nachname}, {name}) – so lassen sich Texte zwischen
+        // Kindern kopieren, ohne dass ein falscher Name stehen bleibt.
+        $haupttext = self::platzhalterEinsetzen($haupttext, $schueler, $name);
+        $fachtexte = array_map(fn ($f) => ['fach' => $f['fach'], 'text' => self::platzhalterEinsetzen($f['text'], $schueler, $name)], $fachtexte);
+
         // {Zeugnistext} = (Klassentext-Vorspann beim Hauptzeugnis) + je Eintrag „Überschrift\nText".
         // Jeder Teiltext wird „versiegelt": ein offener Formatierungs-Marker in einem
         // Fachtext darf nicht alle folgenden Fächer mitfärben.
@@ -224,7 +230,7 @@ class ZeugnisRenderer
                 ->first();
         }
         // Der Spruch wird als {Zeugnisspruch}-Variable escaped gedruckt – Marker raus.
-        $zeugnisspruch = Textauszeichnung::ohneMarker(trim((string) ($spruchAb?->inhalt ?? '')));
+        $zeugnisspruch = Textauszeichnung::ohneMarker(self::platzhalterEinsetzen(trim((string) ($spruchAb?->inhalt ?? '')), $schueler, $name));
 
         return [
             'schulname'             => self::SCHULNAME,
@@ -243,6 +249,26 @@ class ZeugnisRenderer
             'ausgabe.zeile'         => $ausgabe,
             'unterschrift'          => $klasse?->klassenleitungNamen() ?: 'Klassenlehrer/in',
         ];
+    }
+
+    /** Platzhalter, die im Text durch den Namen des Kindes ersetzt werden (Groß/Klein egal). */
+    public const PLATZHALTER = ['{vorname}', '{nachname}', '{name}'];
+
+    /**
+     * {vorname}, {nachname}, {name} (Vor- und Nachname) durch die Daten des Kindes
+     * ersetzen. {name} folgt beim abgeschlossenen Zeugnis dem eingefrorenen Namen.
+     */
+    public static function platzhalterEinsetzen(string $text, ?Schueler $schueler, ?string $name = null): string
+    {
+        if (! $schueler || ! str_contains($text, '{')) {
+            return $text;
+        }
+
+        return str_ireplace(self::PLATZHALTER, [
+            (string) $schueler->vorname,
+            (string) $schueler->nachname,
+            (string) ($name ?: $schueler->fullName()),
+        ], $text);
     }
 
     /** Klassenweiter Text + Schülertext: angeschlossen oder in neuer Zeile; fehlt einer, bleibt der andere. */

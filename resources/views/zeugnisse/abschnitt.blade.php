@@ -243,6 +243,12 @@
                 @endif
             @endif
 
+            @unless ($readonly || $istNote)
+                <p class="text-xs text-gray-500">
+                    Platzhalter: <code>{vorname}</code>, <code>{nachname}</code>, <code>{name}</code> – werden auf dem Zeugnis durch den Namen des Kindes ersetzt, z. B. <code>{vorname}s Hefte</code>.
+                </p>
+            @endunless
+
             @if (in_array($berechtigung, ['voll', 'korrektor']))
                 <label class="block text-sm font-medium text-gray-700">Neue Notiz <span class="text-gray-400">(intern, erscheint nicht auf dem Zeugnis)</span>
                     {{-- bewusst leer bei jedem Aufruf (kein Vorbefüllen aus der DB): beim

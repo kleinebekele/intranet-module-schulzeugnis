@@ -110,3 +110,18 @@ Dann erscheint ein roter Hinweis im Editor und in der Rückmeldung nach dem Spei
 der Zeugnisliste zeigt die ⚠-Spalte ein Personen-Symbol. Gespeichert wird der Text trotzdem –
 es ist nur ein Hinweis. Ist der Name gewollt (das andere Kind wird bewusst erwähnt), lassen Sie
 ihn einfach stehen.
+
+## Platzhalter für den Namen
+
+Statt den Namen auszuschreiben, können Sie Platzhalter verwenden – im Schülertext wie im
+Klassentext:
+
+| Platzhalter | wird auf dem Zeugnis zu |
+|---|---|
+| `{vorname}` | Vorname des Kindes |
+| `{nachname}` | Nachname des Kindes |
+| `{name}` | Vor- und Nachname |
+
+So lässt sich ein Text gefahrlos von einem Kind zum nächsten kopieren: „{vorname}s Hefte sind
+ordentlich" wird bei jedem Kind zum richtigen Namen. Im Editor steht der Platzhalter, ersetzt
+wird erst in Vorschau und PDF.
