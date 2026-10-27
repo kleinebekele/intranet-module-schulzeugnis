@@ -15,6 +15,13 @@ class Fach extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'aktiv' => 'boolean',
+        'aktiv'              => 'boolean',
+        'durch_hauptzeugnis' => 'boolean',
     ];
+
+    /** IDs der Fächer, die in Klassen mit Hauptzeugnis entfallen (das Hauptzeugnis ersetzt sie). */
+    public static function durchHauptzeugnisIds(): array
+    {
+        return self::where('durch_hauptzeugnis', true)->pluck('id')->all();
+    }
 }

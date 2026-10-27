@@ -53,6 +53,17 @@ class Klasse extends Model
     }
 
     /**
+     * Fächer, die in dieser Klasse entfallen, weil das Hauptzeugnis sie ersetzt
+     * (Fach „Wird durch das Hauptzeugnis ersetzt" + Klasse mit Hauptzeugnis).
+     *
+     * @return array<int,int>
+     */
+    public function entfallendeFachIds(): array
+    {
+        return $this->hat_hauptzeugnis ? Fach::durchHauptzeugnisIds() : [];
+    }
+
+    /**
      * Erster Klassenlehrer – loser Verweis (kein FK). Spiegelt den ersten Eintrag der
      * {@see klassenleitung()}; Autor neu angelegter Haupttexte/Sprüche.
      */

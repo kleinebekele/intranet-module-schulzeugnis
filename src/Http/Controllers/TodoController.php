@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Intranet\Modules\Schulzeugnis\Http\Middleware\AlsLehrer;
 use Intranet\Modules\Schulzeugnis\Models\Abschnitt;
+use Intranet\Modules\Schulzeugnis\Models\Fach;
 use Intranet\Modules\Schulzeugnis\Models\Klasse;
 use Intranet\Modules\Schulzeugnis\Models\Klassentext;
 use Intranet\Modules\Schulzeugnis\Models\Lehrauftrag;
@@ -104,6 +105,7 @@ class TodoController
                     return in_array($a->fach_id, $faecherJeKlasse[$klasseId] ?? [], true);
                 });
         }
+        $eigene = $this->ohneEntfallendeFaecher($eigene);
 
         // 2) Offene Korrektur-Anfragen an mich.
         $korrektur = Abschnitt::whereIn('status', self::KORREKTUR_OFFEN)
@@ -113,6 +115,7 @@ class TodoController
                 ->whereHas('schueler', fn ($s) => $s->zeugnisberechtigt()->whereHas('klasse', fn ($k) => $k->where('schuljahr_id', $schuljahr->id))))
             ->with(['fach', 'zeugnis.schueler.klasse.stufe'])
             ->get();
+        $korrektur = $this->ohneEntfallendeFaecher($korrektur);
 
         // 2b) Offene Korrektur-Anfragen an mich bei KLASSENWEITEN Texten (klassen-, nicht
         //     schülerbezogen) – separat, da sie keine Schüler-Zeile haben.
@@ -183,6 +186,21 @@ class TodoController
             'stati'                => Abschnitt::STATI,
             'alsLehrerAuswahl'     => $leer['alsLehrerAuswahl'],
         ]);
+    }
+
+    /**
+     * Abschnitte von Fächern weglassen, die das Hauptzeugnis ihrer Klasse ersetzt –
+     * dafür steht schon das Hauptzeugnis in den ToDos.
+     */
+    private function ohneEntfallendeFaecher(Collection $abschnitte): Collection
+    {
+        $ersetzt = Fach::durchHauptzeugnisIds();
+        if ($ersetzt === []) {
+            return $abschnitte;
+        }
+
+        return $abschnitte->reject(fn (Abschnitt $a) => in_array($a->fach_id, $ersetzt, true)
+            && $a->zeugnis?->schueler?->klasse?->hat_hauptzeugnis)->values();
     }
 
     /**

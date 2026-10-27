@@ -105,10 +105,12 @@ class FachController
             'kuerzel'     => ['nullable', 'string', 'max:50'],
             'reihenfolge' => ['nullable', 'integer', 'min:0'],
             'aktiv'       => ['nullable', 'boolean'],
+            'durch_hauptzeugnis' => ['nullable', 'boolean'],
         ]);
 
         $data['reihenfolge'] = $request->integer('reihenfolge');
         $data['aktiv']       = $request->boolean('aktiv');
+        $data['durch_hauptzeugnis'] = $request->boolean('durch_hauptzeugnis');
 
         return $data;
     }

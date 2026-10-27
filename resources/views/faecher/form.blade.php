@@ -54,6 +54,17 @@
                 <span class="text-sm text-gray-700">Aktiv (wird für neue Lehraufträge angeboten)</span>
             </label>
 
+            <label class="flex items-start gap-2">
+                <input type="hidden" name="durch_hauptzeugnis" value="0">
+                <input type="checkbox" name="durch_hauptzeugnis" value="1"
+                       @checked(old('durch_hauptzeugnis', $fach->durch_hauptzeugnis))
+                       class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <span class="text-sm text-gray-700">
+                    Wird durch das Hauptzeugnis ersetzt
+                    <span class="block text-xs text-gray-500">In Klassen mit Hauptzeugnis entfällt dieses Fach: keine eigene Spalte, kein Abschnitt im Fachzeugnis, keine ToDos.</span>
+                </span>
+            </label>
+
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">

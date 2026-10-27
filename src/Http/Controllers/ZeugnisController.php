@@ -41,9 +41,11 @@ class ZeugnisController
     {
         $klasse->load(['schuljahr', 'klassenlehrer', 'klassenleitung']);
 
-        // Spalten der Tabelle: alle Fächer, die in dieser Klasse einen Lehrauftrag haben.
+        // Spalten der Tabelle: alle Fächer, die in dieser Klasse einen Lehrauftrag haben –
+        // ohne die, die das Hauptzeugnis ersetzt (sonst stünde „Haupt…" doppelt da).
         $fachIds = $klasse->lehrauftraege()->distinct()->pluck('fach_id');
         $faecher = Fach::whereIn('id', $fachIds)
+            ->whereNotIn('id', $klasse->entfallendeFachIds())
             ->orderBy('reihenfolge')
             ->orderBy('name')
             ->get();
@@ -340,7 +342,8 @@ class ZeugnisController
         ]);
 
         // Team-Teaching: alle Lehrer eines Fachs sind gemeinsam ein Autor.
-        $proFach = $klasse->lehrauftraege()->with(['fach', 'lehrer'])->get()->groupBy('fach_id');
+        $proFach = $klasse->lehrauftraege()->whereNotIn('fach_id', $klasse->entfallendeFachIds())
+            ->with(['fach', 'lehrer'])->get()->groupBy('fach_id');
         foreach ($proFach as $gruppe) {
             $fach    = $gruppe->first()->fach;
             $autoren = $gruppe->map(fn ($la) => $la->lehrer?->fullName())->filter()->unique()->implode(', ');
@@ -1800,7 +1803,7 @@ class ZeugnisController
         $fachIds = $klasse->lehrauftraege()
             ->when(! $user?->is_admin, fn ($q) => $q->whereIn('lehrer_id', $this->meineLehrerIds($klasse)))
             ->distinct()->pluck('fach_id');
-        $kette   = Fach::whereIn('id', $fachIds)->orderBy('reihenfolge')->orderBy('name')->get()
+        $kette   = Fach::whereIn('id', $fachIds)->whereNotIn('id', $klasse->entfallendeFachIds())->orderBy('reihenfolge')->orderBy('name')->get()
             ->map(fn ($f) => ['param' => (string) $f->id, 'name' => $f->name])
             ->values();
 

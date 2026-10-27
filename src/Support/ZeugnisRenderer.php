@@ -158,8 +158,11 @@ class ZeugnisRenderer
                 ? Klassentext::where('klasse_id', $klasse->id)->pluck('text', 'fach_id')
                 : collect();
 
+            $entfallend = $klasse ? $klasse->entfallendeFachIds() : [];
+
             $fachtexte = $abschnitte
                 ->whereIn('typ', [Abschnitt::TYP_FACHTEXT, Abschnitt::TYP_NOTE])
+                ->reject(fn ($a) => in_array($a->fach_id, $entfallend, true))
                 ->map(function ($a) use ($klassentexte) {
                     $schuelerText = $a->typ === Abschnitt::TYP_NOTE
                         ? trim(($a->note ? 'Note: ' . $a->note . '  ' : '') . ($a->inhalt ?? ''))
