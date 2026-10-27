@@ -10,6 +10,13 @@
             <div class="flex items-center gap-3 min-w-0">
                 <x-module-icon name="book" class="shrink-0 text-2xl text-indigo-600" />
                 <h1 class="truncate text-3xl font-bold tracking-tight text-gray-800">{{ $schueler?->fullName() ?: $titel }}</h1>
+                {{-- Zurück direkt neben dem Namen – so rückt der Editor nah an den Namen heran. --}}
+                <a href="{{ $zurueck['url'] }}"
+                   class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+                    <i class="bx bx-arrow-back text-lg"></i>
+                    <i class="bx {{ $zurueck['icon'] }} text-lg"></i>
+                    Zurück zu {{ $zurueck['label'] }}
+                </a>
             </div>
             <div class="shrink-0 text-right">
                 <div class="text-base font-semibold text-gray-700">{{ $titel }}</div>
@@ -24,17 +31,6 @@
     </x-slot>
 
     <div class="space-y-4 zt-page">
-        <div class="flex items-center justify-between">
-            <a href="{{ $zurueck['url'] }}"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
-                <i class="bx bx-arrow-back text-lg"></i>
-                <i class="bx {{ $zurueck['icon'] }} text-lg"></i>
-                Zurück zu {{ $zurueck['label'] }}
-            </a>
-            <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $zeugnis) }}"
-               class="text-sm text-gray-500 hover:text-gray-700">Ganzes Zeugnis &rarr;</a>
-        </div>
-
         @if (session('error'))
             <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{{ session('error') }}</div>
         @endif
