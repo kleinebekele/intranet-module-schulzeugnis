@@ -96,7 +96,8 @@ class ZeugnisController
         $klassentexte = $ktRows->map(fn ($kt) => (string) $kt->text);
 
         // Hauptzeugnis: HAU = Fach Hauptunterricht, daneben je Fachbereich eine Spalte.
-        $bereiche       = $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche : collect();
+        // „Allgemein" ist die Spalte HAU selbst – nur die übrigen Bereiche bekommen eine Spalte.
+        $bereiche       = $klasse->hat_hauptzeugnis ? $klasse->hauptbereiche->reject(fn ($b) => $b->istStandard())->values() : collect();
         $huLehrerIds    = $klasse->hat_hauptzeugnis ? $klasse->hauptunterrichtLehrerIds() : collect();
         $huLehrerNamen  = Lehrer::whereIn('id', $huLehrerIds)->get()->map(fn ($l) => $l->fullName())->implode(', ');
         $meineLehrerIdsHaupt = Lehrer::where('schuljahr_id', $klasse->schuljahr_id)->where('core_user_id', $userId)->pluck('id');
@@ -160,28 +161,9 @@ class ZeugnisController
             'huLehrerNamen'    => $huLehrerNamen,
             'binHauptzeugnis'  => $binHauptzeugnis,
             'huOhneHaupt'      => ! $klasse->hat_hauptzeugnis && $klasse->hatHauptunterricht(),
-            'hauStatus'        => $schueler->mapWithKeys(fn ($s) => [$s->id => $this->hauGesamtstatus($s->hauptzeugnis)])->all(),
             'istAdmin'         => (bool) auth()->user()?->is_admin,
             'gsVerfuegbar'     => Ghostscript::verfuegbar(),
         ]);
-    }
-
-    /**
-     * Gesamtstand der Spalte HAU: der am wenigsten fortgeschrittene Status aller
-     * Fachbereiche des Schülers (Reihenfolge von Abschnitt::STATI = Fortschritt).
-     */
-    private function hauGesamtstatus(?Zeugnis $hz): ?string
-    {
-        $stati = $hz?->abschnitte
-            ->where('typ', Abschnitt::TYP_FACHBEREICH)
-            ->filter(fn (Abschnitt $a) => $a->bereich_id !== null)
-            ->pluck('status');
-        if (! $stati || $stati->isEmpty()) {
-            return null;
-        }
-        $rang = array_flip(array_keys(Abschnitt::STATI));
-
-        return $stati->sortBy(fn ($s) => $rang[$s] ?? 0)->first();
     }
 
     /** HTML-Vorschau des befüllten Zeugnisses (echte Daten durchs Format-Layout). */
@@ -1499,6 +1481,10 @@ class ZeugnisController
     private function klassentextParamFuerAbschnitt(Abschnitt $abschnitt): ?string
     {
         if ($abschnitt->typ === Abschnitt::TYP_FACHBEREICH) {
+            if ($abschnitt->istHauptunterricht()) {
+                return 'haupt';
+            }
+
             return $abschnitt->bereich_id ? 'b' . $abschnitt->bereich_id : null;
         }
         if (in_array($abschnitt->typ, [Abschnitt::TYP_HAUPTZEUGNIS, Abschnitt::TYP_SPRUCH], true)) {
@@ -1511,7 +1497,8 @@ class ZeugnisController
     /** Klassentext eines Abschnitts – je Fach bzw. je Fachbereich des Hauptzeugnisses. */
     private function klassentextFuerAbschnitt(Abschnitt $abschnitt, Klasse $klasse): Klassentext
     {
-        return $abschnitt->typ === Abschnitt::TYP_FACHBEREICH
+        // „Allgemein" ist die Spalte HAU – sein klassenweiter Text ist der des Hauptunterrichts.
+        return $abschnitt->typ === Abschnitt::TYP_FACHBEREICH && ! $abschnitt->istHauptunterricht()
             ? $this->klassentextFuer($klasse->id, null, 'fach', $abschnitt->bereich_id)
             : $this->klassentextFuer($klasse->id, $abschnitt->fach_id);
     }
@@ -1888,7 +1875,7 @@ class ZeugnisController
         $kette = collect();
         if ($klasse->hat_hauptzeugnis && ($user?->is_admin || $klasse->darfHauptzeugnis($meine))) {
             $kette->push(['param' => 'haupt', 'name' => 'Hauptunterricht']);
-            foreach ($klasse->hauptbereiche as $b) {
+            foreach ($klasse->hauptbereiche->reject(fn ($b) => $b->istStandard()) as $b) {
                 $kette->push(['param' => 'b' . $b->id, 'name' => $b->name]);
             }
         }
@@ -1931,9 +1918,9 @@ class ZeugnisController
         } elseif ($bereichId !== null) {
             $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_FACHBEREICH)->where('zeugnis_abschnitte.bereich_id', $bereichId);
         } elseif ($fachId === null && $klasse->hat_hauptzeugnis) {
-            // Vorspann (HAU): weiter zum ersten Fachbereich des ersten Schülers.
-            $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_FACHBEREICH)->whereNotNull('zeugnis_abschnitte.bereich_id')
-                ->orderBy('s.nachname')->orderBy('s.vorname')->orderBy('zeugnis_abschnitte.reihenfolge');
+            // HAU: weiter zum Schülertext „Allgemein" des ersten Schülers.
+            $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_FACHBEREICH)
+                ->whereIn('zeugnis_abschnitte.bereich_id', $klasse->hauptbereiche->filter(fn ($b) => $b->istStandard())->pluck('id'));
         } elseif ($fachId === null) {
             $q->where('zeugnis_abschnitte.typ', Abschnitt::TYP_HAUPTTEXT);
         } else {

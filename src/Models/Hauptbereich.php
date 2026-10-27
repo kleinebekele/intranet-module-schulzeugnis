@@ -19,6 +19,12 @@ class Hauptbereich extends Model
 
     protected $guarded = [];
 
+    /** Der Pflicht-Bereich „Allgemein" – er ist die Spalte HAU (Hauptunterricht). */
+    public function istStandard(): bool
+    {
+        return $this->name === self::STANDARD;
+    }
+
     public function klasse(): BelongsTo
     {
         return $this->belongsTo(Klasse::class, 'klasse_id');

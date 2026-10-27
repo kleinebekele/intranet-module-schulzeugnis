@@ -212,7 +212,7 @@ class TodoController
         return match ($a->typ) {
             Abschnitt::TYP_HAUPTTEXT   => 'haupt',
             Abschnitt::TYP_SPRUCH      => 'spruch',
-            Abschnitt::TYP_FACHBEREICH => 'b' . $a->bereich_id,
+            Abschnitt::TYP_FACHBEREICH => $a->istHauptunterricht() ? 'haupt' : 'b' . $a->bereich_id,
             default                    => (string) $a->fach_id,
         };
     }
@@ -312,7 +312,7 @@ class TodoController
 
             return [
                 'key'     => $this->fachKey($a),
-                'label'   => $istBereich ? 'Hauptzeugnis · ' . $a->bezeichnung() : $a->bezeichnung(),
+                'label'   => $istBereich && ! $a->istHauptunterricht() ? 'Hauptzeugnis · ' . $a->bezeichnung() : $a->bezeichnung(),
                 // Hauptzeugnis-Fachbereiche direkt hinter dem Haupttext, vor den Fächern.
                 'sort'    => $istHaupt ? -1 : ($istSpruch ? 9999 : ($istBereich ? -1 + (($a->bereich?->reihenfolge ?? 0) + 2) / 1000 : ($a->fach?->reihenfolge ?? 999))),
                 'farbe'   => null,

@@ -47,14 +47,12 @@ Korrektoren; ihn zu schreiben ist eine Aufgabe, nicht dreißig.
 ## Hauptzeugnis: HAU und die Fachbereiche
 
 Hat die Klasse ein Hauptzeugnis, ist das Zeugnis in **Haupt- und Fachzeugnis** aufgeteilt.
-Vorne steht die Spalte **HAU** für den Hauptunterricht, daneben je **Fachbereich** des
-Hauptzeugnisses eine eigene Spalte – genau wie ein Fach:
+Vorne steht die Spalte **HAU** für den Hauptunterricht (der Pflicht-Bereich „Allgemein"),
+daneben je weiterem **Fachbereich** des Hauptzeugnisses eine eigene Spalte – genau wie ein Fach:
 
-- Jeder Fachbereich hat je Schüler einen eigenen Text mit eigenem Stand und eigenen
-  Korrektoren, und in der Zeile *Klassenweit* einen eigenen Klassentext.
-- **HAU** zeigt je Schüler den Gesamtstand: den Stand des Fachbereichs, der am wenigsten
-  weit ist. Ein Klick öffnet das ganze Hauptzeugnis. In der Zeile *Klassenweit* steht hier
-  der Vorspann, der auf dem Hauptzeugnis vor allen Fachbereichen erscheint.
+- Jede Spalte hat je Schüler einen eigenen Text mit eigenem Stand und eigenen Korrektoren,
+  und in der Zeile *Klassenweit* einen eigenen Klassentext.
+- Der Klassentext von **HAU** steht auf dem Hauptzeugnis vor allen Fachbereichen.
 - Schreiben dürfen die Klassenleitung und die Lehrkräfte mit Lehrauftrag im Hauptunterricht.
 
 Welche Fachbereiche es gibt, legt die Zeugnisverwaltung bei der Klasse fest. Ein später

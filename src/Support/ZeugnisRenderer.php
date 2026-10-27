@@ -149,7 +149,12 @@ class ZeugnisRenderer
 
             $bereichAbschnitte = $abschnitte->where('typ', Abschnitt::TYP_FACHBEREICH);
             if ($bereichAbschnitte->isNotEmpty()) {
-                $fachtexte = $bereichAbschnitte
+                // „Allgemein" ist der Hauptunterricht (HAU): Klassentext + Schülertext oben, ohne Überschrift.
+                $hau = $bereichAbschnitte->first(fn ($a) => $a->istHauptunterricht());
+                if ($hau) {
+                    $haupttext = trim($this->verbinden($haupttext, trim((string) ($hau->inhalt ?? '')), (bool) $hau->klassentext_neue_zeile));
+                }
+                $fachtexte = $bereichAbschnitte->reject(fn ($a) => $hau && $a->is($hau))
                     ->map(fn ($a) => ['fach' => $a->ueberschrift(), 'text' => $this->verbinden(
                         trim((string) ($a->bereich_id ? ($bereichKt[$a->bereich_id] ?? '') : '')),
                         (string) ($a->inhalt ?? ''),

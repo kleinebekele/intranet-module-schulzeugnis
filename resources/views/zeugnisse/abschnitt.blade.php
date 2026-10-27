@@ -1,5 +1,5 @@
 @php
-    $titel = $abschnitt->typ === 'fachbereich'
+    $titel = $abschnitt->typ === 'fachbereich' && ! $abschnitt->istHauptunterricht()
         ? 'Hauptzeugnis · ' . $abschnitt->bezeichnung()
         : $abschnitt->bezeichnung();
     $istNote = $abschnitt->typ === 'note';

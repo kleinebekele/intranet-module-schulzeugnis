@@ -113,6 +113,12 @@ class Abschnitt extends Model
         return $this->bereich?->name ?? (string) $this->bereich_name;
     }
 
+    /** Fachbereich „Allgemein" = Schülertext der Spalte HAU (Hauptunterricht). */
+    public function istHauptunterricht(): bool
+    {
+        return $this->typ === self::TYP_FACHBEREICH && (bool) $this->bereich?->istStandard();
+    }
+
     /** Kurzname für Überschriften und Rückmeldungen (Fach, Fachbereich bzw. Art des Textes). */
     public function bezeichnung(): string
     {
@@ -120,7 +126,7 @@ class Abschnitt extends Model
             self::TYP_HAUPTZEUGNIS => 'Hauptzeugnis',
             self::TYP_HAUPTTEXT    => 'Haupttext',
             self::TYP_SPRUCH       => 'Zeugnisspruch',
-            self::TYP_FACHBEREICH  => $this->ueberschrift() ?: 'Fachbereich',
+            self::TYP_FACHBEREICH  => $this->istHauptunterricht() ? 'Hauptunterricht' : ($this->ueberschrift() ?: 'Fachbereich'),
             default                => $this->fach?->name ?? 'Fachtext',
         };
     }

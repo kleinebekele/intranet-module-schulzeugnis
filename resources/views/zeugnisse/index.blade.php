@@ -222,7 +222,7 @@
                                 data-lehrer="{{ $huLehrerNamen ?: $klasse->klassenleitungNamen() }}"
                                 data-klassentext="{{ $klassentexte['haupt'] ?? '' }}"
                                 @if ($istAdmin || $binHauptzeugnis || in_array('haupt', $ktKorrektorKeys, true)) data-editurl="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}" @endif
-                                title="Hauptunterricht (Hauptzeugnis gesamt)">HAU</th>
+                                title="Hauptunterricht">HAU</th>
                             @foreach ($bereiche as $bereich)
                                 @php $bKey = 'b' . $bereich->id; @endphp
                                 <th class="zt-col zt-col-{{ $bKey }} zt-kopf border-b border-gray-200 px-2 text-center font-semibold"
@@ -267,7 +267,7 @@
                             @php $ktH = $ktRows['haupt'] ?? null; $kmH = $ktH?->statusMeta() ?? $stati['unbearbeitet']; @endphp
                             <td class="px-2 text-center" style="background: var(--color-indigo-50, #eef2ff);">
                                 <a href="{{ route('module.schulzeugnis.klassenraeume.klassentexte.edit', ['klasse' => $klasse, 'fach' => 'haupt']) }}"
-                                   title="Klassentext Hauptunterricht (Vorspann) – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
+                                   title="Klassentext Hauptunterricht – {{ $kmH['label'] }}" class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                     <i class="bx {{ $kmH['icon'] }} text-lg {{ $farbeKlasse[$kmH['farbe']] ?? 'text-gray-300' }}"></i>
                                 </a>
                             </td>
@@ -334,7 +334,7 @@
                             $abs = $z ? $z->abschnitte : collect();
                             $fachMap = $abs->whereIn('typ', ['fachtext', 'note'])->keyBy('fach_id');
                             $bereichMap = $hz ? $hz->abschnitte->where('typ', 'fachbereich')->whereNotNull('bereich_id')->keyBy('bereich_id') : collect();
-                            $hauSt = $hauStatus[$s->id] ?? null;
+                            $haz = $hz ? $hz->abschnitte->first(fn ($a) => $a->istHauptunterricht()) : null;
                         @endphp
                         <tr class="border-b border-gray-100">
                             <td class="border-r border-gray-200 px-4 whitespace-nowrap" style="position: sticky; left: 0; z-index: 10;">
@@ -344,10 +344,11 @@
                             @if ($hatHaupt)
                                 @php $wh = $warnungen[$s->id]['haupt'] ?? null; @endphp
                                 {{-- Hauptzeugnis (HAU) + Warnung/Vorschau/PDF --}}
-                                <td class="px-2 text-center" data-status="{{ $hauSt ?? '' }}">
-                                    @if ($hz && $hauSt)
-                                        @php $hm = $stati[$hauSt] ?? $stati['unbearbeitet']; @endphp
-                                        <a href="{{ route('module.schulzeugnis.klassenraeume.zeugnisse.edit', $hz) }}" title="Hauptzeugnis gesamt – {{ $hm['label'] }} (Stand des am wenigsten fortgeschrittenen Fachbereichs)"
+                                <td class="px-2 text-center" data-status="{{ $haz?->status ?? '' }}">
+                                    @if ($haz)
+                                        @php $hm = $haz->statusMeta(); @endphp
+                                        <a href="{{ route('module.schulzeugnis.klassenraeume.abschnitte.edit', $haz) }}" title="Hauptunterricht – {{ $hm['label'] }}"
+                                           data-ab="{{ $haz->id }}"
                                            class="inline-flex rounded p-0.5 hover:bg-indigo-100">
                                             <i class="bx {{ $hm['icon'] }} text-lg {{ $farbeKlasse[$hm['farbe']] ?? 'text-gray-300' }}"></i>
                                         </a>
