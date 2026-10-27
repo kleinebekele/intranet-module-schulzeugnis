@@ -7,8 +7,8 @@ use Intranet\Modules\Schulzeugnis\Models\Schueler;
 
 /**
  * Sucht im Schülertext nach Namen, die dort vermutlich nicht hingehören:
- *  - der Vorname eines anderen Kindes der Klasse (Text beim falschen Kind gelandet,
- *    oder aus einem anderen Zeugnis kopiert),
+ *  - der Vorname eines anderen Kindes der Klasse oder des Schuljahres (Text beim
+ *    falschen Kind gelandet, oder aus einem anderen Zeugnis/einer anderen Klasse kopiert),
  *  - ein Wort, das dem eigenen Vor- oder Nachnamen sehr ähnelt (Tippfehler, „Karla"
  *    statt „Carla").
  * Nur ein Hinweis – gespeichert wird trotzdem. Geprüft werden großgeschriebene Wörter,
@@ -20,10 +20,11 @@ class Namenspruefung
     private const MIN_LAENGE_TIPPFEHLER = 4;
 
     /**
-     * @param  Collection<int,Schueler>  $klasse  alle Schüler der Klasse (inkl. des geprüften)
+     * @param  Collection<int,Schueler>  $alle  alle Schüler des Schuljahres (inkl. des geprüften,
+     *         mit klasse_id und – für die Meldung – geladener Klasse)
      * @return array<int,string> Hinweise, leer = nichts aufgefallen
      */
-    public static function pruefen(?string $text, Schueler $schueler, Collection $klasse): array
+    public static function pruefen(?string $text, Schueler $schueler, Collection $alle): array
     {
         $woerter = self::woerter($text);
         if ($woerter === []) {
@@ -33,16 +34,23 @@ class Namenspruefung
         $eigene = array_merge(self::teile($schueler->vorname), self::teile($schueler->nachname));
         $eigeneKlein = array_map(fn ($t) => mb_strtolower($t), $eigene);
 
-        // Vornamen der anderen Kinder (klein → Schreibweise), ohne Namen, die das Kind selbst trägt.
+        // Vornamen der anderen Kinder (klein → [Schreibweise, gleiche Klasse?, Klassen]),
+        // ohne Namen, die das Kind selbst trägt.
         $fremde = [];
-        foreach ($klasse as $k) {
+        foreach ($alle as $k) {
             if ((int) $k->id === (int) $schueler->id) {
                 continue;
             }
+            $gleicheKlasse = (int) $k->klasse_id === (int) $schueler->klasse_id;
             foreach (self::teile($k->vorname) as $t) {
                 $klein = mb_strtolower($t);
-                if (! in_array($klein, $eigeneKlein, true)) {
-                    $fremde[$klein] = $t;
+                if (in_array($klein, $eigeneKlein, true)) {
+                    continue;
+                }
+                $fremde[$klein] ??= ['name' => $t, 'gleich' => false, 'klassen' => []];
+                $fremde[$klein]['gleich'] = $fremde[$klein]['gleich'] || $gleicheKlasse;
+                if (! $gleicheKlasse && $k->klasse?->name) {
+                    $fremde[$klein]['klassen'][$k->klasse->name] = true;
                 }
             }
         }
@@ -60,9 +68,16 @@ class Namenspruefung
             }
             if ($treffer = array_values(array_intersect($formen, array_keys($fremde)))) {
                 // Name in Klammern nur, wenn er anders aussieht als das Wort (Genitiv „Johannas").
-                $name = $fremde[$treffer[0]];
-                $hinweise[] = '„' . $wort . '" ist ein anderes Kind der Klasse'
-                    . ($treffer[0] === $klein ? '.' : ' (' . $name . ').');
+                $f = $fremde[$treffer[0]];
+                $klammer = $treffer[0] === $klein ? '' : ' (' . $f['name'] . ')';
+                if ($f['gleich']) {
+                    $hinweise[] = '„' . $wort . '"' . $klammer . ' ist ein anderes Kind der Klasse.';
+                } else {
+                    $klassen = array_keys($f['klassen']);
+                    natcasesort($klassen);
+                    $hinweise[] = '„' . $wort . '"' . $klammer . ' ist ein Kind aus '
+                        . (count($klassen) === 1 ? 'Klasse ' : 'den Klassen ') . implode(', ', $klassen) . '.';
+                }
                 continue;
             }
             foreach ($eigene as $name) {

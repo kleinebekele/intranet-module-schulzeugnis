@@ -102,8 +102,9 @@ mehr.
 Beim Speichern sucht das Modul im Schülertext nach Namen, die dort vermutlich nicht
 hingehören:
 
-- den **Vornamen eines anderen Kindes der Klasse** – etwa wenn ein Text beim falschen Kind
-  gelandet oder aus einem anderen Zeugnis übernommen ist,
+- den **Vornamen eines anderen Kindes** – aus derselben Klasse oder aus einer anderen Klasse
+  des Schuljahres, etwa wenn ein Text beim falschen Kind gelandet oder aus einer anderen Klasse
+  übernommen ist (der Hinweis nennt dann die Klasse),
 - ein Wort, das dem **eigenen Namen sehr ähnelt** – ein Tippfehler wie „Karla" statt „Carla",
 - **Pronomen, die nicht zum Kind passen** (nach dem beim Schüler eingetragenen Geschlecht):
   bei einem Mädchen „er", „ihm", „seine" …; bei einem Jungen „sie", „ihre" … – Letzteres nur,

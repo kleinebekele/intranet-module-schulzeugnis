@@ -1427,12 +1427,17 @@ class ZeugnisController
         $this->logFeld($abschnitt, 'Status', $alt, $neu, 'abschnitt_status');
     }
 
-    /** Schüler der Klasse für die Namensprüfung (einmal je Anfrage geladen). */
+    /**
+     * Schüler des ganzen Schuljahres für die Namensprüfung – Texte werden auch zwischen
+     * Klassen kopiert (einmal je Anfrage geladen).
+     */
     private array $klassenSchueler = [];
 
     private function klassenSchueler(Klasse $klasse): \Illuminate\Support\Collection
     {
-        return $this->klassenSchueler[$klasse->id] ??= $klasse->schueler()->get(['id', 'vorname', 'nachname']);
+        return $this->klassenSchueler[$klasse->schuljahr_id] ??= Schueler::where('schuljahr_id', $klasse->schuljahr_id)
+            ->with('klasse:id,name')
+            ->get(['id', 'vorname', 'nachname', 'klasse_id']);
     }
 
     /**
